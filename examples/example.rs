@@ -1,23 +1,22 @@
 #![windows_subsystem = "windows"]
 
+extern crate include_dir;
 extern crate speedy2d;
 extern crate vinx;
-extern crate include_dir;
 
 use include_dir::{Dir, include_dir};
 use speedy2d::dimen::Vector2;
 use speedy2d::Window;
 use speedy2d::window::{WindowCreationOptions, WindowPosition, WindowSize};
 
-use vinx::gui::assets::{AssetsProvider, set_provider};
-use vinx::gui::events::EventType;
-use vinx::gui::themes::Theme;
-use vinx::gui::ui::UI;
-use vinx::gui::views::List;
-use vinx::gui::win::{Win, WinEvent};
-use vinx::gui::themes::Classic;
-use vinx::gui::traits::View;
-use vinx::gui::views::{Button, Edit, CheckBox};
+use vinx::assets::{AssetsProvider, set_provider};
+use vinx::events::EventType;
+use vinx::themes::Classic;
+use vinx::themes::Theme;
+use vinx::traits::View;
+use vinx::ui::UI;
+use vinx::views::{Button, CheckBox, Edit, List};
+use vinx::win::{Win, WinEvent};
 
 const WIDTH: u32 = 1920;
 const HEIGHT: u32 = 1080;

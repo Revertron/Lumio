@@ -5,5 +5,6 @@ extern crate speedy2d;
 extern crate rand;
 
 pub mod gui;
+pub use gui::*;
 #[cfg(tests)]
 mod tests;
