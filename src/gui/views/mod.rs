@@ -8,7 +8,6 @@ pub mod listview;
 use gui::themes::{Typeface, ViewState};
 use gui::traits::{View, WeakElement};
 use gui::types::Rect;
-use std::rc::Rc;
 use speedy2d::font::FormattedTextBlock;
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -71,7 +70,7 @@ pub struct FieldsTexted {
     pub text_size: f32,
     pub line_height: f32,
     pub single_line: bool,
-    pub cached_text: Option<Rc<FormattedTextBlock>>,
+    pub cached_text: Option<FormattedTextBlock>,
     pub font: FontSelector,
     pub listeners: HashMap<EventType, Box<dyn FnMut(&mut UI, &dyn View) -> bool>>
 }

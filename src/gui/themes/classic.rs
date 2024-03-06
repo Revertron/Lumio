@@ -1,6 +1,5 @@
 use std::cmp::{max, min};
 use std::collections::VecDeque;
-use std::rc::Rc;
 use speedy2d::color::Color;
 use speedy2d::dimen::Vector2;
 use speedy2d::font::FormattedTextBlock;
@@ -245,7 +244,7 @@ impl<'h> Theme for Classic<'h> {
         self.graphics.draw_line((bottom_right.x - half, top_left.y + border + half), (bottom_right.x - half, bottom_right.y + border - half), border, color);
     }
 
-    fn draw_text(&mut self, x: f32, y: f32, color: u32, text: &Rc<FormattedTextBlock>) {
+    fn draw_text(&mut self, x: f32, y: f32, color: u32, text: &FormattedTextBlock) {
         let color = Color::from_hex_rgb(color);
         self.graphics.draw_text((x, y), color, text);
     }

@@ -4,9 +4,9 @@ version = "0.1.0"
 authors = ["Revertron <vinx@revertron.com>"]
 
 [dependencies]
-quick-xml = "0.27.1"
+quick-xml = "0.31.0"
 downcast-rs = "1.2.0"
-speedy2d = "1.10.0"
+speedy2d = "2.0.0"
 rand = "0.8.5"
 
 [dev-dependencies]

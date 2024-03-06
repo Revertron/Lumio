@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::rc::Rc;
 use speedy2d::dimen::Vector2;
 use speedy2d::font::{FormattedTextBlock, TextLayout, TextOptions};
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
@@ -15,7 +14,7 @@ use gui::views::{Borders, Dimension, FieldsMain};
 pub struct List {
     state: RefCell<FieldsMain>,
     items: RefCell<Vec<String>>,
-    texts: RefCell<Vec<Option<Rc<FormattedTextBlock>>>>,
+    texts: RefCell<Vec<Option<FormattedTextBlock>>>,
     text_size: f32,
     scroll_y: RefCell<i32>,
     selected: RefCell<Option<usize>>

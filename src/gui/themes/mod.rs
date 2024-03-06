@@ -1,7 +1,6 @@
 mod classic;
 mod utils;
 
-use std::rc::Rc;
 use speedy2d::font::FormattedTextBlock;
 use gui::styles::selector::MainSelector;
 pub use super::themes::classic::Classic;
@@ -28,7 +27,7 @@ pub trait Theme {
     fn draw_list_body(&mut self, rect: Rect<i32>, state: ViewState);
     fn draw_panel_back(&mut self, rect: Rect<i32>, state: ViewState);
     fn draw_panel_body(&mut self, rect: Rect<i32>, state: ViewState);
-    fn draw_text(&mut self, x: f32, y: f32, color: u32, text: &Rc<FormattedTextBlock>);
+    fn draw_text(&mut self, x: f32, y: f32, color: u32, text: &FormattedTextBlock);
     fn draw_rect(&mut self, rect: Rect<i32>, color: u32);
 }
 
