@@ -6,17 +6,26 @@ use speedy2d::font::{TextAlignment, TextLayout, TextOptions};
 use crate::gui::assets::get_font;
 use crate::gui::events::EventType;
 
-use crate::gui::themes::{FontStyle, Theme, Typeface, ViewState};
+use crate::gui::themes::{Theme, Typeface, ViewState};
 use crate::gui::traits::{Element, View, WeakElement};
 use crate::gui::types::{Point, Rect, rect};
 use crate::gui::ui::UI;
 use crate::gui::views::{Borders, Dimension};
 use crate::gui::styles::selector::FontSelector;
 use crate::gui::views::{BUTTON_MIN_HEIGHT, BUTTON_MIN_WIDTH, FieldsMain, FieldsTexted};
+use crate::gui::view_base::{HasMainFields, ViewBasics};
 
 pub struct Label {
     state: RefCell<FieldsTexted>
 }
+
+impl HasMainFields for Label {
+    fn main_fields(&self) -> &RefCell<FieldsMain> {
+        unsafe { std::mem::transmute(&self.state) }
+    }
+}
+
+impl ViewBasics for Label {}
 
 #[allow(dead_code)]
 impl Label {
@@ -45,81 +54,38 @@ impl Label {
     }
 
     fn get_typeface(&self, parent_typeface: &Typeface) -> Typeface {
-        match &self.state.borrow().main.typeface {
-            None => parent_typeface.clone(),
-            Some(t) => {
-                if t.font_name.is_empty() {
-                    let mut parent = parent_typeface.clone();
-                    parent.font_style = t.font_style.clone();
-                    parent
-                } else {
-                    t.clone()
-                }
-            }
-        }
+        self.state.borrow().main.font_manager.get_typeface(parent_typeface)
     }
 
     fn set_font(&self, font_name: &str) {
-        let typeface = match self.state.borrow_mut().main.typeface.take() {
-            None => Typeface { font_name: font_name.to_owned(), font_style: FontStyle::Regular },
-            Some(mut t) => {
-                t.font_name = font_name.to_owned();
-                t
-            }
-        };
-        self.state.borrow_mut().main.typeface = Some(typeface);
+        self.state.borrow_mut().main.font_manager.set_font(font_name);
     }
 
     fn set_font_style(&self, style: &str) {
-        let font_style = FontStyle::from(style);
-        let typeface = match self.state.borrow_mut().main.typeface.take() {
-            None => Typeface { font_name: String::new(), font_style },
-            Some(t) => Typeface { font_name: t.font_name, font_style },
-        };
-        self.state.borrow_mut().main.typeface = Some(typeface)
+        self.state.borrow_mut().main.font_manager.set_font_style(style);
     }
 }
 
 impl View for Label {
     fn set_any(&mut self, name: &str, value: &str) {
+        if self.base_set_any(name, value) {
+            return;
+        }
+
         match name {
-            "left" => { self.set_x(value.parse().unwrap()) }
-            "top" => { self.set_y(value.parse().unwrap()) }
-            "width" => { self.set_width(value.parse().unwrap()) }
-            "height" => { self.set_height(value.parse().unwrap()) }
-            "padding" => { self.state.borrow_mut().main.padding.set_all(value.parse().unwrap_or(0)) }
-            "padding_top" => { self.state.borrow_mut().main.padding.top = value.parse().unwrap_or(0) }
-            "padding_left" => { self.state.borrow_mut().main.padding.left = value.parse().unwrap_or(0) }
-            "padding_right" => { self.state.borrow_mut().main.padding.right = value.parse().unwrap_or(0) }
-            "padding_bottom" => { self.state.borrow_mut().main.padding.bottom = value.parse().unwrap_or(0) }
-            "margin" => { self.state.borrow_mut().main.margin.set_all(value.parse().unwrap_or(0)) }
-            "margin_left" => { self.state.borrow_mut().main.margin.left = value.parse().unwrap_or(0) }
-            "margin_right" => { self.state.borrow_mut().main.margin.right = value.parse().unwrap_or(0) }
-            "margin_top" => { self.state.borrow_mut().main.margin.top = value.parse().unwrap_or(0) }
-            "margin_bottom" => { self.state.borrow_mut().main.margin.bottom = value.parse().unwrap_or(0) }
-            "id" => { self.set_id(value) }
             "text" => { self.set_text(value) }
             "font" => { self.set_font(value) }
             "font_style" => { self.set_font_style(value) }
-            "break" => { self.state.borrow_mut().main.break_line = value.parse().unwrap_or(false) }
             &_ => {}
         }
     }
 
     fn set_parent(&self, parent: Option<WeakElement>) {
-        self.state.borrow_mut().main.parent = parent;
+        self.base_set_parent(parent);
     }
 
     fn get_parent(&self) -> Option<Element> {
-        match &self.state.borrow().main.parent {
-            None => { None }
-            Some(weak) => {
-                match weak.upgrade() {
-                    None => { None }
-                    Some(parent) => { Some(parent) }
-                }
-            }
-        }
+        self.base_get_parent()
     }
 
     fn layout_content(&mut self, x: i32, y: i32, width: i32, _height: i32, typeface: &Typeface, scale: f64) -> Rect<i32> {
@@ -128,7 +94,7 @@ impl View for Label {
             return self.get_rect();
         }
 
-        self.state.borrow_mut().main.scale = scale;
+        self.base_set_scale(scale);
         let typeface = self.get_typeface(typeface);
         if let Some(font) = get_font(&typeface.font_name, &typeface.font_style.to_string()) {
             let options = TextOptions::new()
@@ -170,40 +136,31 @@ impl View for Label {
     }
 
     fn get_rect(&self) -> Rect<i32> {
-        self.state.borrow().main.rect
+        self.base_get_rect()
     }
 
     fn set_rect(&mut self, rect: Rect<i32>) {
-        self.state.borrow_mut().main.rect = rect;
+        self.base_set_rect(rect);
     }
 
     fn get_padding(&self, scale: f64) -> Borders {
-        self.state.borrow().main.padding.scaled(scale)
+        self.base_get_padding(scale)
     }
 
     fn set_padding(&self, top: i32, left: i32, right: i32, bottom: i32) {
-        let mut state = self.state.borrow_mut();
-        state.main.padding.top = top;
-        state.main.padding.left = left;
-        state.main.padding.right = right;
-        state.main.padding.bottom = bottom;
+        self.base_set_padding(top, left, right, bottom);
     }
 
     fn get_margin(&self, scale: f64) -> Borders {
-        self.state.borrow().main.margin.scaled(scale)
+        self.base_get_margin(scale)
     }
 
     fn set_margin(&self, top: i32, left: i32, right: i32, bottom: i32) {
-        let mut state = self.state.borrow_mut();
-        state.main.margin.top = top;
-        state.main.margin.left = left;
-        state.main.margin.right = right;
-        state.main.margin.bottom = bottom;
+        self.base_set_margin(top, left, right, bottom);
     }
 
     fn get_bounds(&self) -> (Dimension, Dimension) {
-        let state = self.state.borrow();
-        (state.main.width, state.main.height)
+        self.base_get_bounds()
     }
 
     fn get_content_size(&self) -> (i32, i32) {
@@ -219,31 +176,31 @@ impl View for Label {
     }
 
     fn is_break(&self) -> bool {
-        self.state.borrow().main.break_line
+        self.base_is_break()
     }
 
     fn set_focusable(&self, focusable: bool) {
-        self.state.borrow_mut().main.state.focusable = focusable;
+        self.base_set_focusable(focusable);
     }
 
     fn set_width(&mut self, width: Dimension) {
-        self.state.borrow_mut().main.width = width;
+        self.base_set_width(width);
     }
 
     fn set_height(&mut self, height: Dimension) {
-        self.state.borrow_mut().main.height = height;
+        self.base_set_height(height);
     }
 
     fn set_scale(&mut self, scale: f64) {
-        self.state.borrow_mut().main.scale = scale;
+        self.base_set_scale(scale);
     }
 
     fn set_id(&mut self, id: &str) {
-        self.state.borrow_mut().main.id = id.to_owned();
+        self.base_set_id(id);
     }
 
     fn get_id(&self) -> String {
-        self.state.borrow().main.id.clone()
+        self.base_get_id()
     }
 
     fn on_event(&mut self, event: EventType, func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {

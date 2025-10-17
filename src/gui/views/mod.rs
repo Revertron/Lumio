@@ -15,6 +15,7 @@ use super::super::common::random_string;
 use super::super::events::EventType;
 use super::super::ui::UI;
 use super::styles::selector::{MainSelector, FontSelector};
+use super::super::view_base::FontManager;
 pub use self::label::Label;
 pub use self::button::Button;
 pub use self::edit::Edit;
@@ -38,7 +39,7 @@ pub struct FieldsMain {
     pub background: MainSelector,
     pub foreground: MainSelector,
     pub parent: Option<WeakElement>,
-    pub typeface: Option<Typeface>
+    pub font_manager: FontManager
 }
 
 impl FieldsMain {
@@ -58,8 +59,23 @@ impl FieldsMain {
             background: MainSelector::new(),
             foreground: MainSelector::new(),
             parent: None,
-            typeface: None
+            font_manager: FontManager::new()
         }
+    }
+
+    /// Get the effective typeface (for backward compatibility)
+    pub fn get_typeface(&self, parent_typeface: &Typeface) -> Typeface {
+        self.font_manager.get_typeface(parent_typeface)
+    }
+
+    /// Set the typeface (for backward compatibility)
+    pub fn set_typeface(&mut self, typeface: Option<Typeface>) {
+        self.font_manager.set(typeface);
+    }
+
+    /// Get the stored typeface (for backward compatibility)
+    pub fn typeface(&self) -> Option<Typeface> {
+        self.font_manager.get()
     }
 }
 

@@ -6,5 +6,5 @@ extern crate rand;
 
 pub mod gui;
 pub use gui::*;
-#[cfg(tests)]
+#[cfg(test)]
 mod tests;

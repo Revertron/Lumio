@@ -7,6 +7,7 @@ use super::super::traits::{Element, View, WeakElement};
 use super::super::types::{Point, Rect, rect};
 use super::super::ui::UI;
 use super::super::views::{Borders, Dimension, FieldsMain};
+use super::super::view_base::{HasMainFields, ViewBasics};
 
 pub trait ListItem {
     fn get_view(&self) -> Element;
@@ -20,6 +21,14 @@ pub struct ListView {
     scroll_y: i32,
     selected: RefCell<Option<usize>>
 }
+
+impl HasMainFields for ListView {
+    fn main_fields(&self) -> &RefCell<FieldsMain> {
+        &self.state
+    }
+}
+
+impl ViewBasics for ListView {}
 
 impl ListView {
     pub fn new(rect: Rect<i32>) -> ListView {
@@ -39,7 +48,7 @@ impl ListView {
         let mut y = 0;
         let width = self.get_rect().width();
         let max_height = 20000; //TODO make it infinite
-        let typeface = self.state.borrow().typeface.clone().unwrap();
+        let typeface = self.state.borrow().font_manager.get().unwrap();
         let scale = self.state.borrow().scale;
         for i in self.items.borrow().iter() {
             let view = i.get_view();
@@ -79,46 +88,23 @@ impl ListView {
 
 impl View for ListView {
     fn set_any(&mut self, name: &str, value: &str) {
-        match name {
-            "left" => { self.set_x(value.parse().unwrap()) }
-            "top" => { self.set_y(value.parse().unwrap()) }
-            "width" => { self.set_width(value.parse().unwrap()) }
-            "height" => { self.set_height(value.parse().unwrap()) }
-            "padding" => { self.state.borrow_mut().padding.set_all(value.parse().unwrap_or(0)) }
-            "padding_top" => { self.state.borrow_mut().padding.top = value.parse().unwrap_or(0) }
-            "padding_left" => { self.state.borrow_mut().padding.left = value.parse().unwrap_or(0) }
-            "padding_right" => { self.state.borrow_mut().padding.right = value.parse().unwrap_or(0) }
-            "padding_bottom" => { self.state.borrow_mut().padding.bottom = value.parse().unwrap_or(0) }
-            "margin" => { self.state.borrow_mut().margin.set_all(value.parse().unwrap_or(0)) }
-            "margin_left" => { self.state.borrow_mut().margin.left = value.parse().unwrap_or(0) }
-            "margin_right" => { self.state.borrow_mut().margin.right = value.parse().unwrap_or(0) }
-            "margin_top" => { self.state.borrow_mut().margin.top = value.parse().unwrap_or(0) }
-            "margin_bottom" => { self.state.borrow_mut().margin.bottom = value.parse().unwrap_or(0) }
-            "id" => { self.set_id(value) }
-            "break" => { self.state.borrow_mut().break_line = value.parse().unwrap_or(false) }
-            &_ => {}
+        if self.base_set_any(name, value) {
+            return;
         }
+        // No ListView-specific properties
     }
 
     fn set_parent(&self, parent: Option<WeakElement>) {
-        self.state.borrow_mut().parent = parent;
+        self.base_set_parent(parent);
     }
 
     fn get_parent(&self) -> Option<Element> {
-        match &self.state.borrow().parent {
-            None => { None }
-            Some(weak) => {
-                match weak.upgrade() {
-                    None => { None }
-                    Some(parent) => { Some(parent) }
-                }
-            }
-        }
+        self.base_get_parent()
     }
 
     fn layout_content(&mut self, x: i32, y: i32, width: i32, height: i32, typeface: &Typeface, scale: f64) -> Rect<i32> {
-        self.state.borrow_mut().typeface = Some(typeface.clone());
-        self.state.borrow_mut().scale = scale;
+        self.state.borrow_mut().font_manager.set(Some(typeface.clone()));
+        self.base_set_scale(scale);
         let (width, height) = {
             let state = self.state.borrow_mut();
             let ww;
@@ -167,40 +153,31 @@ impl View for ListView {
     }
 
     fn get_rect(&self) -> Rect<i32> {
-        self.state.borrow().rect
+        self.base_get_rect()
     }
 
     fn set_rect(&mut self, rect: Rect<i32>) {
-        self.state.borrow_mut().rect = rect;
+        self.base_set_rect(rect);
     }
 
     fn get_padding(&self, scale: f64) -> Borders {
-        self.state.borrow().padding.scaled(scale)
+        self.base_get_padding(scale)
     }
 
     fn set_padding(&self, top: i32, left: i32, right: i32, bottom: i32) {
-        let mut state = self.state.borrow_mut();
-        state.padding.top = top;
-        state.padding.left = left;
-        state.padding.right = right;
-        state.padding.bottom = bottom;
+        self.base_set_padding(top, left, right, bottom);
     }
 
     fn get_margin(&self, scale: f64) -> Borders {
-        self.state.borrow().margin.scaled(scale)
+        self.base_get_margin(scale)
     }
 
     fn set_margin(&self, top: i32, left: i32, right: i32, bottom: i32) {
-        let mut state = self.state.borrow_mut();
-        state.margin.top = top;
-        state.margin.left = left;
-        state.margin.right = right;
-        state.margin.bottom = bottom;
+        self.base_set_margin(top, left, right, bottom);
     }
 
     fn get_bounds(&self) -> (Dimension, Dimension) {
-        let state = self.state.borrow();
-        (state.width, state.height)
+        self.base_get_bounds()
     }
 
     fn get_content_size(&self) -> (i32, i32) {
@@ -208,39 +185,39 @@ impl View for ListView {
     }
 
     fn is_focused(&self) -> bool {
-        self.state.borrow().state.focused
+        self.base_is_focused()
     }
 
     fn is_break(&self) -> bool {
-        self.state.borrow().break_line
+        self.base_is_break()
     }
 
     fn set_focused(&self, focused: bool) {
-        self.state.borrow_mut().state.focused = focused;
+        self.base_set_focused(focused);
     }
 
     fn set_focusable(&self, focusable: bool) {
-        self.state.borrow_mut().state.focusable = focusable;
+        self.base_set_focusable(focusable);
     }
 
     fn set_width(&mut self, width: Dimension) {
-        self.state.borrow_mut().width = width;
+        self.base_set_width(width);
     }
 
     fn set_height(&mut self, height: Dimension) {
-        self.state.borrow_mut().height = height;
+        self.base_set_height(height);
     }
 
     fn set_scale(&mut self, scale: f64) {
-        self.state.borrow_mut().scale = scale;
+        self.base_set_scale(scale);
     }
 
     fn set_id(&mut self, id: &str) {
-        self.state.borrow_mut().id = id.to_owned();
+        self.base_set_id(id);
     }
 
     fn get_id(&self) -> String {
-        self.state.borrow().id.clone()
+        self.base_get_id()
     }
 
     fn on_event(&mut self, _event: EventType, _func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {

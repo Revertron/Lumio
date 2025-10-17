@@ -9,7 +9,6 @@ pub struct Point<N> {
 
 impl<T> From<(T, T)> for Point<T> where T: Copy {
     #[inline]
-    #[must_use]
     fn from(value: (T, T)) -> Self {
         point(value.0, value.1)
     }

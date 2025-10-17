@@ -6,11 +6,12 @@ use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode}
 use super::events::EventType;
 use super::views::Borders;
 
-use super::themes::{FontStyle, Theme, Typeface, ViewState};
+use super::themes::{Theme, Typeface, ViewState};
 use super::traits::{Container, Element, View, WeakElement};
 use super::types::{Point, Rect, rect};
 use super::ui::UI;
 use super::views::{Dimension, Direction, FieldsMain};
+use super::view_base::{HasMainFields, ViewBasics};
 
 pub struct Frame {
     state: RefCell<FieldsMain>,
@@ -18,6 +19,14 @@ pub struct Frame {
     views: Vec<Element>,
     breaking: bool
 }
+
+impl HasMainFields for Frame {
+    fn main_fields(&self) -> &RefCell<FieldsMain> {
+        &self.state
+    }
+}
+
+impl ViewBasics for Frame {}
 
 impl Frame {
     pub(crate) fn focus_next(&self) -> bool {
@@ -74,23 +83,11 @@ impl Frame {
     }
 
     fn set_font(&mut self, font_name: &str) {
-        let typeface = match self.state.borrow_mut().typeface.take() {
-            None => Typeface { font_name: font_name.to_owned(), font_style: FontStyle::Regular },
-            Some(mut t) => {
-                t.font_name = font_name.to_owned();
-                t
-            }
-        };
-        self.state.borrow_mut().typeface = Some(typeface)
+        self.state.borrow_mut().font_manager.set_font(font_name);
     }
 
     fn set_font_style(&mut self, style: &str) {
-        let font_style = FontStyle::from(style);
-        let typeface = match self.state.borrow_mut().typeface.take() {
-            None => Typeface { font_name: String::new(), font_style },
-            Some(t) => Typeface { font_name: t.font_name, font_style },
-        };
-        self.state.borrow_mut().typeface = Some(typeface)
+        self.state.borrow_mut().font_manager.set_font_style(style);
     }
 
     fn set_direction(&mut self, direction: Direction) {
@@ -127,49 +124,29 @@ impl Container for Frame {
 
 impl View for Frame {
     fn set_any(&mut self, name: &str, value: &str) {
+        if self.base_set_any(name, value) {
+            return;
+        }
+
         match name {
-            "left" => { self.set_x(value.parse().unwrap()) }
-            "top" => { self.set_y(value.parse().unwrap()) }
-            "width" => { self.set_width(value.parse().unwrap()) }
-            "height" => { self.set_height(value.parse().unwrap()) }
-            "padding" => { self.state.borrow_mut().padding.set_all(value.parse().unwrap_or(0)) }
-            "padding_top" => { self.state.borrow_mut().padding.top = value.parse().unwrap_or(0) }
-            "padding_left" => { self.state.borrow_mut().padding.left = value.parse().unwrap_or(0) }
-            "padding_right" => { self.state.borrow_mut().padding.right = value.parse().unwrap_or(0) }
-            "padding_bottom" => { self.state.borrow_mut().padding.bottom = value.parse().unwrap_or(0) }
-            "margin" => { self.state.borrow_mut().margin.set_all(value.parse().unwrap_or(0)) }
-            "margin_top" => { self.state.borrow_mut().margin.top = value.parse().unwrap_or(0) }
-            "margin_left" => { self.state.borrow_mut().margin.left = value.parse().unwrap_or(0) }
-            "margin_right" => { self.state.borrow_mut().margin.right = value.parse().unwrap_or(0) }
-            "margin_bottom" => { self.state.borrow_mut().margin.bottom = value.parse().unwrap_or(0) }
             "direction" => { self.set_direction(value.parse().unwrap()) }
-            "id" => { self.set_id(value) }
             "font" => { self.set_font(value) }
             "font_style" => { self.set_font_style(value) }
             "breaking" => { self.breaking = value.parse().unwrap_or(false) }
-            "break" => { self.state.borrow_mut().break_line = value.parse().unwrap_or(false) }
             &_ => {}
         }
     }
 
     fn set_parent(&self, parent: Option<WeakElement>) {
-        self.state.borrow_mut().parent = parent;
+        self.base_set_parent(parent);
     }
 
     fn get_parent(&self) -> Option<Element> {
-        match &self.state.borrow().parent {
-            None => { None }
-            Some(weak) => {
-                match weak.upgrade() {
-                    None => { None }
-                    Some(rc) => { Some(rc) }
-                }
-            }
-        }
+        self.base_get_parent()
     }
 
     fn layout_content(&mut self, x: i32, y: i32, width: i32, height: i32, typeface: &Typeface, scale: f64) -> Rect<i32> {
-        self.state.borrow_mut().scale = scale;
+        self.base_set_scale(scale);
         //println!("Laying out for {},{} - {},{}", x, y, width, height);
         let (new_width, new_height) = self.calculate_size(width, height, scale);
         //println!("New width {}, new height {}", new_width, new_height);
@@ -179,7 +156,7 @@ impl View for Frame {
         let mut yy = padding.top;
         let max_x = new_width - padding.right;
         let mut max_height = 0;
-        let typeface = match self.state.borrow().typeface.clone() {
+        let typeface = match self.state.borrow().font_manager.get() {
             None => typeface.clone(),
             Some(t) => t
         };
@@ -265,40 +242,31 @@ impl View for Frame {
     }
 
     fn get_rect(&self) -> Rect<i32> {
-        self.state.borrow().rect
+        self.base_get_rect()
     }
 
     fn set_rect(&mut self, rect: Rect<i32>) {
-        self.state.borrow_mut().rect = rect;
+        self.base_set_rect(rect);
     }
 
     fn get_padding(&self, scale: f64) -> Borders {
-        self.state.borrow().padding.scaled(scale)
+        self.base_get_padding(scale)
     }
 
     fn set_padding(&self, top: i32, left: i32, right: i32, bottom: i32) {
-        let mut state = self.state.borrow_mut();
-        state.padding.top = top;
-        state.padding.left = left;
-        state.padding.right = right;
-        state.padding.bottom = bottom;
+        self.base_set_padding(top, left, right, bottom);
     }
 
     fn get_margin(&self, scale: f64) -> Borders {
-        self.state.borrow().margin.scaled(scale)
+        self.base_get_margin(scale)
     }
 
     fn set_margin(&self, top: i32, left: i32, right: i32, bottom: i32) {
-        let mut state = self.state.borrow_mut();
-        state.margin.top = top;
-        state.margin.left = left;
-        state.margin.right = right;
-        state.margin.bottom = bottom;
+        self.base_set_margin(top, left, right, bottom);
     }
 
     fn get_bounds(&self) -> (Dimension, Dimension) {
-        let state = self.state.borrow();
-        (state.width, state.height)
+        self.base_get_bounds()
     }
 
     fn get_content_size(&self) -> (i32, i32) {
@@ -341,7 +309,7 @@ impl View for Frame {
     }
 
     fn is_break(&self) -> bool {
-        self.state.borrow().break_line
+        self.base_is_break()
     }
 
     fn set_focused(&self, focused: bool) {
@@ -354,27 +322,27 @@ impl View for Frame {
     }
 
     fn set_focusable(&self, focusable: bool) {
-        self.state.borrow_mut().state.focusable = focusable;
+        self.base_set_focusable(focusable);
     }
 
     fn set_width(&mut self, width: Dimension) {
-        self.state.borrow_mut().width = width;
+        self.base_set_width(width);
     }
 
     fn set_height(&mut self, height: Dimension) {
-        self.state.borrow_mut().height = height;
+        self.base_set_height(height);
     }
 
     fn set_scale(&mut self, scale: f64) {
-        self.state.borrow_mut().scale = scale;
+        self.base_set_scale(scale);
     }
 
     fn set_id(&mut self, id: &str) {
-        self.state.borrow_mut().id = id.to_owned();
+        self.base_set_id(id);
     }
 
     fn get_id(&self) -> String {
-        self.state.borrow().id.clone()
+        self.base_get_id()
     }
 
     fn as_container(&self) -> Option<&dyn Container> {
