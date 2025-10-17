@@ -294,6 +294,10 @@ impl View for CheckBox {
         self.state.borrow_mut().main.height = height;
     }
 
+    fn set_scale(&mut self, scale: f64) {
+        self.state.borrow_mut().main.scale = scale;
+    }
+
     fn set_id(&mut self, id: &str) {
         self.state.borrow_mut().main.id = id.to_owned();
     }

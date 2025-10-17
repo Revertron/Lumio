@@ -1,12 +1,12 @@
 use std::cell::RefCell;
 use speedy2d::dimen::Vector2;
 use speedy2d::window::MouseButton;
-use gui::events::EventType;
-use gui::themes::{Theme, Typeface, ViewState};
-use gui::traits::{Element, View, WeakElement};
-use gui::types::{Point, Rect, rect};
-use gui::ui::UI;
-use gui::views::{Borders, Dimension, FieldsMain};
+use super::super::events::EventType;
+use super::super::themes::{Theme, Typeface, ViewState};
+use super::super::traits::{Element, View, WeakElement};
+use super::super::types::{Point, Rect, rect};
+use super::super::ui::UI;
+use super::super::views::{Borders, Dimension, FieldsMain};
 
 pub trait ListItem {
     fn get_view(&self) -> Element;
@@ -34,11 +34,11 @@ impl ListView {
     }
 
     pub fn set_items(&mut self, items: Vec<Box<dyn ListItem>>) {
-        self.items = RefCell::new(items);
+        self.items = RefCell::new(items); //TODO don't hold two copies of entities (items & views)
         self.views.borrow_mut().clear();
         let mut y = 0;
         let width = self.get_rect().width();
-        let max_height = 20000;
+        let max_height = 20000; //TODO make it infinite
         let typeface = self.state.borrow().typeface.clone().unwrap();
         let scale = self.state.borrow().scale;
         for i in self.items.borrow().iter() {
@@ -229,6 +229,10 @@ impl View for ListView {
 
     fn set_height(&mut self, height: Dimension) {
         self.state.borrow_mut().height = height;
+    }
+
+    fn set_scale(&mut self, scale: f64) {
+        self.state.borrow_mut().scale = scale;
     }
 
     fn set_id(&mut self, id: &str) {

@@ -5,12 +5,12 @@ use speedy2d::dimen::Vector2;
 use speedy2d::font::FormattedTextBlock;
 use speedy2d::Graphics2D;
 use speedy2d::shape::Rectangle;
-use gui::styles::selector::{DrawState, MainSelector};
-use gui::themes::{Theme, Typeface, ViewState};
-use gui::themes::utils::draw_dashed_rectangle;
-use gui::types::Rect;
-use gui::types;
-use gui::types::rect;
+use super::super::styles::selector::{DrawState, MainSelector};
+use super::super::themes::{Theme, Typeface, ViewState};
+use super::super::themes::utils::draw_dashed_rectangle;
+use super::super::types::Rect;
+use super::super::types;
+use super::super::types::rect;
 
 #[allow(unused)]
 pub struct Classic<'h> {

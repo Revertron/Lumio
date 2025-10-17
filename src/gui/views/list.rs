@@ -2,14 +2,14 @@ use std::cell::RefCell;
 use speedy2d::dimen::Vector2;
 use speedy2d::font::{FormattedTextBlock, TextLayout, TextOptions};
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
-use gui::assets::get_font;
-use gui::common::DEFAULT_TEXT_SIZE;
-use gui::events::EventType;
-use gui::themes::{Theme, Typeface, ViewState};
-use gui::traits::{Element, View, WeakElement};
-use gui::types::{Point, Rect, rect};
-use gui::ui::UI;
-use gui::views::{Borders, Dimension, FieldsMain};
+use super::super::assets::get_font;
+use super::super::common::DEFAULT_TEXT_SIZE;
+use super::super::events::EventType;
+use super::super::themes::{Theme, Typeface, ViewState};
+use super::super::traits::{Element, View, WeakElement};
+use super::super::types::{Point, Rect, rect};
+use super::super::ui::UI;
+use super::super::views::{Borders, Dimension, FieldsMain};
 
 pub struct List {
     state: RefCell<FieldsMain>,
@@ -266,6 +266,10 @@ impl View for List {
 
     fn set_height(&mut self, height: Dimension) {
         self.state.borrow_mut().height = height;
+    }
+
+    fn set_scale(&mut self, scale: f64) {
+        self.state.borrow_mut().scale = scale;
     }
 
     fn set_id(&mut self, id: &str) {

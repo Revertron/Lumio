@@ -2,9 +2,9 @@ mod classic;
 mod utils;
 
 use speedy2d::font::FormattedTextBlock;
-use gui::styles::selector::MainSelector;
+use super::super::styles::selector::MainSelector;
 pub use super::themes::classic::Classic;
-use gui::types::Rect;
+use super::super::types::Rect;
 
 pub trait Theme {
     fn clear_screen(&mut self);

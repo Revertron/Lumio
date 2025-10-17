@@ -1,0 +1,5 @@
+<Frame id="message" width="max" height="min" direction="vertical" padding="8">
+    <Label id="sender" text="Sender" padding="4"/>
+    <Label id="message" text="Some long message text" padding="4"/>
+    <Label id="time" text="01:43" width="max" padding="4"/>
+</Frame>

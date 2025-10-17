@@ -365,6 +365,10 @@ impl View for Frame {
         self.state.borrow_mut().height = height;
     }
 
+    fn set_scale(&mut self, scale: f64) {
+        self.state.borrow_mut().scale = scale;
+    }
+
     fn set_id(&mut self, id: &str) {
         self.state.borrow_mut().id = id.to_owned();
     }

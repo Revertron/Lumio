@@ -2,25 +2,25 @@
 
 extern crate include_dir;
 extern crate speedy2d;
-extern crate vinx;
+extern crate lumio;
 
 use include_dir::{Dir, include_dir};
 use speedy2d::dimen::Vector2;
 use speedy2d::Window;
 use speedy2d::window::{WindowCreationOptions, WindowPosition, WindowSize};
 
-use vinx::assets::{AssetsProvider, set_provider};
-use vinx::events::EventType;
-use vinx::themes::Classic;
-use vinx::themes::Theme;
-use vinx::traits::View;
-use vinx::ui::UI;
-use vinx::views::{Button, CheckBox, Edit, List};
-use vinx::win::{Win, WinEvent};
+use lumio::assets::{AssetsProvider, set_provider};
+use lumio::events::EventType;
+use lumio::themes::Classic;
+use lumio::themes::Theme;
+use lumio::traits::View;
+use lumio::ui::UI;
+use lumio::views::{Button, CheckBox, Edit, List};
+use lumio::win::{Win, WinEvent};
 
 const WIDTH: u32 = 1920;
 const HEIGHT: u32 = 1080;
-const TITLE: &'static str = "VinX";
+const TITLE: &'static str = "Lumio";
 
 // Usually you will not use the `examples` part
 const ASSETS: Dir = include_dir!("$CARGO_MANIFEST_DIR/examples/assets");
@@ -96,12 +96,16 @@ fn button2_click(ui: &mut UI, _view: &dyn View) -> bool {
         buf.push(format!("New item {}", i));
     }
     // Set items for list
+    set_items_for_list1(ui, buf);
+    true
+}
+
+fn set_items_for_list1(ui: &mut UI, buf: Vec<String>) {
     if let Some(list) = ui.get_view("list1") {
         if let Some(list) = list.borrow_mut().downcast_mut::<List>() {
             list.set_items(buf);
         }
     }
-    true
 }
 
 fn on_start(ui: &mut UI) {
@@ -110,9 +114,5 @@ fn on_start(ui: &mut UI) {
         buf.push(format!("Start item {}", i));
     }
     // Set items for list
-    if let Some(list) = ui.get_view("list1") {
-        if let Some(list) = list.borrow_mut().downcast_mut::<List>() {
-            list.set_items(buf);
-        }
-    }
+    set_items_for_list1(ui, buf);
 }

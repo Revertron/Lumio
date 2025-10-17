@@ -4,8 +4,8 @@ use speedy2d::dimen::Vector2;
 use speedy2d::Graphics2D;
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, UserEventSender, VirtualKeyCode, WindowHandler, WindowHelper, WindowStartupInfo};
 
-use gui::ui::UI;
-use gui::themes::*;
+use super::ui::UI;
+use super::themes::*;
 
 pub struct Win<T> {
     ui: UI,

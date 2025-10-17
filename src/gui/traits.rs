@@ -89,6 +89,7 @@ pub trait View: Downcast {
     }
     fn set_width(&mut self, width: Dimension);
     fn set_height(&mut self, height: Dimension);
+    fn set_scale(&mut self, scale: f64);
     fn set_id(&mut self, id: &str);
     fn get_id(&self) -> String;
     fn as_container(&self) -> Option<&dyn Container> { None }
