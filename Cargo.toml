@@ -5,7 +5,7 @@ edition = "2018"
 authors = ["Revertron <lumio@revertron.com>"]
 
 [dependencies]
-quick-xml = "0.31.0"
+quick-xml = "0.38.3"
 downcast-rs = "1.2.0"
 speedy2d = "2.1.0"
 rand = "0.8.5"

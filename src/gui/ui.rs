@@ -121,7 +121,7 @@ impl UI {
     pub fn from_xml(xml: &str, width: u32, height: u32, typeface: Typeface, scale: f64) -> Option<Self> {
         let mut ui = UI::new(width, height, typeface, scale);
         let mut reader = Reader::from_str(xml);
-        reader.trim_text(true);
+        reader.config_mut().trim_text(true);
 
         let mut txt = Vec::new();
         let mut stack: Vec<Element> = Vec::new();
@@ -162,7 +162,7 @@ impl UI {
                     }
                 },
                 // unescape and decode the text event using the reader encoding
-                Ok(Event::Text(e)) => txt.push(e.unescape().unwrap()),
+                Ok(Event::Text(e)) => txt.push(e.into_inner().into_owned()),
                 Ok(Event::Eof) => break, // exits the loop when reaching end of file
                 Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
                 _ => (), // There are several other `Event`s we do not consider here

@@ -305,7 +305,6 @@ impl View for List {
     }
 
     fn on_mouse_wheel_scroll(&self, _ui: &mut UI, position: Vector2<i32>, distance: MouseScrollDistance) -> bool {
-        println!("Scrolling by {:?}", &distance);
         if self.state.borrow().rect.hit((position.x, position.y)) {
             let mut scroll_y = *self.scroll_y.borrow();
 

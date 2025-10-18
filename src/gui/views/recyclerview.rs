@@ -318,6 +318,7 @@ impl RecyclerPool {
         }
     }
 
+    #[allow(dead_code)]
     fn set_max_pool_size(&mut self, size: usize) {
         self.max_pool_size = size;
     }
@@ -907,7 +908,7 @@ impl View for RecyclerView {
             let available_height = viewport_height - padding.top - padding.bottom;
             let max_scroll = -(content_height - available_height).max(0);
 
-            let mut new_scroll = old_scroll;
+            let new_scroll;
 
             match key {
                 VirtualKeyCode::Up => {
