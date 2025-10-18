@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::time::Duration;
 use speedy2d::dimen::Vector2;
 use speedy2d::Graphics2D;
-use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, UserEventSender, VirtualKeyCode, WindowHandler, WindowHelper, WindowStartupInfo};
+use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, UserEventSender, VirtualKeyCode, WindowHandler, WindowHelper, WindowStartupInfo};
 
 use super::ui::UI;
 use super::themes::*;
@@ -82,24 +82,28 @@ impl<T> WindowHandler<T> for Win<T> {
         let position = Vector2::new(position.x.round() as i32, position.y.round() as i32);
         self.mouse_pos = position;
         if self.ui.on_mouse_move(position) {
-            //self.ui.layout(self.ui.get_width(), self.ui.get_height());
             helper.request_redraw();
         }
     }
 
     fn on_mouse_button_down(&mut self, helper: &mut WindowHelper<T>, button: MouseButton) {
         if self.ui.on_mouse_button_down(self.mouse_pos, button) {
-            //self.ui.layout(self.ui.get_width(), self.ui.get_height());
             helper.request_redraw();
         }
     }
 
     fn on_mouse_button_up(&mut self, helper: &mut WindowHelper<T>, button: MouseButton) {
         if self.ui.on_mouse_button_up(self.mouse_pos, button) {
-            //self.ui.layout(self.ui.get_width(), self.ui.get_height());
             helper.request_redraw();
         }
     }
+
+    fn on_mouse_wheel_scroll(&mut self, helper: &mut WindowHelper<T>, distance: MouseScrollDistance) {
+        if self.ui.on_mouse_wheel_scroll(self.mouse_pos, distance) {
+            helper.request_redraw();
+        }
+    }
+
 
     fn on_key_down(&mut self, helper: &mut WindowHelper<T>, virtual_key_code: Option<VirtualKeyCode>, scancode: KeyScancode) {
         println!("KeyCode: {:?}, scancode: {:?} down", virtual_key_code, scancode);

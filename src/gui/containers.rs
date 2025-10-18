@@ -412,6 +412,16 @@ impl View for Frame {
         false
     }
 
+    fn on_mouse_wheel_scroll(&self, ui: &mut UI, position: Vector2<i32>, distance: speedy2d::window::MouseScrollDistance) -> bool {
+        let position = (position.x - self.state.borrow().rect.min.x, position.y - self.state.borrow().rect.min.y);
+        for v in self.views.iter().rev() {
+            if v.borrow().on_mouse_wheel_scroll(ui, Vector2::from(position), distance) {
+                return true;
+            }
+        }
+        false
+    }
+
     fn on_key_down(&self, ui: &mut UI, virtual_key_code: Option<VirtualKeyCode>, scancode: KeyScancode, state: ModifiersState) -> bool {
         for v in self.views.iter() {
             if v.borrow().is_focused() {

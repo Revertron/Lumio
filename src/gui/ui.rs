@@ -6,7 +6,7 @@ use std::rc::Rc;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::Reader;
 use speedy2d::dimen::Vector2;
-use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
+use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
 
 use super::containers::Frame;
 use super::themes::Theme;
@@ -230,6 +230,16 @@ impl UI {
             None => false,
             Some(root) => {
                 root.borrow().on_mouse_button_up(self, position, button)
+            }
+        }
+    }
+
+    pub fn on_mouse_wheel_scroll(&mut self, position: Vector2<i32>, distance: MouseScrollDistance) -> bool {
+        let root = self.root.clone();
+        match root {
+            None => false,
+            Some(root) => {
+                root.borrow().on_mouse_wheel_scroll(self, position, distance)
             }
         }
     }

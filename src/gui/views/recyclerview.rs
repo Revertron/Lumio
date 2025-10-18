@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use speedy2d::dimen::Vector2;
-use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
+use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
 use super::super::events::EventType;
 use super::super::themes::{Theme, Typeface, ViewState};
 use super::super::traits::{Element, View, WeakElement};
@@ -479,7 +479,10 @@ impl RecyclerView {
             (self_rect.width() - padding.left - padding.right,
              self_rect.height() - padding.top - padding.bottom)
         );
-        let scroll = *self.scroll_y.borrow();
+        let scroll_y = *self.scroll_y.borrow();
+        // Layout manager expects positive scroll offset (absolute position in content)
+        // but scroll_y is negative (List convention), so negate it
+        let scroll_offset = -scroll_y;
 
         // Get layout for visible range (need to borrow adapter temporarily)
         let layouts = {
@@ -488,7 +491,7 @@ impl RecyclerView {
             self.layout_manager.borrow_mut().layout_items(
                 adapter.get_item_count(),
                 viewport,
-                scroll,
+                scroll_offset,
                 adapter.as_ref()
             )
         };
@@ -588,7 +591,7 @@ impl RecyclerView {
                 self.layout_manager.borrow_mut().layout_items(
                     item_count,
                     viewport,
-                    scroll,
+                    scroll_offset,
                     adapter.as_ref()
                 );
             }
@@ -687,7 +690,8 @@ impl View for RecyclerView {
         let scroll_x = *self.scroll_x.borrow();
         let scroll_y = *self.scroll_y.borrow();
         // Items are positioned at absolute positions, apply scroll offset here
-        let content_start = Point::from((start.x + padding.left - scroll_x, start.y + padding.top - scroll_y));
+        // Like List: add scroll_y (which is negative or 0)
+        let content_start = Point::from((start.x + padding.left + scroll_x, start.y + padding.top + scroll_y));
 
         for holder in self.attached_holders.borrow().iter() {
             // Item's rect contains absolute position, scroll is applied via content_start
@@ -836,32 +840,98 @@ impl View for RecyclerView {
         false
     }
 
+    fn on_mouse_wheel_scroll(&self, _ui: &mut UI, position: Vector2<i32>, distance: MouseScrollDistance) -> bool {
+        if self.state.borrow().rect.hit((position.x, position.y)) {
+            let mut scroll_y = *self.scroll_y.borrow();
+
+            // Get default item height for scroll step
+            let scroll_step = self.layout_manager.borrow().get_item_height(0).max(20);
+
+            // Calculate max_scroll (negative value)
+            let item_count = self.adapter.borrow().as_ref().map(|a| a.get_item_count()).unwrap_or(0);
+            let (_, content_height) = self.layout_manager.borrow().get_content_size(item_count);
+            let scale = self.state.borrow().scale;
+            let padding = self.get_padding(scale);
+            let viewport_height = self.state.borrow().rect.height();
+            let available_height = viewport_height - padding.top - padding.bottom;
+            let max_scroll = -(content_height - available_height).max(0);
+
+            match &distance {
+                MouseScrollDistance::Lines { y, .. } => {
+                    // Scroll by lines (positive y = scroll down, negative = scroll up)
+                    scroll_y += (*y as i32) * scroll_step;
+                }
+                MouseScrollDistance::Pixels { y, .. } => {
+                    // Scroll by pixels
+                    scroll_y += *y as i32;
+                }
+                MouseScrollDistance::Pages { y, .. } => {
+                    // Scroll by pages
+                    let page_scroll = self.state.borrow().rect.height();
+                    scroll_y += (*y as i32) * page_scroll;
+                }
+            }
+
+            // Clamp scroll to valid range (max_scroll <= scroll_y <= 0)
+            scroll_y = scroll_y.clamp(max_scroll, 0);
+
+            if scroll_y != *self.scroll_y.borrow() {
+                *self.scroll_y.borrow_mut() = scroll_y;
+
+                // Recalculate which items are visible and recycle/fill as needed
+                let scale = self.state.borrow().scale;
+                let typeface = self.state.borrow().font_manager.get().unwrap_or_else(|| {
+                    use super::super::themes::Typeface;
+                    Typeface::default()
+                });
+                self.recycle_and_fill(&typeface, scale);
+            }
+
+            true
+        } else {
+            false
+        }
+    }
+
     fn on_key_down(&self, _ui: &mut UI, virtual_key_code: Option<VirtualKeyCode>, _scancode: KeyScancode, _state: ModifiersState) -> bool {
         if let Some(key) = virtual_key_code {
             let scroll_step = 50; // Pixels to scroll per key press
             let old_scroll = *self.scroll_y.borrow();
-            let max_scroll = *self.max_scroll.borrow();
+
+            // Calculate max_scroll (negative value, like List does)
+            let item_count = self.adapter.borrow().as_ref().map(|a| a.get_item_count()).unwrap_or(0);
+            let (_, content_height) = self.layout_manager.borrow().get_content_size(item_count);
+            let scale = self.state.borrow().scale;
+            let padding = self.get_padding(scale);
+            let viewport_height = self.state.borrow().rect.height();
+            let available_height = viewport_height - padding.top - padding.bottom;
+            let max_scroll = -(content_height - available_height).max(0);
+
             let mut new_scroll = old_scroll;
 
             match key {
                 VirtualKeyCode::Up => {
-                    new_scroll = (old_scroll - scroll_step).max(0);
+                    // Scrolling up means decreasing scroll_y (more negative)
+                    new_scroll = (old_scroll - scroll_step).max(max_scroll);
                 }
                 VirtualKeyCode::Down => {
-                    new_scroll = (old_scroll + scroll_step).min(max_scroll);
+                    // Scrolling down means increasing scroll_y (less negative, toward 0)
+                    new_scroll = (old_scroll + scroll_step).min(0);
                 }
                 VirtualKeyCode::PageUp => {
                     let page_scroll = self.state.borrow().rect.height();
-                    new_scroll = (old_scroll - page_scroll).max(0);
+                    new_scroll = (old_scroll - page_scroll).max(max_scroll);
                 }
                 VirtualKeyCode::PageDown => {
                     let page_scroll = self.state.borrow().rect.height();
-                    new_scroll = (old_scroll + page_scroll).min(max_scroll);
+                    new_scroll = (old_scroll + page_scroll).min(0);
                 }
                 VirtualKeyCode::Home => {
+                    // Home goes to top (scroll_y = 0)
                     new_scroll = 0;
                 }
                 VirtualKeyCode::End => {
+                    // End goes to bottom (scroll_y = max_scroll, which is negative)
                     new_scroll = max_scroll;
                 }
                 _ => {

@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 use downcast_rs::Downcast;
 use speedy2d::dimen::Vector2;
-use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
+use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
 use super::events::EventType;
 use super::ui::UI;
 use super::themes::{Theme, ViewState};
@@ -107,6 +107,8 @@ pub trait View: Downcast {
     fn on_mouse_button_down(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool { false }
     #[allow(unused_variables)]
     fn on_mouse_button_up(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool { false }
+    #[allow(unused_variables)]
+    fn on_mouse_wheel_scroll(&self, ui: &mut UI, position: Vector2<i32>, distance: MouseScrollDistance) -> bool { false }
     #[allow(unused_variables)]
     fn on_key_down(&self, ui: &mut UI, virtual_key_code: Option<VirtualKeyCode>, scancode: KeyScancode, state: ModifiersState) -> bool { false }
     #[allow(unused_variables)]

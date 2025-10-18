@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use speedy2d::dimen::Vector2;
 use speedy2d::font::{FormattedTextBlock, TextLayout, TextOptions};
-use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
+use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
 use super::super::assets::get_font;
 use super::super::common::DEFAULT_TEXT_SIZE;
 use super::super::events::EventType;
@@ -303,6 +303,53 @@ impl View for List {
         }
         false
     }
+
+    fn on_mouse_wheel_scroll(&self, _ui: &mut UI, position: Vector2<i32>, distance: MouseScrollDistance) -> bool {
+        println!("Scrolling by {:?}", &distance);
+        if self.state.borrow().rect.hit((position.x, position.y)) {
+            let mut scroll_y = *self.scroll_y.borrow();
+
+            // Get line height from first text item (or use default)
+            let line_height = self.texts.borrow().first()
+                .and_then(|t| t.as_ref().map(|text| text.height().ceil() as i32))
+                .unwrap_or(DEFAULT_TEXT_SIZE as i32);
+
+            // Calculate total content height
+            let mut total_height = 0i32;
+            for v in self.texts.borrow().iter() {
+                if let Some(text) = v {
+                    total_height += text.height().ceil() as i32;
+                }
+            }
+
+            let rect_height = self.get_rect().height();
+            let max_scroll = -(total_height - rect_height).max(0);
+
+            match &distance {
+                MouseScrollDistance::Lines { y, .. } => {
+                    // Scroll by lines (positive y = scroll down, negative = scroll up)
+                    scroll_y += (*y as i32) * line_height;
+                }
+                MouseScrollDistance::Pixels { y, .. } => {
+                    // Scroll by pixels
+                    scroll_y += *y as i32;
+                }
+                MouseScrollDistance::Pages { y, .. } => {
+                    // Scroll by pages
+                    scroll_y += (*y as i32) * rect_height;
+                }
+            }
+
+            // Clamp scroll to valid range (max_scroll <= scroll_y <= 0)
+            scroll_y = scroll_y.clamp(max_scroll, 0);
+            *self.scroll_y.borrow_mut() = scroll_y;
+
+            true
+        } else {
+            false
+        }
+    }
+
 
     fn on_key_down(&self, _ui: &mut UI, virtual_key_code: Option<VirtualKeyCode>, _scancode: KeyScancode, _state: ModifiersState) -> bool {
         if let Some(code) = virtual_key_code {
