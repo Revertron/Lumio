@@ -15,8 +15,9 @@ use lumio::themes::Classic;
 use lumio::themes::Theme;
 use lumio::traits::View;
 use lumio::ui::UI;
-use lumio::views::{Button, CheckBox, Edit, List};
+use lumio::views::{Button, CheckBox, Edit, List, RecyclerView, RecyclerAdapter, ViewHolder};
 use lumio::win::{Win, WinEvent};
+use lumio::containers::Frame;
 
 const WIDTH: u32 = 1920;
 const HEIGHT: u32 = 1080;
@@ -44,12 +45,82 @@ impl AssetsProvider for Provider {
     }
 }
 
+// Message data structure
+struct Message {
+    sender: String,
+    text: String,
+    time: String,
+}
+
+// MessageAdapter implements RecyclerAdapter
+struct MessageAdapter {
+    messages: Vec<Message>,
+    item_layout: String,
+}
+
+impl MessageAdapter {
+    fn new(messages: Vec<Message>) -> Self {
+        let item_layout = include_str!("message.xml").to_string();
+        Self { messages, item_layout }
+    }
+}
+
+impl RecyclerAdapter for MessageAdapter {
+    fn get_item_count(&self) -> usize {
+        self.messages.len()
+    }
+
+    fn get_item_view_type(&self, _position: usize) -> i32 {
+        0 // Single view type for now
+    }
+
+    fn create_view_holder(&mut self, _view_type: i32) -> ViewHolder {
+        // Parse XML layout for each item
+        let ui = UI::from_xml(&self.item_layout, 800, 100, Classic::typeface(), 1.0).unwrap();
+        let root = ui.get_view("message_item").expect("message_item not found in XML");
+
+        ViewHolder::new(root, _view_type)
+    }
+
+    fn bind_view_holder(&self, holder: &ViewHolder, position: usize) {
+        if position >= self.messages.len() {
+            return;
+        }
+
+        let message = &self.messages[position];
+
+        // Get the root frame
+        if let Some(frame) = holder.item_view.borrow().downcast_ref::<Frame>() {
+            // Find and update sender label
+            if let Some(sender_view) = frame.as_container().unwrap().get_view("sender") {
+                if let Some(label) = sender_view.borrow_mut().downcast_mut::<lumio::views::Label>() {
+                    label.set_text(&message.sender);
+                }
+            }
+
+            // Find and update time label
+            if let Some(time_view) = frame.as_container().unwrap().get_view("time") {
+                if let Some(label) = time_view.borrow_mut().downcast_mut::<lumio::views::Label>() {
+                    label.set_text(&message.time);
+                }
+            }
+
+            // Find and update text label
+            if let Some(text_view) = frame.as_container().unwrap().get_view("text") {
+                if let Some(label) = text_view.borrow_mut().downcast_mut::<lumio::views::Label>() {
+                    label.set_text(&message.text);
+                }
+            }
+        }
+    }
+}
+
 fn main() {
     let assets = Provider::new(ASSETS);
     set_provider(Box::new(assets));
 
     let layout = include_str!("layout.xml");
-    let mut ui = UI::from_xml(layout, WIDTH, HEIGHT, Classic::typeface()).unwrap();
+    let mut ui = UI::from_xml(layout, WIDTH, HEIGHT, Classic::typeface(), 1.0).unwrap();
 
     if let Some(button) = ui.get_view("btn1") {
         button.borrow_mut().on_event(EventType::Click, Box::new(button1_click));
@@ -115,4 +186,33 @@ fn on_start(ui: &mut UI) {
     }
     // Set items for list
     set_items_for_list1(ui, buf);
+
+    // Create 50 messages for RecyclerView
+    let names = vec!["Alice", "Bob", "Charlie", "Diana", "Eve", "Frank"];
+    let mut messages = Vec::new();
+
+    for i in 0..50 {
+        let sender = names[i % names.len()].to_string();
+        let text = format!("This is message number {} with some sample text to display.", i + 1);
+        let hour = 9 + (i / 6) % 12;
+        let minute = (i * 10) % 60;
+        let time = format!("{:02}:{:02}", hour, minute);
+
+        messages.push(Message {
+            sender,
+            text,
+            time,
+        });
+    }
+
+    // Set adapter on RecyclerView
+    if let Some(recycler) = ui.get_view("my_list") {
+        if let Some(recycler) = recycler.borrow_mut().downcast_mut::<RecyclerView>() {
+            let adapter = MessageAdapter::new(messages);
+            recycler.set_adapter(Box::new(adapter));
+        }
+    }
+
+    // Trigger layout after setting adapter so RecyclerView displays items immediately
+    ui.relayout();
 }

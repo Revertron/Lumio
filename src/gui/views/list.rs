@@ -124,19 +124,20 @@ impl View for List {
     fn layout_content(&mut self, x: i32, y: i32, width: i32, height: i32, typeface: &Typeface, scale: f64) -> Rect<i32> {
         self.state.borrow_mut().font_manager.set(Some(typeface.clone()));
         self.base_set_scale(scale);
+        let (new_width, new_height) = self.calculate_size(width, height, scale);
         let (width, height) = {
             let state = self.state.borrow_mut();
             let ww;
             let hh;
             match &state.width {
                 Dimension::Min => ww = 0,
-                Dimension::Max => ww = width,
+                Dimension::Max => ww = new_width,
                 Dimension::Dip(dip) => ww = *dip as i32,
                 Dimension::Percent(p) => ww = (width as f32 * p / 100f32).round() as i32
             }
             match &state.height {
                 Dimension::Min => hh = 0,
-                Dimension::Max => hh = height,
+                Dimension::Max => hh = new_height,
                 Dimension::Dip(dip) => hh = *dip as i32,
                 Dimension::Percent(p) => hh = (height as f32 * p / 100f32).round() as i32
             }
@@ -218,7 +219,27 @@ impl View for List {
     }
 
     fn get_content_size(&self) -> (i32, i32) {
-        (100, 200)
+        // Return content size matching what was set in the rect
+        let state = self.state.borrow();
+        let scale = state.scale;
+        let width = match &state.width {
+            Dimension::Dip(dip) => *dip as i32,  // Unscaled, matching layout_content
+            _ => {
+                // For Max/Min/Percent, use the current rect size minus padding
+                let rect = self.get_rect();
+                let padding = self.get_padding(scale);
+                (rect.width() - padding.left - padding.right).max(0)
+            }
+        };
+        let height = match &state.height {
+            Dimension::Dip(dip) => *dip as i32,  // Unscaled, matching layout_content
+            _ => {
+                let rect = self.get_rect();
+                let padding = self.get_padding(scale);
+                (rect.height() - padding.top - padding.bottom).max(0)
+            }
+        };
+        (width, height)
     }
 
     fn is_focused(&self) -> bool {

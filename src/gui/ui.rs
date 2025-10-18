@@ -14,11 +14,12 @@ use super::traits::{Element, View};
 use super::types::Point;
 use super::themes::Typeface;
 
-use super::views::{Button, Edit, Label, CheckBox, List};
+use super::views::{Button, Edit, Label, CheckBox, List, RecyclerView};
 
 pub struct UI {
     width: u32,
     height: u32,
+    scale: f64,
     typeface: Typeface,
     root: Option<Element>,
     types: HashMap<String, fn() -> Element>,
@@ -27,13 +28,14 @@ pub struct UI {
 
 #[allow(dead_code)]
 impl UI {
-    pub fn new(width: u32, height: u32, typeface: Typeface) -> Self {
-        let mut ui = UI { width, height, typeface, root: None, types: HashMap::new(), on_start: None };
+    pub fn new(width: u32, height: u32, typeface: Typeface, scale: f64) -> Self {
+        let mut ui = UI { width, height, typeface, scale, root: None, types: HashMap::new(), on_start: None };
         ui.register::<Label>("Label");
         ui.register::<Button>("Button");
         ui.register::<CheckBox>("CheckBox");
         ui.register::<Edit>("Edit");
         ui.register::<List>("List");
+        ui.register::<RecyclerView>("RecyclerView");
         ui.register::<Frame>("Frame");
         ui
     }
@@ -51,7 +53,7 @@ impl UI {
     }
 
     pub fn get_view(&self, id: &str) -> Option<Element> {
-        println!("Searching {} in UI", &id);
+        //println!("Searching {} in UI", &id);
         match &self.root {
             None => None,
             Some(root) => {
@@ -81,9 +83,17 @@ impl UI {
     pub fn layout(&mut self, width: u32, height: u32, scale: f64) {
         self.width = width;
         self.height = height;
+        self.scale = scale;
         let root = self.root.clone();
         if let Some(root) = root {
             root.borrow_mut().layout_content(0, 0, width as i32, height as i32, &self.typeface.clone(), scale);
+        }
+    }
+
+    pub fn relayout(&mut self) {
+        let root = self.root.clone();
+        if let Some(root) = root {
+            root.borrow_mut().layout_content(0, 0, self.width as i32, self.height as i32, &self.typeface.clone(), self.scale);
         }
     }
 
@@ -108,14 +118,15 @@ impl UI {
         }
     }
 
-    pub fn from_xml(xml: &str, width: u32, height: u32, typeface: Typeface) -> Option<Self> {
-        let mut ui = UI::new(width, height, typeface);
+    pub fn from_xml(xml: &str, width: u32, height: u32, typeface: Typeface, scale: f64) -> Option<Self> {
+        let mut ui = UI::new(width, height, typeface, scale);
         let mut reader = Reader::from_str(xml);
         reader.trim_text(true);
 
         let mut txt = Vec::new();
         let mut stack: Vec<Element> = Vec::new();
 
+        // TODO extract parsing views into self contained method
         loop {
             match reader.read_event() {
                 Ok(Event::Start(ref e)) => {

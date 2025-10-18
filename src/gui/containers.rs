@@ -101,7 +101,7 @@ impl Container for Frame {
     }
 
     fn get_view(&self, id: &str) -> Option<Element> {
-        println!("Searching {} in Frame {}", &id, &self.get_id());
+        //println!("Searching {} in Frame {}", &id, &self.get_id());
         if let Some(found) = self.views.iter().find(|&view| view.borrow().get_id() == id) {
             return Some(Rc::clone(found));
         }

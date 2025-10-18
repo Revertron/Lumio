@@ -1,0 +1,7 @@
+<Frame id="message_item" width="max" height="min" direction="vertical" padding="8">
+    <Frame id="header" width="max" height="min" direction="horizontal">
+        <Label id="sender" text="Sender" width="min" font_style="Bold"/>
+        <Label id="time" text="12:34" width="min" margin_left="8"/>
+    </Frame>
+    <Label id="text" text="Message text goes here" width="max" margin_top="4"/>
+</Frame>

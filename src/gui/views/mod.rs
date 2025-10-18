@@ -3,7 +3,7 @@ pub mod button;
 pub mod edit;
 pub mod checkbox;
 pub mod list;
-pub mod listview;
+pub mod recyclerview;
 
 use super::super::themes::{Typeface, ViewState};
 use super::super::traits::{View, WeakElement};
@@ -21,6 +21,7 @@ pub use self::button::Button;
 pub use self::edit::Edit;
 pub use self::checkbox::CheckBox;
 pub use self::list::List;
+pub use self::recyclerview::{RecyclerView, RecyclerAdapter, ViewHolder, LayoutManager, LinearLayoutManager};
 
 pub const BUTTON_MIN_WIDTH: i32 = 80;
 pub const BUTTON_MIN_HEIGHT: i32 = 24;
