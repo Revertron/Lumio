@@ -159,7 +159,10 @@ impl View for List {
         theme.push_clip();
         theme.clip_rect(rect);
         let state = self.get_state().unwrap();
-        theme.draw_list_back(rect, state);
+
+        // Step 1: Draw background (before items)
+        theme.draw_component("edit_field_classic_back", rect, state);
+
         //let color = theme.get_text_color(self.state.borrow().state, &self.state.borrow().foreground);
         let mut y = rect.min.y;
         let mut index = 0usize;
@@ -182,7 +185,10 @@ impl View for List {
             }
             index += 1;
         }
-        theme.draw_list_body(rect, state);
+
+        // Step 2: Draw borders (after items)
+        theme.draw_component("edit_field_classic_body", rect, state);
+
         theme.pop_clip();
     }
 

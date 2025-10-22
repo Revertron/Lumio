@@ -1,0 +1,111 @@
+<!-- Classic Windows button borders (drawn after text) -->
+<selector>
+    <!-- Pressed and hovered state (sunken 3D effect) -->
+    <item state_pressed="true" state_hovered="true">
+        <layer-list>
+            <!-- Outer layer: Gray (#808080) shadow on top-left -->
+            <item>
+                <shape type="rect">
+                    <!-- Top: from x=0 to x=width-1, at y=0 -->
+                    <stroke width="1" color="#808080" top="0" left="0" right="1"/>
+                    <!-- Left: from y=0 to y=height-1, at x=0 -->
+                    <stroke width="1" color="#808080" left="0" top="0" bottom="1"/>
+                </shape>
+            </item>
+
+            <!-- Inner layer: Dark (#404040) shadow on top-left, inset by 1px -->
+            <item>
+                <shape type="rect">
+                    <!-- Top: from x=1 to x=width-1, at y=1 -->
+                    <stroke width="1" color="#404040" top="1" left="1" right="1"/>
+                    <!-- Left: from y=1 to y=height-1, at x=1 -->
+                    <stroke width="1" color="#404040" left="1" top="1" bottom="1"/>
+                </shape>
+            </item>
+
+            <!-- Inner highlight: White on bottom-right, inset by 1px -->
+            <item>
+                <shape type="rect">
+                    <!-- Bottom: from x=1 to x=width-1, at y=height-1 -->
+                    <stroke width="1" color="#ffffff" bottom="1" left="1" right="1"/>
+                    <!-- Right: from y=1 to y=height-1, at x=width-1 -->
+                    <stroke width="1" color="#ffffff" right="1" top="1" bottom="1"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+
+    <!-- Focused state (raised 3D effect with focus ring) -->
+    <item state_focused="true">
+        <layer-list>
+            <!-- Outer highlight: White on top-left -->
+            <item>
+                <shape type="rect">
+                    <stroke width="1" color="#ffffff" top="0" left="0" right="2"/>
+                    <stroke width="1" color="#ffffff" left="0" top="1" bottom="1"/>
+                </shape>
+            </item>
+
+            <!-- Outer shadow: Dark (#404040) on bottom-right -->
+            <item>
+                <shape type="rect">
+                    <stroke width="1" color="#404040" bottom="1" left="0" right="0"/>
+                    <stroke width="1" color="#404040" right="1" top="0" bottom="1"/>
+                </shape>
+            </item>
+
+            <!-- Inner shadow: Gray (#808080) on bottom-right -->
+            <item>
+                <shape type="rect">
+                    <stroke width="1" color="#808080" bottom="2" left="1" right="2"/>
+                    <stroke width="1" color="#808080" right="2" top="1" bottom="1"/>
+                </shape>
+            </item>
+
+            <!-- Focus rectangle: Dashed black, inset by 4px -->
+            <item>
+                <shape type="rect">
+                    <!--<stroke width="1" color="#80000000" top="3" left="3" right="4"/>-->
+                    <stroke width="1" color="#808080" bottom="6" left="6" right="6"/>
+                    <!--<stroke width="1" color="#80000000" left="3" top="3" bottom="4"/>-->
+                    <!--<stroke width="1" color="#80000000" right="4" top="3" bottom="4"/>-->
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+
+    <!-- Default state (raised 3D effect) -->
+    <item>
+        <layer-list>
+            <!-- Outer highlight: White on top-left -->
+            <item>
+                <shape type="rect">
+                    <!-- Top: from x=2 to x=width-3, at y=2 -->
+                    <stroke width="1" color="#ffffff" top="0" left="0" right="2"/>
+                    <!-- Left: from y=2 to y=height-3, at x=2 -->
+                    <stroke width="1" color="#ffffff" left="0" top="1" bottom="1"/>
+                </shape>
+            </item>
+
+            <!-- Outer shadow: Dark (#404040) on bottom-right -->
+            <item>
+                <shape type="rect">
+                    <!-- Bottom: from x=2 to x=width-2, at y=height-2 -->
+                    <stroke width="1" color="#404040" bottom="1" left="0" right="0"/>
+                    <!-- Right: from y=2 to y=height-2, at x=width-2 -->
+                    <stroke width="1" color="#404040" right="1" top="0" bottom="1"/>
+                </shape>
+            </item>
+
+            <!-- Inner shadow: Gray (#808080) on bottom-right, inset by 3px -->
+            <item>
+                <shape type="rect">
+                    <!-- Bottom: from x=3 to x=width-3, at y=height-3 -->
+                    <stroke width="1" color="#808080" bottom="2" left="1" right="2"/>
+                    <!-- Right: from y=3 to y=height-3, at x=width-3 -->
+                    <stroke width="1" color="#808080" right="2" top="1" bottom="1"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

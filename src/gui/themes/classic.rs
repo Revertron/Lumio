@@ -11,6 +11,7 @@ use super::super::themes::utils::draw_dashed_rectangle;
 use super::super::types::Rect;
 use super::super::types;
 use super::super::types::rect;
+use super::super::drawing::{Drawable, DrawableRegistry, DrawingEngine};
 
 #[allow(unused)]
 pub struct Classic<'h> {
@@ -19,7 +20,8 @@ pub struct Classic<'h> {
     height: i32,
     scale: f64,
     current_clip: Rect<i32>,
-    clip_stack: VecDeque<Rect<i32>>
+    clip_stack: VecDeque<Rect<i32>>,
+    drawable_registry: &'h DrawableRegistry,
 }
 
 #[allow(dead_code)]
@@ -31,9 +33,17 @@ impl<'h> Classic<'h> {
     const DARK: u32 = 0xff404040;
     const BLACK: u32 = 0xff000000;
 
-    pub fn new(graphics: &'h mut Graphics2D, width: i32, height: i32, scale: f64) -> Self {
+    pub fn new(graphics: &'h mut Graphics2D, drawable_registry: &'h DrawableRegistry, width: i32, height: i32, scale: f64) -> Self {
         let current_clip = rect((0, 0), (width, height));
-        Classic { graphics, width, height, scale, current_clip, clip_stack: VecDeque::new() }
+        Classic {
+            graphics,
+            width,
+            height,
+            scale,
+            current_clip,
+            clip_stack: VecDeque::new(),
+            drawable_registry,
+        }
     }
 }
 
@@ -168,7 +178,7 @@ impl<'h> Theme for Classic<'h> {
     #[allow(unused)]
     fn draw_edit_body(&mut self, rect: Rect<i32>, state: ViewState) {
         let border: f32 = self.scale as f32;
-        let border2: f32 = (self.scale * 2f64) as f32;
+        //let border2: f32 = (self.scale * 2f64) as f32;
         let border_half: f32 = (self.scale / 2f64) as f32;
         let top_left = Vector2::new(rect.min.x as f32, rect.min.y as f32);
         let bottom_right = Vector2::new(rect.max.x as f32, rect.max.y as f32);
@@ -204,14 +214,18 @@ impl<'h> Theme for Classic<'h> {
     fn draw_checkbox_body(&mut self, rect: Rect<i32>, state: ViewState) {
         self.draw_edit_body(rect, state);
         if state.checked {
-            let top_left = Vector2::new(rect.min.x as f32 + self.scale as f32 * 3.0, rect.min.y as f32 + self.scale as f32 * 3.0);
-            let bottom_right = Vector2::new(rect.max.x as f32 - self.scale as f32 * 3.0, rect.max.y as f32 - self.scale as f32 * 3.0);
-            let width = bottom_right.x - top_left.x;
-            let height = bottom_right.y - top_left.y;
-            let color = Color::from_hex_rgb(Classic::BLACK);
-            self.graphics.draw_line((top_left.x, top_left.y + height / 2f32), (top_left.x + width / 3f32, bottom_right.y - height / 8f32), self.scale as f32, color);
-            self.graphics.draw_line((top_left.x + width / 3f32, bottom_right.y - height / 8f32), (bottom_right.x, top_left.y + height / 8f32), self.scale as f32, color);
+            self.draw_checkbox_checkmark(rect, state);
         }
+    }
+
+    fn draw_checkbox_checkmark(&mut self, rect: Rect<i32>, _state: ViewState) {
+        let top_left = Vector2::new(rect.min.x as f32 + self.scale as f32 * 3.0, rect.min.y as f32 + self.scale as f32 * 3.0);
+        let bottom_right = Vector2::new(rect.max.x as f32 - self.scale as f32 * 3.0, rect.max.y as f32 - self.scale as f32 * 3.0);
+        let width = bottom_right.x - top_left.x;
+        let height = bottom_right.y - top_left.y;
+        let color = Color::from_hex_rgb(Classic::BLACK);
+        self.graphics.draw_line((top_left.x, top_left.y + height / 2f32), (top_left.x + width / 3f32, bottom_right.y - height / 8f32), self.scale as f32, color);
+        self.graphics.draw_line((top_left.x + width / 3f32, bottom_right.y - height / 8f32), (bottom_right.x, top_left.y + height / 8f32), self.scale as f32, color);
     }
 
     fn draw_list_back(&mut self, rect: Rect<i32>, state: ViewState) {
@@ -254,5 +268,25 @@ impl<'h> Theme for Classic<'h> {
         let bottom_right = Vector2::new(rect.max.x as f32, rect.max.y as f32);
         let color = Color::from_hex_argb(color);
         self.graphics.draw_rectangle(Rectangle::new(top_left, bottom_right), color);
+    }
+
+    // New drawable-based methods implementation
+    fn draw_drawable(&mut self, drawable: &Drawable, rect: Rect<i32>) {
+        let mut engine = DrawingEngine::new(self.graphics, self.scale);
+        engine.draw_drawable(drawable, rect);
+    }
+
+    fn get_drawable_registry(&self) -> &DrawableRegistry {
+        &self.drawable_registry
+    }
+
+    fn draw_component(&mut self, drawable_name: &str, rect: Rect<i32>, state: ViewState) {
+        // Get drawable from registry
+        if let Some(selector) = self.drawable_registry.get(drawable_name) {
+            if let Some(drawable) = selector.get_drawable(&state) {
+                let mut engine = DrawingEngine::new(self.graphics, self.scale);
+                engine.draw_drawable(drawable, rect);
+            }
+        }
     }
 }

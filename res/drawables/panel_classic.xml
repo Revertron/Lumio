@@ -1,0 +1,23 @@
+<!-- Classic Windows panel drawable -->
+<selector>
+    <item>
+        <layer-list>
+            <!-- Background -->
+            <item>
+                <shape type="rect">
+                    <solid color="#d4d0c8"/>
+                </shape>
+            </item>
+
+            <!-- Simple border - all four edges -->
+            <item>
+                <shape type="rect">
+                    <stroke width="1" color="#808080" top="0" left="0" right="0"/>
+                    <stroke width="1" color="#808080" bottom="0" left="0" right="0"/>
+                    <stroke width="1" color="#808080" left="0" top="0" bottom="0"/>
+                    <stroke width="1" color="#808080" right="0" top="0" bottom="0"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

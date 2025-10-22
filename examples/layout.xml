@@ -2,7 +2,7 @@
     <Label id="label1" text="Label with NotoSans font" padding="4"/>
     <Frame id="buttons1" direction="horizontal" padding="0" width="min">
         <Button id="btn1" text="Button 1" margin="4"/>
-        <Button id="btn2" text="Italic 2" margin="4" font_style="Italic" width="300"/>
+        <Button id="btn2" text="Button 2" margin="4" width="300"/>
         <Button id="btn3" text="Button 3" margin="4"/>
     </Frame>
 
@@ -11,7 +11,7 @@
     <CheckBox id="checkbox1" text="Create awesome GUI in Rust?" margin="4"/>
 
     <Frame width="min" height="min">
-        <Frame id="content" font="Akkurat" direction="vertical" width="min" padding="4">
+        <!--<Frame id="content" font="Akkurat" direction="vertical" width="min" padding="4">
             <Button id="btn4" text="Akkurat 4" width="max" margin_top="4"/>
             <Button id="btn5" text="Bold 5" font_style="Bold" width="max" margin_top="4"/>
             <Button id="btn6" text="Button 6" width="max" margin_top="4"/>
@@ -23,7 +23,7 @@
             <Button id="btn6-1" text="Button 2-1" width="min"/>
             <Button id="btn6-1" text="Button 3-1" width="min"/>
             <Button id="btn6-1" text="Button 3-2" width="min"/>
-        </Frame>
+        </Frame>-->
         <List id="list1" width="500" height="500" margin_left="4"/>
         <RecyclerView id="my_list" width="max" height="500" margin_left="4" margin_right="4" padding="5" />
     </Frame>

@@ -168,8 +168,11 @@ impl View for CheckBox {
         theme.clip_rect(rect);
         let box_y = (self.get_rect_height() - box_size) / 2;
         let box_rect = super::super::types::rect((rect.min.x, rect.min.y + box_y), (rect.min.x + box_size, rect.min.y + box_y + box_size));
-        theme.draw_checkbox_back(box_rect, state.main.state);
-        theme.draw_checkbox_body(box_rect, state.main.state);
+
+        // Step 1: Draw checkbox background (before text)
+        theme.draw_component("edit_field_classic_back", box_rect, state.main.state);
+
+        // Step 2: Draw text label
         // TODO use padding
         if let Some(text) = &state.cached_text {
             let x = (rect.min.x as f32 + box_size as f32 + self.text_margin as f32 * state.main.scale as f32) as f32;
@@ -177,6 +180,15 @@ impl View for CheckBox {
             let color = theme.get_text_color(state.main.state, &state.main.foreground);
             theme.draw_text(x.round(), (rect.min.y as f32 + y).round(), color, text);
         }
+
+        // Step 3: Draw checkbox borders (after text)
+        theme.draw_component("edit_field_classic_body", box_rect, state.main.state);
+
+        // Step 4: Draw checkmark if checked (on top of borders)
+        if state.main.state.checked {
+            theme.draw_checkbox_checkmark(box_rect, state.main.state);
+        }
+
         theme.pop_clip();
     }
 

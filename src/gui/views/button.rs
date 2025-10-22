@@ -151,15 +151,21 @@ impl View for Button {
         rect.move_by(origin);
         theme.push_clip();
         theme.clip_rect(rect);
-        theme.draw_button_back(rect, state.main.state);
-        theme.draw_button_body(rect, state.main.state);
-        // TODO use padding
+
+        // Step 1: Draw background (before text)
+        theme.draw_component("button_classic_back", rect, state.main.state);
+
+        // Step 2: Draw text
         if let Some(text) = &state.cached_text {
             let x = (self.get_rect_width() as f32 - text.width()) / 2f32;
             let y = (self.get_rect_height() as f32 - text.height()) / 2f32;
             let color = theme.get_text_color(state.main.state, &state.main.foreground);
             theme.draw_text((rect.min.x as f32 + x).round(), (rect.min.y as f32 + y).round(), color, text);
         }
+
+        // Step 3: Draw borders/body (after text, covers edges)
+        theme.draw_component("button_classic_body", rect, state.main.state);
+
         theme.pop_clip();
     }
 

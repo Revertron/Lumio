@@ -1,0 +1,99 @@
+<!-- Classic Windows button drawable -->
+<selector>
+    <!-- Pressed and hovered state (sunken) -->
+    <item state_pressed="true" state_hovered="true">
+        <layer-list>
+            <!-- Background -->
+            <item>
+                <shape type="rect">
+                    <solid color="#e4e0d8"/>
+                </shape>
+            </item>
+
+            <!-- Inset border effect -->
+            <item>
+                <shape type="rect">
+                    <!-- Outer shadow: Gray on top-left -->
+                    <stroke width="1" color="#808080" top="0" left="0" right="1"/>
+                    <stroke width="1" color="#808080" left="0" top="0" bottom="1"/>
+
+                    <!-- Inner dark line: Dark on top-left, inset 1px -->
+                    <stroke width="1" color="#404040" top="1" left="1" right="1"/>
+                    <stroke width="1" color="#404040" left="1" top="1" bottom="1"/>
+
+                    <!-- Inner highlight: White on bottom-right, inset 1px -->
+                    <stroke width="1" color="#ffffff" bottom="1" left="1" right="1"/>
+                    <stroke width="1" color="#ffffff" right="1" top="1" bottom="1"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+
+    <!-- Focused state (add focus ring) -->
+    <item state_focused="true">
+        <layer-list>
+            <!-- Background -->
+            <item>
+                <shape type="rect">
+                    <solid color="#d4d0c8"/>
+                </shape>
+            </item>
+
+            <!-- Raised border effect -->
+            <item>
+                <shape type="rect">
+                    <!-- Outer highlight: White on top-left -->
+                    <stroke width="1" color="#ffffff" top="0" left="0" right="1"/>
+                    <stroke width="1" color="#ffffff" left="0" top="0" bottom="1"/>
+
+                    <!-- Outer shadow: Dark on bottom-right -->
+                    <stroke width="1" color="#404040" bottom="0" left="0" right="0"/>
+                    <stroke width="1" color="#404040" right="0" top="0" bottom="0"/>
+
+                    <!-- Inner shadow: Gray on bottom-right, inset 1px -->
+                    <stroke width="1" color="#808080" bottom="1" left="1" right="1"/>
+                    <stroke width="1" color="#808080" right="1" top="1" bottom="1"/>
+                </shape>
+            </item>
+
+            <!-- Focus rectangle: Dashed black, inset 4px -->
+            <item>
+                <shape type="rect">
+                    <stroke width="1" color="#000000" top="4" left="4" right="4" dash_array="2,2"/>
+                    <stroke width="1" color="#000000" bottom="4" left="4" right="4" dash_array="2,2"/>
+                    <stroke width="1" color="#000000" left="4" top="4" bottom="4" dash_array="2,2"/>
+                    <stroke width="1" color="#000000" right="4" top="4" bottom="4" dash_array="2,2"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+
+    <!-- Default state (raised) -->
+    <item>
+        <layer-list>
+            <!-- Background -->
+            <item>
+                <shape type="rect">
+                    <solid color="#d4d0c8"/>
+                </shape>
+            </item>
+
+            <!-- Raised border effect -->
+            <item>
+                <shape type="rect">
+                    <!-- Outer highlight: White on top-left -->
+                    <stroke width="1" color="#ffffff" top="0" left="0" right="1"/>
+                    <stroke width="1" color="#ffffff" left="0" top="0" bottom="1"/>
+
+                    <!-- Outer shadow: Dark on bottom-right -->
+                    <stroke width="1" color="#404040" bottom="0" left="0" right="0"/>
+                    <stroke width="1" color="#404040" right="0" top="0" bottom="0"/>
+
+                    <!-- Inner shadow: Gray on bottom-right, inset 1px -->
+                    <stroke width="1" color="#808080" bottom="1" left="1" right="1"/>
+                    <stroke width="1" color="#808080" right="1" top="1" bottom="1"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

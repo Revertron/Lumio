@@ -1,0 +1,13 @@
+<!-- Classic Windows edit field caret (text cursor) -->
+<selector>
+    <!-- Only visible when focused -->
+    <item state_focused="true">
+        <layer-list>
+            <item>
+                <shape type="rect">
+                    <solid color="#000000"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

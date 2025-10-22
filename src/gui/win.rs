@@ -3,12 +3,13 @@ use std::time::Duration;
 use speedy2d::dimen::Vector2;
 use speedy2d::Graphics2D;
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, UserEventSender, VirtualKeyCode, WindowHandler, WindowHelper, WindowStartupInfo};
-
+use crate::drawing::DrawableRegistry;
 use super::ui::UI;
 use super::themes::*;
 
 pub struct Win<T> {
     ui: UI,
+    drawable_registry: DrawableRegistry,
     width: u32,
     height: u32,
     mouse_pos: Vector2<i32>,
@@ -21,6 +22,7 @@ impl<T> Win<T> {
     pub fn new(ui: UI, sender: UserEventSender<WinEvent>) -> Self {
         Win {
             ui,
+            drawable_registry: DrawableRegistry::new(),
             width: 0,
             height: 0,
             mouse_pos: Vector2::new(-1, -1),
@@ -73,7 +75,7 @@ impl<T> WindowHandler<T> for Win<T> {
 
     fn on_draw(&mut self, helper: &mut WindowHelper<T>, graphics: &mut Graphics2D) {
         let scale = helper.get_scale_factor();
-        let mut theme = Classic::new(graphics, self.width as i32, self.height as i32, scale);
+        let mut theme = Classic::new(graphics, &self.drawable_registry, self.width as i32, self.height as i32, scale);
         self.ui.paint(&mut theme);
     }
 

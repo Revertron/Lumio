@@ -1,0 +1,13 @@
+<!-- Classic Windows edit field background (drawn before text) -->
+<selector>
+    <!-- All states use white background -->
+    <item>
+        <layer-list>
+            <item>
+                <shape type="rect">
+                    <solid color="#ffffff"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

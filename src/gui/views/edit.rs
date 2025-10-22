@@ -253,13 +253,13 @@ impl View for Edit {
         let mut rect = state.main.rect;
         rect.move_by(origin);
         //println!("Drawing Edit {} in rect: {:?}, starting rect {:?}", self.get_id(), &rect, &state.main.rect);
-        // Drawing the back and frame
+        // Step 1: Draw background (before text)
         theme.push_clip();
         theme.clip_rect(rect);
-        theme.draw_edit_back(rect, state.main.state);
-        theme.draw_edit_body(rect, state.main.state);
+        theme.draw_component("edit_field_classic_back", rect, state.main.state);
         theme.pop_clip();
-        // Drawing the text
+
+        // Step 2: Draw the text
         let padding = state.main.padding.scaled(state.main.scale);
         rect.shrink_by(padding.top, padding.left, padding.right, padding.bottom);
         theme.push_clip();
@@ -270,11 +270,21 @@ impl View for Edit {
             theme.draw_text((rect.min.x as f32 + scroll_x as f32).round(), (rect.min.y as f32 + y).round(), color, text);
         }
         theme.pop_clip();
+
+        // Step 3: Draw borders (after text)
+        let mut rect = state.main.rect;
+        rect.move_by(origin);
+        theme.push_clip();
+        theme.clip_rect(rect);
+        theme.draw_component("edit_field_classic_body", rect, state.main.state);
+        theme.pop_clip();
+
+        // Step 4: Draw caret (on top of everything)
         if state.main.state.focused && *self.caret_visible.borrow() {
             let mut caret_rect = self.get_caret_rect(state.main.scale);
             caret_rect.move_by(origin);
             caret_rect.move_by((scroll_x, 0));
-            theme.draw_edit_caret(caret_rect, state.main.state);
+            theme.draw_component("edit_caret_classic", caret_rect, state.main.state);
         }
     }
 

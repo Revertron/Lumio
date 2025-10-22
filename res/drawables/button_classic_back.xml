@@ -1,0 +1,34 @@
+<!-- Classic Windows button background (drawn before text) -->
+<selector>
+    <!-- Hovered or pressed state - lighter background -->
+    <item state_hovered="true">
+        <layer-list>
+            <item>
+                <shape type="rect">
+                    <solid color="#e4e0d8"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+
+    <item state_focused="true">
+        <layer-list>
+            <item>
+                <shape type="rect">
+                    <solid color="#e4e0d8"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+
+    <!-- Default state - normal background -->
+    <item>
+        <layer-list>
+            <item>
+                <shape type="rect">
+                    <solid color="#d4d0c8"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>
