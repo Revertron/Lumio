@@ -4,6 +4,7 @@ pub mod edit;
 pub mod checkbox;
 pub mod list;
 pub mod recyclerview;
+pub mod imagebutton;
 
 use super::themes::{Typeface, ViewState};
 use super::traits::{View, WeakElement};
@@ -22,6 +23,7 @@ pub use self::edit::Edit;
 pub use self::checkbox::CheckBox;
 pub use self::list::List;
 pub use self::recyclerview::{RecyclerView, RecyclerAdapter, ViewHolder, LayoutManager, LinearLayoutManager};
+pub use self::imagebutton::ImageButton;
 
 pub const BUTTON_MIN_WIDTH: i32 = 80;
 pub const BUTTON_MIN_HEIGHT: i32 = 24;

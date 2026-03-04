@@ -1,8 +1,10 @@
 use std::cmp::{max, min};
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
+use std::io::Cursor;
 use speedy2d::color::Color;
 use speedy2d::dimen::Vector2;
 use speedy2d::font::FormattedTextBlock;
+use speedy2d::image::{ImageHandle, ImageSmoothingMode};
 use speedy2d::Graphics2D;
 use speedy2d::shape::Rectangle;
 use super::super::styles::selector::{DrawState, MainSelector};
@@ -13,6 +15,9 @@ use super::super::types;
 use super::super::types::rect;
 use super::super::drawing::{Drawable, DrawableRegistry, DrawingEngine};
 
+/// Cache for GPU image handles, keyed by the raw pointer of the source byte slice.
+pub type ImageCache = HashMap<usize, ImageHandle>;
+
 #[allow(unused)]
 pub struct Classic<'h> {
     graphics: &'h mut Graphics2D,
@@ -22,6 +27,7 @@ pub struct Classic<'h> {
     current_clip: Rect<i32>,
     clip_stack: VecDeque<Rect<i32>>,
     drawable_registry: &'h DrawableRegistry,
+    image_cache: &'h mut ImageCache,
 }
 
 #[allow(dead_code)]
@@ -33,7 +39,7 @@ impl<'h> Classic<'h> {
     const DARK: u32 = 0xff404040;
     const BLACK: u32 = 0xff000000;
 
-    pub fn new(graphics: &'h mut Graphics2D, drawable_registry: &'h DrawableRegistry, width: i32, height: i32, scale: f64) -> Self {
+    pub fn new(graphics: &'h mut Graphics2D, drawable_registry: &'h DrawableRegistry, image_cache: &'h mut ImageCache, width: i32, height: i32, scale: f64) -> Self {
         let current_clip = rect((0, 0), (width, height));
         Classic {
             graphics,
@@ -43,6 +49,7 @@ impl<'h> Classic<'h> {
             current_clip,
             clip_stack: VecDeque::new(),
             drawable_registry,
+            image_cache,
         }
     }
 }
@@ -287,6 +294,29 @@ impl<'h> Theme for Classic<'h> {
                 let mut engine = DrawingEngine::new(self.graphics, self.scale);
                 engine.draw_drawable(drawable, rect);
             }
+        }
+    }
+
+    fn draw_image(&mut self, rect: Rect<i32>, image_bytes: &[u8]) {
+        let cache_key = image_bytes.as_ptr() as usize;
+        if !self.image_cache.contains_key(&cache_key) {
+            let cursor = Cursor::new(image_bytes);
+            match self.graphics.create_image_from_file_bytes(None, ImageSmoothingMode::Linear, cursor) {
+                Ok(handle) => {
+                    self.image_cache.insert(cache_key, handle);
+                }
+                Err(e) => {
+                    println!("Error creating image: {}", e);
+                    return;
+                }
+            }
+        }
+        if let Some(handle) = self.image_cache.get(&cache_key) {
+            let speedy_rect = Rectangle::from_tuples(
+                (rect.min.x as f32, rect.min.y as f32),
+                (rect.max.x as f32, rect.max.y as f32),
+            );
+            self.graphics.draw_rectangle_image(speedy_rect, handle);
         }
     }
 }

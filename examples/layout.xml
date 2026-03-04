@@ -28,10 +28,11 @@
         <RecyclerView id="my_list" width="max" height="500" margin_left="4" margin_right="4" padding="5" />
     </Frame>
 
-    <Frame id="footer" width="30%" height="min" breaking="true" padding="4">
+    <Frame id="footer" width="40%" height="min" breaking="true" padding="4">
         <Button id="btn7" text="Tlačidlo 7"/>
         <Button id="btn8" text="Кнопка 8"/>
         <Button id="btn9" text="Last button" width="min"/>
+        <ImageButton id="play_btn" image="send.png" hover_image="send-hover.png" no_inset="true" width="24" height="24"/>
     </Frame>
 
     <Frame id="test" width="40%" height="min">

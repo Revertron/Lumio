@@ -17,6 +17,18 @@ pub fn set_provider(value: Box<impl AssetsProvider + 'static>) {
     });
 }
 
+pub fn get_asset(path: &str) -> Option<Vec<u8>> {
+    let mut result = None;
+    PROVIDER.with(|provider| {
+        if let Some(p) = provider.borrow().as_ref() {
+            if let Some(bytes) = p.get_file(path) {
+                result = Some(bytes.to_vec());
+            }
+        }
+    });
+    result
+}
+
 pub fn get_font(name: &str, style: &str) -> Option<Font> {
     let mut result = None;
     PROVIDER.with(|provider| {

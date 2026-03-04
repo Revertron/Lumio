@@ -5,6 +5,7 @@ use speedy2d::font::FormattedTextBlock;
 use super::styles::selector::MainSelector;
 use super::drawing::{Drawable, DrawableRegistry};
 pub use self::classic::Classic;
+pub use self::classic::ImageCache;
 use super::types::Rect;
 
 pub trait Theme {
@@ -44,6 +45,10 @@ pub trait Theme {
     /// Draw a component using a drawable from the registry
     /// This method has a default implementation that can be overridden
     fn draw_component(&mut self, drawable_name: &str, rect: Rect<i32>, state: ViewState);
+
+    /// Draw an image from raw file bytes, scaled to fit the given rect.
+    /// The image is cached by the byte slice pointer for efficiency.
+    fn draw_image(&mut self, rect: Rect<i32>, image_bytes: &[u8]);
 }
 
 #[allow(unused)]

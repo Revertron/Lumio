@@ -5,6 +5,6 @@ pub use crate::events::EventType;
 pub use crate::assets::{AssetsProvider, set_provider};
 pub use crate::themes::{Theme, Classic, Typeface};
 pub use crate::containers::Frame;
-pub use crate::views::{Label, Button, Edit, CheckBox, List};
+pub use crate::views::{Label, Button, Edit, CheckBox, List, ImageButton};
 pub use crate::views::{RecyclerView, RecyclerAdapter, ViewHolder};
 pub use crate::views::{Dimension, Direction, Borders};
