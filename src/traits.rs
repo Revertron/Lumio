@@ -92,6 +92,23 @@ pub trait View: Downcast {
     fn set_scale(&mut self, scale: f64);
     fn set_id(&mut self, id: &str);
     fn get_id(&self) -> String;
+    /// Returns the absolute (window) position of this view's top-left corner
+    /// by walking up the parent chain and accumulating offsets.
+    fn get_absolute_position(&self) -> Point<i32> {
+        let rect = self.get_rect();
+        let mut x = rect.min.x;
+        let mut y = rect.min.y;
+        let mut current = self.get_parent();
+        while let Some(parent) = current {
+            let parent_ref = parent.borrow();
+            let pr = parent_ref.get_rect();
+            x += pr.min.x;
+            y += pr.min.y;
+            current = parent_ref.get_parent();
+        }
+        Point { x, y }
+    }
+
     fn as_container(&self) -> Option<&dyn Container> { None }
     fn as_container_mut(&mut self) -> Option<&mut dyn Container> { None }
 

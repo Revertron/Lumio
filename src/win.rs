@@ -127,6 +127,11 @@ impl<T> WindowHandler<T> for Win<T> {
     fn on_keyboard_char(&mut self,helper: &mut WindowHelper<T>, unicode_codepoint: char) {
         println!("Codepoint {:?}", unicode_codepoint);
         if unicode_codepoint == 27 as char {
+            if self.ui.has_popups() {
+                self.ui.close_all_popups();
+                helper.request_redraw();
+                return;
+            }
             helper.terminate_loop();
         }
         if self.ui.on_key_char(unicode_codepoint, self.mod_state.clone()) {

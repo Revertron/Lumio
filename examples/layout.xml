@@ -3,7 +3,7 @@
     <Frame id="buttons1" direction="horizontal" padding="0" width="min">
         <Button id="btn1" text="Button 1" margin="4"/>
         <Button id="btn2" text="Button 2" margin="4" width="300"/>
-        <Button id="btn3" text="Button 3" margin="4"/>
+        <Button id="btn3" text="Popup menu" margin="4"/>
     </Frame>
 
     <Edit id="edit1" text="Some very very very long text to edit and test clipping" width="40%" margin="4"/>

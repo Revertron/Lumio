@@ -662,7 +662,13 @@ impl View for RecyclerView {
         };
 
         let rect = rect((x, y), (x + width, y + height));
+        let old_rect = self.get_rect();
         self.set_rect(rect);
+
+        // Trigger re-layout when size changes
+        if old_rect.width() != rect.width() || old_rect.height() != rect.height() {
+            *self.needs_layout.borrow_mut() = true;
+        }
 
         // Trigger recycle and fill
         if *self.needs_layout.borrow() {

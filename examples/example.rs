@@ -118,6 +118,29 @@ fn main() {
         button.borrow_mut().on_event(EventType::Click, Box::new(button2_click));
     }
 
+    if let Some(button) = ui.get_view("btn3") {
+        button.borrow_mut().on_event(EventType::Click, Box::new(|ui, view| {
+            let menu_element = ui.create("PopupMenu");
+            {
+                let mut menu = menu_element.borrow_mut();
+                let popup = menu.downcast_mut::<PopupMenu>().unwrap();
+                popup.add_item("cut", "icons/cut.png", "Cut");
+                popup.add_item("copy", "icons/copy.png", "Copy");
+                popup.add_item("paste", "icons/paste.png", "Paste");
+                popup.on_event(EventType::Click, Box::new(|ui, view| {
+                    let popup = view.as_any().downcast_ref::<PopupMenu>().unwrap();
+                    if let Some(index) = popup.get_hovered_index() {
+                        println!("Selected item: {}", index);
+                    }
+                    true
+                }));
+            }
+            let pos = ui.get_mouse_pos();
+            ui.show_popup(menu_element, pos.x, pos.y, PopupDirection::BottomRight, PopupMode::Popup);
+            true
+        }));
+    }
+
     if let Some(image) = ui.get_view("my_image") {
         image.borrow_mut().on_event(EventType::Click, Box::new(|_ui, _view| {
             println!("Image clicked!");
