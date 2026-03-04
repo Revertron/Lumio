@@ -14,7 +14,7 @@ use super::traits::{Element, View};
 use super::types::Point;
 use super::themes::Typeface;
 
-use super::views::{Button, Edit, Label, CheckBox, List, RecyclerView, ImageButton};
+use super::views::{Button, Edit, Label, CheckBox, List, RecyclerView, ImageButton, ImageView};
 
 pub struct UI {
     width: u32,
@@ -37,6 +37,7 @@ impl UI {
         ui.register::<List>("List");
         ui.register::<RecyclerView>("RecyclerView");
         ui.register::<ImageButton>("ImageButton");
+        ui.register::<ImageView>("ImageView");
         ui.register::<Frame>("Frame");
         ui
     }

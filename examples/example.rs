@@ -118,6 +118,13 @@ fn main() {
         button.borrow_mut().on_event(EventType::Click, Box::new(button2_click));
     }
 
+    if let Some(image) = ui.get_view("my_image") {
+        image.borrow_mut().on_event(EventType::Click, Box::new(|_ui, _view| {
+            println!("Image clicked!");
+            true
+        }));
+    }
+
     ui.on_start(Box::new(on_start));
 
     let window_size = WindowSize::PhysicalPixels(Vector2::new(WIDTH, HEIGHT));

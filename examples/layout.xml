@@ -24,7 +24,8 @@
             <Button id="btn6-1" text="Button 3-1" width="min"/>
             <Button id="btn6-1" text="Button 3-2" width="min"/>
         </Frame>-->
-        <List id="list1" width="500" height="500" margin_left="4"/>
+        <List id="list1" width="300" height="500" margin_left="4"/>
+        <ImageView id="my_image" width="218" margin_left="4" image="cats.jpg" />
         <RecyclerView id="my_list" width="max" height="500" margin_left="4" margin_right="4" padding="5" />
     </Frame>
 

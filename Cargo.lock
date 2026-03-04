@@ -777,6 +777,7 @@ name = "lumio"
 version = "0.1.0"
 dependencies = [
  "downcast-rs",
+ "image",
  "include_dir",
  "quick-xml",
  "rand",

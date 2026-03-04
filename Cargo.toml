@@ -11,6 +11,7 @@ categories = ["gui", "rendering"]
 quick-xml = "0.38.3"
 downcast-rs = "1.2.0"
 speedy2d = "3.0.0"
+image = "0.23"
 rand = "0.8.5"
 
 [dev-dependencies]
