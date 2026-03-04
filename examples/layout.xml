@@ -32,7 +32,7 @@
     <Frame id="footer" width="40%" height="min" breaking="true" padding="4">
         <Button id="btn7" text="Tlačidlo 7"/>
         <Button id="btn8" text="Кнопка 8"/>
-        <Button id="btn9" text="Last button" width="min"/>
+        <Button id="btn9" text="Show dialog" width="min"/>
         <ImageButton id="play_btn" image="send.png" hover_image="send-hover.png" no_inset="true" width="24" height="24"/>
     </Frame>
 

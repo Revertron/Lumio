@@ -7,6 +7,7 @@ pub mod recyclerview;
 pub mod imagebutton;
 pub mod imageview;
 pub mod popupmenu;
+pub mod dialog;
 
 use super::themes::{Typeface, ViewState};
 use super::traits::{View, WeakElement};
@@ -28,6 +29,7 @@ pub use self::recyclerview::{RecyclerView, RecyclerAdapter, ViewHolder, LayoutMa
 pub use self::imagebutton::ImageButton;
 pub use self::imageview::ImageView;
 pub use self::popupmenu::{PopupMenu, MenuItem};
+pub use self::dialog::{Dialog, DialogButton, ButtonSide};
 
 pub const BUTTON_MIN_WIDTH: i32 = 80;
 pub const BUTTON_MIN_HEIGHT: i32 = 24;

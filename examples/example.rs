@@ -1,5 +1,7 @@
 #![windows_subsystem = "windows"]
 
+use std::cell::RefCell;
+use std::rc::Rc;
 use include_dir::{Dir, include_dir};
 use speedy2d::dimen::Vector2;
 use speedy2d::Window;
@@ -137,6 +139,31 @@ fn main() {
             }
             let pos = ui.get_mouse_pos();
             ui.show_popup(menu_element, pos.x, pos.y, PopupDirection::BottomRight, PopupMode::Popup);
+            true
+        }));
+    }
+
+    if let Some(button) = ui.get_view("btn9") {
+        button.borrow_mut().on_event(EventType::Click, Box::new(|ui, _view| {
+            let dlg: Element = Rc::new(RefCell::new(Dialog::new()));
+            {
+                let mut d = dlg.borrow_mut();
+                let dialog = d.downcast_mut::<Dialog>().unwrap();
+                dialog.set_icon("icons/warning.png");
+                dialog.set_message("Are you sure you want to delete this file?");
+                dialog.add_button("yes", "Yes", ButtonSide::Right, true);
+                dialog.add_button("no", "No", ButtonSide::Right, false);
+                dialog.add_button("help", "Help", ButtonSide::Left, false);
+                dialog.on_event(EventType::Click, Box::new(|ui, view| {
+                    let d = view.as_any().downcast_ref::<Dialog>().unwrap();
+                    println!("Pressed: {:?}", d.get_pressed_button());
+                    d.close(ui);
+                    true
+                }));
+            }
+            let cx = (ui.get_width() / 2) as i32;
+            let cy = (ui.get_height() / 2) as i32;
+            ui.show_popup(dlg, cx, cy, PopupDirection::Center, PopupMode::Modal);
             true
         }));
     }

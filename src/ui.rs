@@ -14,7 +14,7 @@ use super::traits::{Element, View};
 use super::types::Point;
 use super::themes::Typeface;
 
-use super::views::{Button, Edit, Label, CheckBox, List, RecyclerView, ImageButton, ImageView, PopupMenu};
+use super::views::{Button, Edit, Label, CheckBox, List, RecyclerView, ImageButton, ImageView, PopupMenu, Dialog};
 
 /// Controls how a popup interacts with the rest of the UI.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -36,6 +36,8 @@ pub enum PopupDirection {
     TopRight,
     /// (x, y) is the bottom-right corner of the popup.
     TopLeft,
+    /// (x, y) is the center of the popup.
+    Center,
 }
 
 struct PopupEntry {
@@ -70,6 +72,7 @@ impl UI {
         ui.register::<ImageButton>("ImageButton");
         ui.register::<ImageView>("ImageView");
         ui.register::<PopupMenu>("PopupMenu");
+        ui.register::<Dialog>("Dialog");
         ui.register::<Frame>("Frame");
         ui
     }
@@ -161,6 +164,7 @@ impl UI {
             PopupDirection::BottomLeft => (x - pw, y),
             PopupDirection::TopRight => (x, y - ph),
             PopupDirection::TopLeft => (x - pw, y - ph),
+            PopupDirection::Center => (x - pw / 2, y - ph / 2),
         };
 
         // Clamp to window bounds
