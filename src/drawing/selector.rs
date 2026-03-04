@@ -1,5 +1,5 @@
 use super::primitives::Drawable;
-use crate::gui::themes::ViewState;
+use crate::themes::ViewState;
 
 /// Android StateListDrawable-style selector
 /// Maps view states to drawables

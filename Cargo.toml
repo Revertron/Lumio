@@ -1,13 +1,16 @@
 [package]
 name = "lumio"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 authors = ["Revertron <lumio@revertron.com>"]
+description = "A declarative XML-based GUI framework for Rust built on speedy2d"
+keywords = ["gui", "ui", "xml", "desktop", "framework"]
+categories = ["gui", "rendering"]
 
 [dependencies]
 quick-xml = "0.38.3"
 downcast-rs = "1.2.0"
-speedy2d = "2.1.0"
+speedy2d = "3.0.0"
 rand = "0.8.5"
 
 [dev-dependencies]

@@ -1,8 +1,8 @@
 use std::cell::RefCell;
-use crate::gui::themes::{FontStyle, Typeface};
-use crate::gui::traits::{Element, WeakElement};
-use crate::gui::types::Rect;
-use crate::gui::views::{Borders, Dimension, FieldsMain};
+use crate::themes::{FontStyle, Typeface};
+use crate::traits::{Element, WeakElement};
+use crate::types::Rect;
+use crate::views::{Borders, Dimension, FieldsMain};
 
 /// Manages font/typeface inheritance and manipulation
 #[derive(Clone, Default)]

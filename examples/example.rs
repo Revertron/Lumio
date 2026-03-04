@@ -1,23 +1,11 @@
 #![windows_subsystem = "windows"]
 
-extern crate include_dir;
-extern crate speedy2d;
-extern crate lumio;
-
 use include_dir::{Dir, include_dir};
 use speedy2d::dimen::Vector2;
 use speedy2d::Window;
 use speedy2d::window::{WindowCreationOptions, WindowPosition, WindowSize};
 
-use lumio::assets::{AssetsProvider, set_provider};
-use lumio::events::EventType;
-use lumio::themes::Classic;
-use lumio::themes::Theme;
-use lumio::traits::View;
-use lumio::ui::UI;
-use lumio::views::{Button, CheckBox, Edit, List, RecyclerView, RecyclerAdapter, ViewHolder};
-use lumio::win::{Win, WinEvent};
-use lumio::containers::Frame;
+use lumio::prelude::*;
 
 const WIDTH: u32 = 1920;
 const HEIGHT: u32 = 1080;

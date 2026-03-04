@@ -2,10 +2,10 @@ mod classic;
 mod utils;
 
 use speedy2d::font::FormattedTextBlock;
-use super::super::styles::selector::MainSelector;
-use super::super::drawing::{Drawable, DrawableRegistry};
-pub use super::themes::classic::Classic;
-use super::super::types::Rect;
+use super::styles::selector::MainSelector;
+use super::drawing::{Drawable, DrawableRegistry};
+pub use self::classic::Classic;
+use super::types::Rect;
 
 pub trait Theme {
     fn clear_screen(&mut self);

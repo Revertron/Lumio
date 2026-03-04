@@ -6,17 +6,16 @@ use speedy2d::dimen::Vector2;
 use speedy2d::font::{TextLayout, TextOptions};
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
 
-use crate::gui::assets::get_font;
-use crate::gui::events::EventType;
-use crate::gui;
-use crate::gui::common::{delete_char, insert_char};
-use crate::gui::views::Borders;
-use crate::gui::styles::selector::FontSelector;
-use crate::gui::themes::{Theme, Typeface, ViewState};
-use crate::gui::traits::{Element, View, WeakElement};
-use crate::gui::types::{Point, Rect, rect};
-use crate::gui::ui::UI;
-use crate::gui::view_base::{HasMainFields, ViewBasics};
+use crate::assets::get_font;
+use crate::events::EventType;
+use crate::common::{delete_char, insert_char};
+use crate::views::Borders;
+use crate::styles::selector::FontSelector;
+use crate::themes::{Theme, Typeface, ViewState};
+use crate::traits::{Element, View, WeakElement};
+use crate::types::{Point, Rect, rect};
+use crate::ui::UI;
+use crate::view_base::{HasMainFields, ViewBasics};
 use super::{BUTTON_MIN_HEIGHT, BUTTON_MIN_WIDTH, Dimension, FieldsMain, FieldsTexted};
 
 pub struct Edit {
@@ -54,7 +53,7 @@ impl Edit {
             state: RefCell::new(fields),
             scroll_x: RefCell::new(0),
             caret_pos: RefCell::new(0),
-            caret_rect: RefCell::new(gui::types::rect((0, 0), (0, 0))),
+            caret_rect: RefCell::new(crate::types::rect((0, 0), (0, 0))),
             caret_time: RefCell::new(Instant::now()),
             caret_visible: RefCell::new(false)
         }

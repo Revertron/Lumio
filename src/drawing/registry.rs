@@ -22,14 +22,14 @@ impl DrawableRegistry {
     fn load_embedded_drawables(&mut self) {
         println!("Loading drawables");
         // Classic theme drawables
-        self.load_drawable("button_classic", include_str!("../../../res/drawables/button_classic.xml"));
-        self.load_drawable("button_classic_back", include_str!("../../../res/drawables/button_classic_back.xml"));
-        self.load_drawable("button_classic_body", include_str!("../../../res/drawables/button_classic_body.xml"));
-        self.load_drawable("edit_field_classic_back", include_str!("../../../res/drawables/edit_field_classic_back.xml"));
-        self.load_drawable("edit_field_classic_body", include_str!("../../../res/drawables/edit_field_classic_body.xml"));
-        self.load_drawable("edit_caret_classic", include_str!("../../../res/drawables/edit_caret_classic.xml"));
-        self.load_drawable("checkbox_classic", include_str!("../../../res/drawables/checkbox_classic.xml"));
-        self.load_drawable("panel_classic", include_str!("../../../res/drawables/panel_classic.xml"));
+        self.load_drawable("button_classic", include_str!("../drawables/button_classic.xml"));
+        self.load_drawable("button_classic_back", include_str!("../drawables/button_classic_back.xml"));
+        self.load_drawable("button_classic_body", include_str!("../drawables/button_classic_body.xml"));
+        self.load_drawable("edit_field_classic_back", include_str!("../drawables/edit_field_classic_back.xml"));
+        self.load_drawable("edit_field_classic_body", include_str!("../drawables/edit_field_classic_body.xml"));
+        self.load_drawable("edit_caret_classic", include_str!("../drawables/edit_caret_classic.xml"));
+        self.load_drawable("checkbox_classic", include_str!("../drawables/checkbox_classic.xml"));
+        self.load_drawable("panel_classic", include_str!("../drawables/panel_classic.xml"));
 
         // Future: Add more themes here
         // self.load_drawable("button_modern", include_str!("../../../res/drawables/button_modern.xml"));
@@ -80,7 +80,7 @@ mod tests {
 
         // Check that all classic drawables are loaded
         assert!(registry.contains("button_classic"));
-        assert!(registry.contains("edit_field_classic"));
+        assert!(registry.contains("edit_field_classic_back"));
         assert!(registry.contains("checkbox_classic"));
         assert!(registry.contains("panel_classic"));
     }

@@ -4,7 +4,7 @@ use speedy2d::dimen::Vector2;
 use speedy2d::shape::Rectangle;
 
 use super::primitives::*;
-use crate::gui::types::Rect;
+use crate::types::Rect;
 
 /// Context for expression evaluation
 pub struct DrawContext {
@@ -180,8 +180,8 @@ impl<'a> DrawingEngine<'a> {
     /// Draw rectangle stroke (outline)
     fn draw_rect_stroke(&mut self, rect: Rectangle, stroke: &Stroke) {
         let width = self.eval_expr(&stroke.width, Rect {
-            min: crate::gui::types::Point { x: rect.top_left().x as i32, y: rect.top_left().y as i32 },
-            max: crate::gui::types::Point { x: rect.bottom_right().x as i32, y: rect.bottom_right().y as i32 },
+            min: crate::types::Point { x: rect.top_left().x as i32, y: rect.top_left().y as i32 },
+            max: crate::types::Point { x: rect.bottom_right().x as i32, y: rect.bottom_right().y as i32 },
         });
 
         if let Some(color) = self.eval_paint(&stroke.paint) {
