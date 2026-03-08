@@ -34,6 +34,10 @@
             <Label id="info" text="Click buttons to scroll programmatically" width="max" height="24"/>
             <Button id="scroll_top" text="Scroll to Top" width="200" height="30" margin="2"/>
             <Button id="scroll_bottom" text="Scroll to Bottom" width="200" height="30" margin="2"/>
+            <Label id="lbl_det" text="Determinate (70%):" width="max" height="20" margin_top="10" margin_left="2"/>
+            <ProgressBar id="pb_det" width="max" height="16" margin="2" value="0.7"/>
+            <Label id="lbl_indet" text="Indeterminate:" width="max" height="20" margin_top="10" margin_left="2"/>
+            <ProgressBar id="pb_indet" width="max" height="16" margin="2" indeterminate="true"/>
         </Frame>
     </Frame>
 </Frame>

@@ -54,6 +54,10 @@ pub trait Theme {
     /// The image is cached by the byte slice pointer for efficiency.
     fn draw_image(&mut self, rect: Rect<i32>, image_bytes: &[u8]);
 
+    // Progress bar drawing methods
+    fn draw_progressbar_track(&mut self, rect: Rect<i32>);
+    fn draw_progressbar_fill(&mut self, rect: Rect<i32>);
+
     // Scrollbar drawing methods
     fn draw_scrollbar_track(&mut self, rect: Rect<i32>, direction: super::views::Direction);
     fn draw_scrollbar_thumb(&mut self, rect: Rect<i32>, state: ViewState, direction: super::views::Direction);

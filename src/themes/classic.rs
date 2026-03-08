@@ -360,6 +360,20 @@ impl<'h> Theme for Classic<'h> {
         }
     }
 
+    fn draw_progressbar_track(&mut self, rect: Rect<i32>) {
+        // Sunken 3D border (same as edit field) with background fill
+        self.draw_edit_back(rect, ViewState::no_focus());
+        self.draw_edit_body(rect, ViewState::no_focus());
+    }
+
+    fn draw_progressbar_fill(&mut self, rect: Rect<i32>) {
+        // Classic Win95 blue progress fill: navy blue (0x000080)
+        let top_left = Vector2::new(rect.min.x as f32, rect.min.y as f32);
+        let bottom_right = Vector2::new(rect.max.x as f32, rect.max.y as f32);
+        let color = Color::from_hex_rgb(0xff000080);
+        self.graphics.draw_rectangle(Rectangle::new(top_left, bottom_right), color);
+    }
+
     fn draw_scrollbar_track(&mut self, rect: Rect<i32>, _direction: Direction) {
         let top_left = Vector2::new(rect.min.x as f32, rect.min.y as f32);
         let bottom_right = Vector2::new(rect.max.x as f32, rect.max.y as f32);

@@ -14,7 +14,7 @@ use super::traits::{Element, View};
 use super::types::Point;
 use super::themes::Typeface;
 
-use super::views::{Button, Edit, Label, CheckBox, RadioButton, ComboBox, ScrollView, List, RecyclerView, ImageButton, ImageView, PopupMenu, Dialog};
+use super::views::{Button, Edit, Label, CheckBox, RadioButton, ComboBox, ScrollView, ProgressBar, List, RecyclerView, ImageButton, ImageView, PopupMenu, Dialog};
 
 /// Controls how a popup interacts with the rest of the UI.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -69,6 +69,7 @@ impl UI {
         ui.register::<RadioButton>("RadioButton");
         ui.register::<ComboBox>("ComboBox");
         ui.register::<ScrollView>("ScrollView");
+        ui.register::<ProgressBar>("ProgressBar");
         ui.register::<Edit>("Edit");
         ui.register::<List>("List");
         ui.register::<RecyclerView>("RecyclerView");
