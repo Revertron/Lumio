@@ -140,7 +140,7 @@ impl<T> WindowHandler<T> for Win<T> {
     }
 
     fn on_keyboard_modifiers_changed(&mut self, _helper: &mut WindowHelper<T>, state: ModifiersState) {
-        println!("Modifiers: {:?}", &state);
+        self.mod_state = state;
     }
 }
 

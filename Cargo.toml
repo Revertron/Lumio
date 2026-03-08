@@ -13,6 +13,7 @@ downcast-rs = "1.2.0"
 speedy2d = "3.0.0"
 image = "0.23"
 rand = "0.8.5"
+arboard = "3"
 
 [dev-dependencies]
 include_dir = "0.7"

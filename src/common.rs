@@ -35,6 +35,23 @@ pub fn insert_char(text: &str, pos: usize, ch: char) -> String {
     part1
 }
 
+/// Deletes a range of characters from char-index `start` to `end` (exclusive)
+pub fn delete_range(text: &str, start: usize, end: usize) -> String {
+    let mut result = text.chars().take(start).collect::<String>();
+    let rest = text.chars().skip(end).collect::<String>();
+    result.push_str(&rest);
+    result
+}
+
+/// Inserts a string at the given char position
+pub fn insert_str(text: &str, pos: usize, s: &str) -> String {
+    let mut result = text.chars().take(pos).collect::<String>();
+    result.push_str(s);
+    let rest = text.chars().skip(pos).collect::<String>();
+    result.push_str(&rest);
+    result
+}
+
 /// Deletes one character from the string given it's position
 pub fn delete_char(text: &str, pos: usize) -> String {
     if pos > text.len() {
