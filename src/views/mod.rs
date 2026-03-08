@@ -11,6 +11,7 @@ pub mod radiobutton;
 pub mod combobox;
 pub mod scrollview;
 pub mod progressbar;
+pub mod tabview;
 pub mod dialog;
 
 use super::themes::{Typeface, ViewState};
@@ -37,6 +38,7 @@ pub use self::radiobutton::RadioButton;
 pub use self::combobox::ComboBox;
 pub use self::scrollview::ScrollView;
 pub use self::progressbar::ProgressBar;
+pub use self::tabview::TabView;
 pub use self::dialog::{Dialog, DialogButton, ButtonSide};
 
 pub const BUTTON_MIN_WIDTH: i32 = 80;

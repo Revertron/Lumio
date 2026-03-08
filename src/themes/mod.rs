@@ -62,6 +62,11 @@ pub trait Theme {
     fn draw_scrollbar_track(&mut self, rect: Rect<i32>, direction: super::views::Direction);
     fn draw_scrollbar_thumb(&mut self, rect: Rect<i32>, state: ViewState, direction: super::views::Direction);
     fn draw_scrollbar_arrow_button(&mut self, rect: Rect<i32>, state: ViewState, toward_start: bool, direction: super::views::Direction);
+
+    // Tab view drawing methods
+    fn draw_tab_active(&mut self, rect: Rect<i32>, state: ViewState);
+    fn draw_tab_inactive(&mut self, rect: Rect<i32>, state: ViewState);
+    fn draw_tab_content_area(&mut self, rect: Rect<i32>, state: ViewState);
 }
 
 #[allow(unused)]

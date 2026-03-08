@@ -1,0 +1,528 @@
+use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
+use std::rc::Rc;
+
+use speedy2d::dimen::Vector2;
+use speedy2d::font::{FormattedTextBlock, TextLayout, TextOptions};
+use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
+
+use crate::assets::get_font;
+use crate::common::DEFAULT_TEXT_SIZE;
+use crate::events::EventType;
+use crate::themes::{Theme, Typeface, ViewState};
+use crate::traits::{Container, Element, View, WeakElement};
+use crate::types::{Point, Rect, rect};
+use crate::ui::UI;
+use crate::view_base::{HasMainFields, ViewBasics};
+use crate::views::{Borders, Dimension, FieldsMain};
+
+/// Horizontal padding inside each tab (in dip).
+const TAB_PADDING_H: i32 = 8;
+/// Vertical padding inside each tab (in dip).
+const TAB_PADDING_V: i32 = 4;
+/// Border width around the content area (in dip).
+const CONTENT_BORDER: i32 = 2;
+
+struct TabInfo {
+    title: String,
+    cached_title: Option<FormattedTextBlock>,
+    tab_rect: Rect<i32>,
+}
+
+pub struct TabView {
+    state: RefCell<FieldsMain>,
+    views: Vec<Element>,
+    tabs: Vec<TabInfo>,
+    active_tab: Cell<usize>,
+    tab_bar_height: Cell<i32>,
+    listeners: RefCell<HashMap<EventType, Box<dyn FnMut(&mut UI, &dyn View) -> bool>>>,
+}
+
+impl HasMainFields for TabView {
+    fn main_fields(&self) -> &RefCell<FieldsMain> {
+        &self.state
+    }
+}
+
+impl ViewBasics for TabView {}
+
+#[allow(dead_code)]
+impl TabView {
+    pub fn get_active_tab(&self) -> usize {
+        self.active_tab.get()
+    }
+
+    pub fn set_active_tab(&self, index: usize) {
+        if index < self.views.len() {
+            self.active_tab.set(index);
+        }
+    }
+
+    pub fn set_tab_title(&mut self, index: usize, title: &str) {
+        if let Some(tab) = self.tabs.get_mut(index) {
+            tab.title = title.to_owned();
+            tab.cached_title = None;
+        }
+    }
+
+    pub fn get_tab_count(&self) -> usize {
+        self.views.len()
+    }
+
+    fn set_font(&mut self, font_name: &str) {
+        self.state.borrow_mut().font_manager.set_font(font_name);
+    }
+
+    fn set_font_style(&mut self, style: &str) {
+        self.state.borrow_mut().font_manager.set_font_style(style);
+    }
+
+    fn layout_tab_titles(&mut self, scale: f64) {
+        let typeface = self.state.borrow().font_manager.get();
+        if let Some(typeface) = typeface {
+            if let Some(font) = get_font(&typeface.font_name, &typeface.font_style.to_string()) {
+                let size = DEFAULT_TEXT_SIZE * scale as f32;
+                for tab in self.tabs.iter_mut() {
+                    if tab.cached_title.is_none() {
+                        let text = font.layout_text(&tab.title, size, TextOptions::new());
+                        tab.cached_title = Some(text);
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl Container for TabView {
+    fn add_view(&mut self, view: Element) {
+        let title = view.borrow().get_id();
+        self.tabs.push(TabInfo {
+            title,
+            cached_title: None,
+            tab_rect: rect((0, 0), (0, 0)),
+        });
+        self.views.push(view);
+    }
+
+    fn get_view(&self, id: &str) -> Option<Element> {
+        // Search ALL children, not just active tab
+        if let Some(found) = self.views.iter().find(|v| v.borrow().get_id() == id) {
+            return Some(Rc::clone(found));
+        }
+        for v in self.views.iter() {
+            if let Some(container) = v.borrow().as_container() {
+                if let Some(found) = container.get_view(id) {
+                    return Some(found);
+                }
+            }
+        }
+        None
+    }
+
+    fn get_view_count(&self) -> usize {
+        self.views.len()
+    }
+
+    fn get_views(&self) -> Vec<Element> {
+        self.views.clone()
+    }
+}
+
+impl View for TabView {
+    fn set_any(&mut self, name: &str, value: &str) {
+        if self.base_set_any(name, value) {
+            return;
+        }
+        match name {
+            "active_tab" => {
+                if let Ok(idx) = value.parse::<usize>() {
+                    self.active_tab.set(idx);
+                }
+            }
+            "font" => self.set_font(value),
+            "font_style" => self.set_font_style(value),
+            _ => {}
+        }
+    }
+
+    fn set_parent(&self, parent: Option<WeakElement>) {
+        self.base_set_parent(parent);
+    }
+
+    fn get_parent(&self) -> Option<Element> {
+        self.base_get_parent()
+    }
+
+    fn layout_content(&mut self, x: i32, y: i32, width: i32, height: i32, typeface: &Typeface, scale: f64) -> Rect<i32> {
+        self.base_set_scale(scale);
+
+        // Resolve typeface
+        let typeface = match self.state.borrow().font_manager.get() {
+            None => typeface.clone(),
+            Some(t) => t,
+        };
+        self.state.borrow_mut().font_manager.set(Some(typeface.clone()));
+
+        let (new_width, new_height) = self.calculate_size(width, height, scale);
+
+        // Layout tab title text blocks
+        self.layout_tab_titles(scale);
+
+        // Calculate tab bar height
+        let pad_v = (TAB_PADDING_V as f64 * scale).round() as i32;
+        let pad_h = (TAB_PADDING_H as f64 * scale).round() as i32;
+        let border = (CONTENT_BORDER as f64 * scale).round() as i32;
+
+        let mut max_text_height = 0i32;
+        for tab in self.tabs.iter() {
+            if let Some(ref text) = tab.cached_title {
+                let h = text.height().ceil() as i32;
+                if h > max_text_height {
+                    max_text_height = h;
+                }
+            }
+        }
+        let tab_bar_h = max_text_height + pad_v * 2;
+        self.tab_bar_height.set(tab_bar_h);
+
+        // Compute each tab's rect (positioned horizontally)
+        let mut tab_x = 0i32;
+        for tab in self.tabs.iter_mut() {
+            let text_width = tab.cached_title.as_ref().map(|t| t.width().ceil() as i32).unwrap_or(40);
+            let tab_w = text_width + pad_h * 2;
+            tab.tab_rect = rect((tab_x, 0), (tab_x + tab_w, tab_bar_h));
+            tab_x += tab_w;
+        }
+
+        // Content area: below tab bar, inset by border
+        let content_x = border;
+        let content_y = tab_bar_h + border;
+        let content_w = new_width - border * 2;
+        let content_h = new_height - tab_bar_h - border * 2;
+
+        // Layout all children so they are ready when the user switches tabs
+        for v in self.views.iter() {
+            let mut v = v.try_borrow_mut().unwrap();
+            let margins = v.get_margin(scale);
+            v.layout_content(
+                content_x + margins.left,
+                content_y + margins.top,
+                content_w - margins.left - margins.right,
+                content_h - margins.top - margins.bottom,
+                &typeface,
+                scale,
+            );
+        }
+
+        let my_rect = rect((x, y), (x + new_width, y + new_height));
+        self.base_set_rect(my_rect);
+        my_rect
+    }
+
+    fn fits_in_rect(&self, width: i32, height: i32, scale: f64) -> bool {
+        let size = self.calculate_full_size(scale);
+        size.0 <= width && size.1 <= height
+    }
+
+    fn paint(&self, origin: Point<i32>, theme: &mut dyn Theme) {
+        let my_rect = {
+            let mut r = self.state.borrow().rect;
+            r.move_by(origin);
+            r
+        };
+        let start = my_rect.min;
+        let tab_bar_h = self.tab_bar_height.get();
+        let scale = self.state.borrow().scale;
+        let view_state = self.state.borrow().state;
+
+        theme.push_clip();
+        theme.clip_rect(my_rect);
+
+        // Draw content area panel (below tab bar)
+        let content_rect = rect(
+            (my_rect.min.x, my_rect.min.y + tab_bar_h),
+            (my_rect.max.x, my_rect.max.y),
+        );
+        theme.draw_tab_content_area(content_rect, view_state);
+
+        let active = self.active_tab.get();
+
+        // Draw inactive tabs first (behind active)
+        for (i, tab) in self.tabs.iter().enumerate() {
+            if i == active {
+                continue;
+            }
+            let mut tr = tab.tab_rect;
+            tr.move_by(start);
+            // Inactive tabs are shorter — offset top by 2 scaled pixels
+            let inset = (2.0 * scale).round() as i32;
+            tr.min.y += inset;
+            theme.draw_tab_inactive(tr, view_state);
+
+            // Draw text centered
+            if let Some(ref text) = tab.cached_title {
+                let text_x = tr.min.x as f32 + (tr.width() as f32 - text.width()) / 2.0;
+                let text_y = tr.min.y as f32 + (tr.height() as f32 - text.height()) / 2.0;
+                let color = theme.get_text_color(view_state, &self.state.borrow().foreground);
+                theme.draw_text(text_x.round(), text_y.round(), color, text);
+            }
+        }
+
+        // Draw active tab on top
+        if active < self.tabs.len() {
+            let tab = &self.tabs[active];
+            let mut tr = tab.tab_rect;
+            tr.move_by(start);
+            theme.draw_tab_active(tr, view_state);
+
+            if let Some(ref text) = tab.cached_title {
+                let text_x = tr.min.x as f32 + (tr.width() as f32 - text.width()) / 2.0;
+                let text_y = tr.min.y as f32 + (tr.height() as f32 - text.height()) / 2.0;
+                let color = theme.get_text_color(view_state, &self.state.borrow().foreground);
+                theme.draw_text(text_x.round(), text_y.round(), color, text);
+            }
+        }
+
+        // Paint only the active child
+        if active < self.views.len() {
+            let v = self.views[active].try_borrow().unwrap();
+            v.paint(start, theme);
+        }
+
+        theme.pop_clip();
+    }
+
+    fn get_state(&self) -> Option<ViewState> {
+        Some(self.state.borrow().state)
+    }
+
+    fn get_rect(&self) -> Rect<i32> {
+        self.base_get_rect()
+    }
+
+    fn set_rect(&mut self, rect: Rect<i32>) {
+        self.base_set_rect(rect);
+    }
+
+    fn get_padding(&self, scale: f64) -> Borders {
+        self.base_get_padding(scale)
+    }
+
+    fn set_padding(&self, top: i32, left: i32, right: i32, bottom: i32) {
+        self.base_set_padding(top, left, right, bottom);
+    }
+
+    fn get_margin(&self, scale: f64) -> Borders {
+        self.base_get_margin(scale)
+    }
+
+    fn set_margin(&self, top: i32, left: i32, right: i32, bottom: i32) {
+        self.base_set_margin(top, left, right, bottom);
+    }
+
+    fn get_bounds(&self) -> (Dimension, Dimension) {
+        self.base_get_bounds()
+    }
+
+    fn get_content_size(&self) -> (i32, i32) {
+        // Content size is the full area including tab bar
+        let scale = self.state.borrow().scale;
+        let tab_bar_h = self.tab_bar_height.get();
+        let border = (CONTENT_BORDER as f64 * scale).round() as i32;
+        let active = self.active_tab.get();
+        if active < self.views.len() {
+            let v = self.views[active].borrow();
+            let (cw, ch) = v.get_content_size();
+            let margins = v.get_margin(scale);
+            (cw + margins.left + margins.right + border * 2,
+             ch + margins.top + margins.bottom + tab_bar_h + border * 2)
+        } else {
+            (border * 2, tab_bar_h + border * 2)
+        }
+    }
+
+    fn is_focused(&self) -> bool {
+        let active = self.active_tab.get();
+        if active < self.views.len() {
+            return self.views[active].borrow().is_focused();
+        }
+        false
+    }
+
+    fn is_break(&self) -> bool {
+        self.base_is_break()
+    }
+
+    fn set_focused(&self, focused: bool) {
+        if focused {
+            return;
+        }
+        for v in self.views.iter() {
+            v.borrow().set_focused(false);
+        }
+    }
+
+    fn set_focusable(&self, focusable: bool) {
+        self.base_set_focusable(focusable);
+    }
+
+    fn set_width(&mut self, width: Dimension) {
+        self.base_set_width(width);
+    }
+
+    fn set_height(&mut self, height: Dimension) {
+        self.base_set_height(height);
+    }
+
+    fn set_scale(&mut self, scale: f64) {
+        self.base_set_scale(scale);
+    }
+
+    fn set_id(&mut self, id: &str) {
+        self.base_set_id(id);
+    }
+
+    fn get_id(&self) -> String {
+        self.base_get_id()
+    }
+
+    fn as_container(&self) -> Option<&dyn Container> {
+        Some(self as &dyn Container)
+    }
+
+    fn as_container_mut(&mut self) -> Option<&mut dyn Container> {
+        Some(self as &mut dyn Container)
+    }
+
+    fn on_event(&mut self, event: EventType, func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {
+        self.listeners.borrow_mut().insert(event, func);
+    }
+
+    fn click(&self, _ui: &mut UI) -> bool {
+        false
+    }
+
+    fn update(&mut self, ui: &mut UI) -> bool {
+        let active = self.active_tab.get();
+        if active < self.views.len() {
+            return self.views[active].borrow_mut().update(ui);
+        }
+        false
+    }
+
+    fn on_mouse_move(&self, ui: &mut UI, position: Vector2<i32>) -> bool {
+        let local = (position.x - self.state.borrow().rect.min.x, position.y - self.state.borrow().rect.min.y);
+        let active = self.active_tab.get();
+        if active < self.views.len() {
+            return self.views[active].borrow().on_mouse_move(ui, Vector2::from(local));
+        }
+        false
+    }
+
+    fn on_mouse_button_down(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+        let rect = self.state.borrow().rect;
+        if !rect.hit((position.x, position.y)) {
+            return false;
+        }
+        let local_x = position.x - rect.min.x;
+        let local_y = position.y - rect.min.y;
+
+        // Check if click is in the tab bar
+        let tab_bar_h = self.tab_bar_height.get();
+        if local_y < tab_bar_h {
+            for (i, tab) in self.tabs.iter().enumerate() {
+                if tab.tab_rect.hit((local_x, local_y)) {
+                    if i != self.active_tab.get() {
+                        self.active_tab.set(i);
+                        // Fire SelectionChanged listener
+                        let listener = self.listeners.borrow_mut().remove(&EventType::SelectionChanged);
+                        if let Some(mut callback) = listener {
+                            callback(ui, self as &dyn View);
+                            self.listeners.borrow_mut().insert(EventType::SelectionChanged, callback);
+                        }
+                    }
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Forward to active child
+        let active = self.active_tab.get();
+        if active < self.views.len() {
+            let focused;
+            let v = &self.views[active];
+            let f = v.borrow().is_focused();
+            if v.borrow().on_mouse_button_down(ui, Vector2::new(local_x, local_y), button) {
+                focused = !f && v.borrow().is_focused();
+                if focused {
+                    // Unfocus other tabs' children
+                    for (j, vv) in self.views.iter().enumerate() {
+                        if j != active {
+                            vv.borrow().set_focused(false);
+                        }
+                    }
+                }
+                return true;
+            }
+        }
+        false
+    }
+
+    fn on_mouse_button_up(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+        let local = (position.x - self.state.borrow().rect.min.x, position.y - self.state.borrow().rect.min.y);
+        let active = self.active_tab.get();
+        if active < self.views.len() {
+            return self.views[active].borrow().on_mouse_button_up(ui, Vector2::from(local), button);
+        }
+        false
+    }
+
+    fn on_mouse_wheel_scroll(&self, ui: &mut UI, position: Vector2<i32>, distance: MouseScrollDistance) -> bool {
+        let local = (position.x - self.state.borrow().rect.min.x, position.y - self.state.borrow().rect.min.y);
+        let active = self.active_tab.get();
+        if active < self.views.len() {
+            return self.views[active].borrow().on_mouse_wheel_scroll(ui, Vector2::from(local), distance);
+        }
+        false
+    }
+
+    fn on_key_down(&self, ui: &mut UI, virtual_key_code: Option<VirtualKeyCode>, scancode: KeyScancode, state: ModifiersState) -> bool {
+        let active = self.active_tab.get();
+        if active < self.views.len() {
+            return self.views[active].borrow().on_key_down(ui, virtual_key_code, scancode, state);
+        }
+        false
+    }
+
+    fn on_key_up(&self, ui: &mut UI, virtual_key_code: Option<VirtualKeyCode>, scancode: KeyScancode, state: ModifiersState) -> bool {
+        let active = self.active_tab.get();
+        if active < self.views.len() {
+            return self.views[active].borrow().on_key_up(ui, virtual_key_code, scancode, state);
+        }
+        false
+    }
+
+    fn on_key_char(&self, ui: &mut UI, unicode_codepoint: char, state: ModifiersState) -> bool {
+        let active = self.active_tab.get();
+        if active < self.views.len() {
+            return self.views[active].borrow().on_key_char(ui, unicode_codepoint, state);
+        }
+        false
+    }
+}
+
+impl Default for TabView {
+    fn default() -> Self {
+        let mut main = FieldsMain::with_rect(rect((0, 0), (400, 300)), Dimension::Max, Dimension::Max);
+        main.state.focusable = false;
+        TabView {
+            state: RefCell::new(main),
+            views: Vec::new(),
+            tabs: Vec::new(),
+            active_tab: Cell::new(0),
+            tab_bar_height: Cell::new(0),
+            listeners: RefCell::new(HashMap::new()),
+        }
+    }
+}

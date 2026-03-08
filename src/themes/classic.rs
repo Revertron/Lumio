@@ -428,6 +428,146 @@ impl<'h> Theme for Classic<'h> {
         self.graphics.draw_triangle_three_color([p1, p2, p3], [color, color, color]);
     }
 
+    fn draw_tab_active(&mut self, rect: Rect<i32>, _state: ViewState) {
+        let border: f32 = self.scale as f32;
+        let border_half: f32 = (self.scale / 2.0) as f32;
+        let top_left = Vector2::new(rect.min.x as f32, rect.min.y as f32);
+        let bottom_right = Vector2::new(rect.max.x as f32, rect.max.y as f32);
+
+        // Background fill — extend past bottom to erase the content area's top border
+        let bg_color = Color::from_hex_rgb(Classic::BACKGROUND);
+        self.graphics.draw_rectangle(
+            Rectangle::new(
+                Vector2::new(top_left.x + border, top_left.y + border),
+                Vector2::new(bottom_right.x - border, bottom_right.y + border),
+            ),
+            bg_color,
+        );
+
+        // White left border
+        let white = Color::from_hex_rgb(0xffffff);
+        self.graphics.draw_line(
+            (top_left.x + border_half, top_left.y),
+            (top_left.x + border_half, bottom_right.y),
+            border, white,
+        );
+        // White top border
+        self.graphics.draw_line(
+            (top_left.x, top_left.y + border_half),
+            (bottom_right.x, top_left.y + border_half),
+            border, white,
+        );
+        // Dark right border (outer)
+        let dark = Color::from_hex_rgb(Classic::DARK);
+        self.graphics.draw_line(
+            (bottom_right.x - border_half, top_left.y),
+            (bottom_right.x - border_half, bottom_right.y),
+            border, dark,
+        );
+        // Light right border (inner)
+        let light = Color::from_hex_rgb(Classic::LIGHT);
+        self.graphics.draw_line(
+            (bottom_right.x - border - border_half, top_left.y + border),
+            (bottom_right.x - border - border_half, bottom_right.y),
+            border, light,
+        );
+    }
+
+    fn draw_tab_inactive(&mut self, rect: Rect<i32>, _state: ViewState) {
+        let border: f32 = self.scale as f32;
+        let border_half: f32 = (self.scale / 2.0) as f32;
+        let top_left = Vector2::new(rect.min.x as f32, rect.min.y as f32);
+        let bottom_right = Vector2::new(rect.max.x as f32, rect.max.y as f32);
+
+        // Background fill (slightly lighter for inactive)
+        let bg_color = Color::from_hex_rgb(Classic::BACKGROUND);
+        self.graphics.draw_rectangle(
+            Rectangle::new(
+                Vector2::new(top_left.x + border, top_left.y + border),
+                Vector2::new(bottom_right.x - border, bottom_right.y - border),
+            ),
+            bg_color,
+        );
+
+        // White left border
+        let white = Color::from_hex_rgb(0xffffff);
+        self.graphics.draw_line(
+            (top_left.x + border_half, top_left.y),
+            (top_left.x + border_half, bottom_right.y),
+            border, white,
+        );
+        // White top border
+        self.graphics.draw_line(
+            (top_left.x, top_left.y + border_half),
+            (bottom_right.x, top_left.y + border_half),
+            border, white,
+        );
+        // Dark right border (outer)
+        let dark = Color::from_hex_rgb(Classic::DARK);
+        self.graphics.draw_line(
+            (bottom_right.x - border_half, top_left.y),
+            (bottom_right.x - border_half, bottom_right.y),
+            border, dark,
+        );
+        // Light right border (inner)
+        let light = Color::from_hex_rgb(Classic::LIGHT);
+        self.graphics.draw_line(
+            (bottom_right.x - border - border_half, top_left.y + border),
+            (bottom_right.x - border - border_half, bottom_right.y),
+            border, light,
+        );
+    }
+
+    fn draw_tab_content_area(&mut self, rect: Rect<i32>, _state: ViewState) {
+        let border: f32 = self.scale as f32;
+        let border_half: f32 = (self.scale / 2.0) as f32;
+        let top_left = Vector2::new(rect.min.x as f32, rect.min.y as f32);
+        let bottom_right = Vector2::new(rect.max.x as f32, rect.max.y as f32);
+
+        // Background fill
+        let bg_color = Color::from_hex_rgb(Classic::BACKGROUND);
+        self.graphics.draw_rectangle(Rectangle::new(top_left, bottom_right), bg_color);
+
+        // Raised 3D border: white top + left
+        let white = Color::from_hex_rgb(0xffffff);
+        self.graphics.draw_line(
+            (top_left.x, top_left.y + border_half),
+            (bottom_right.x, top_left.y + border_half),
+            border, white,
+        );
+        self.graphics.draw_line(
+            (top_left.x + border_half, top_left.y),
+            (top_left.x + border_half, bottom_right.y),
+            border, white,
+        );
+
+        // Dark bottom + right
+        let dark = Color::from_hex_rgb(Classic::DARK);
+        self.graphics.draw_line(
+            (top_left.x, bottom_right.y - border_half),
+            (bottom_right.x, bottom_right.y - border_half),
+            border, dark,
+        );
+        self.graphics.draw_line(
+            (bottom_right.x - border_half, top_left.y),
+            (bottom_right.x - border_half, bottom_right.y),
+            border, dark,
+        );
+
+        // Inner shadow: light gray inside top+left
+        let light = Color::from_hex_rgb(Classic::LIGHT);
+        self.graphics.draw_line(
+            (top_left.x + border, bottom_right.y - border - border_half),
+            (bottom_right.x - border, bottom_right.y - border - border_half),
+            border, light,
+        );
+        self.graphics.draw_line(
+            (bottom_right.x - border - border_half, top_left.y + border),
+            (bottom_right.x - border - border_half, bottom_right.y - border),
+            border, light,
+        );
+    }
+
     fn draw_image(&mut self, rect: Rect<i32>, image_bytes: &[u8]) {
         let cache_key = image_bytes.as_ptr() as usize;
         if !self.image_cache.contains_key(&cache_key) {
