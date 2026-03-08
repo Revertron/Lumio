@@ -1,0 +1,39 @@
+<Frame id="root" direction="vertical" width="max" height="max">
+    <Label id="title" text="ScrollView Demo" width="max" height="24" margin="4"/>
+    <Frame id="content" direction="horizontal" width="max" height="max">
+        <ScrollView id="scroll_v" width="300" height="max" direction="vertical" margin="4">
+            <Frame id="inner_v" direction="vertical" width="max" height="min">
+                <Button id="btn1" text="Button 1" width="max" height="30" margin="2"/>
+                <Button id="btn2" text="Button 2" width="max" height="30" margin="2"/>
+                <Button id="btn3" text="Button 3" width="max" height="30" margin="2"/>
+                <CheckBox id="cb1" text="Option A" margin="2"/>
+                <CheckBox id="cb2" text="Option B" margin="2"/>
+                <CheckBox id="cb3" text="Option C" margin="2"/>
+                <Button id="btn4" text="Button 4" width="max" height="30" margin="2"/>
+                <Button id="btn5" text="Button 5" width="max" height="30" margin="2"/>
+                <Edit id="edit1" text="Edit me" width="max" margin="2"/>
+                <Button id="btn6" text="Button 6" width="max" height="30" margin="2"/>
+                <Button id="btn7" text="Button 7" width="max" height="30" margin="2"/>
+                <RadioButton id="rb1" text="Choice 1" group="choices" margin="2"/>
+                <RadioButton id="rb2" text="Choice 2" group="choices" margin="2"/>
+                <RadioButton id="rb3" text="Choice 3" group="choices" margin="2"/>
+                <Button id="btn8" text="Button 8" width="max" height="30" margin="2"/>
+                <Button id="btn9" text="Button 9" width="max" height="30" margin="2"/>
+                <Button id="btn10" text="Button 10" width="max" height="30" margin="2"/>
+                <Label id="lbl1" text="Some label text here" margin="2"/>
+                <Button id="btn11" text="Button 11" width="max" height="30" margin="2"/>
+                <Button id="btn12" text="Button 12" width="max" height="30" margin="2"/>
+                <CheckBox id="cb4" text="Option D" margin="2"/>
+                <CheckBox id="cb5" text="Option E" margin="2"/>
+                <Button id="btn13" text="Button 13" width="max" height="30" margin="2"/>
+                <Button id="btn14" text="Button 14" width="max" height="30" margin="2"/>
+                <Button id="btn15" text="Button 15" width="max" height="30" margin="2"/>
+            </Frame>
+        </ScrollView>
+        <Frame id="right_panel" direction="vertical" width="max" height="max" margin="4">
+            <Label id="info" text="Click buttons to scroll programmatically" width="max" height="24"/>
+            <Button id="scroll_top" text="Scroll to Top" width="200" height="30" margin="2"/>
+            <Button id="scroll_bottom" text="Scroll to Bottom" width="200" height="30" margin="2"/>
+        </Frame>
+    </Frame>
+</Frame>

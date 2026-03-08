@@ -53,6 +53,11 @@ pub trait Theme {
     /// Draw an image from raw file bytes, scaled to fit the given rect.
     /// The image is cached by the byte slice pointer for efficiency.
     fn draw_image(&mut self, rect: Rect<i32>, image_bytes: &[u8]);
+
+    // Scrollbar drawing methods
+    fn draw_scrollbar_track(&mut self, rect: Rect<i32>, direction: super::views::Direction);
+    fn draw_scrollbar_thumb(&mut self, rect: Rect<i32>, state: ViewState, direction: super::views::Direction);
+    fn draw_scrollbar_arrow_button(&mut self, rect: Rect<i32>, state: ViewState, toward_start: bool, direction: super::views::Direction);
 }
 
 #[allow(unused)]

@@ -14,6 +14,7 @@ use super::super::types::Rect;
 use super::super::types;
 use super::super::types::rect;
 use super::super::drawing::{Drawable, DrawableRegistry, DrawingEngine};
+use super::super::views::Direction;
 
 /// Cache for GPU image handles, keyed by the raw pointer of the source byte slice.
 pub type ImageCache = HashMap<usize, ImageHandle>;
@@ -357,6 +358,60 @@ impl<'h> Theme for Classic<'h> {
                 engine.draw_drawable(drawable, rect);
             }
         }
+    }
+
+    fn draw_scrollbar_track(&mut self, rect: Rect<i32>, _direction: Direction) {
+        let top_left = Vector2::new(rect.min.x as f32, rect.min.y as f32);
+        let bottom_right = Vector2::new(rect.max.x as f32, rect.max.y as f32);
+        let color = Color::from_hex_rgb(Classic::BACKGROUND);
+        self.graphics.draw_rectangle(Rectangle::new(top_left, bottom_right), color);
+    }
+
+    fn draw_scrollbar_thumb(&mut self, rect: Rect<i32>, state: ViewState, _direction: Direction) {
+        self.draw_button_back(rect, state);
+        self.draw_button_body(rect, state);
+    }
+
+    fn draw_scrollbar_arrow_button(&mut self, rect: Rect<i32>, state: ViewState, toward_start: bool, direction: Direction) {
+        self.draw_button_back(rect, state);
+        self.draw_button_body(rect, state);
+
+        // Draw arrow triangle — nudge left/up by half a pixel to center within the 3D button borders
+        let border_offset = (self.scale * 0.5) as f32;
+        let cx = (rect.min.x + rect.max.x) as f32 / 2.0 - border_offset;
+        let cy = (rect.min.y + rect.max.y) as f32 / 2.0 - border_offset;
+        let half_w = (3.0 * self.scale).round() as f32;
+        let half_h = (2.0 * self.scale).round() as f32;
+        let color = Color::from_hex_rgb(Classic::BLACK);
+        let offset = if state.pressed { self.scale as f32 } else { 0.0 };
+
+        let (p1, p2, p3) = match (direction, toward_start) {
+            (Direction::Vertical, true) => {
+                // Up arrow
+                (Vector2::new(cx + offset, cy - half_h + offset),
+                 Vector2::new(cx - half_w + offset, cy + half_h + offset),
+                 Vector2::new(cx + half_w + offset, cy + half_h + offset))
+            }
+            (Direction::Vertical, false) => {
+                // Down arrow
+                (Vector2::new(cx - half_w + offset, cy - half_h + offset),
+                 Vector2::new(cx + half_w + offset, cy - half_h + offset),
+                 Vector2::new(cx + offset, cy + half_h + offset))
+            }
+            (Direction::Horizontal, true) => {
+                // Left arrow
+                (Vector2::new(cx - half_h + offset, cy + offset),
+                 Vector2::new(cx + half_h + offset, cy - half_w + offset),
+                 Vector2::new(cx + half_h + offset, cy + half_w + offset))
+            }
+            (Direction::Horizontal, false) => {
+                // Right arrow
+                (Vector2::new(cx - half_h + offset, cy - half_w + offset),
+                 Vector2::new(cx - half_h + offset, cy + half_w + offset),
+                 Vector2::new(cx + half_h + offset, cy + offset))
+            }
+        };
+        self.graphics.draw_triangle_three_color([p1, p2, p3], [color, color, color]);
     }
 
     fn draw_image(&mut self, rect: Rect<i32>, image_bytes: &[u8]) {
