@@ -31,6 +31,7 @@ pub trait Theme {
     fn draw_radiobutton_back(&mut self, rect: Rect<i32>, state: ViewState);
     fn draw_radiobutton_body(&mut self, rect: Rect<i32>, state: ViewState);
     fn draw_radiobutton_indicator(&mut self, rect: Rect<i32>, state: ViewState);
+    fn draw_combobox_arrow(&mut self, rect: Rect<i32>, state: ViewState);
     fn draw_list_back(&mut self, rect: Rect<i32>, state: ViewState);
     fn draw_list_body(&mut self, rect: Rect<i32>, state: ViewState);
     fn draw_panel_back(&mut self, rect: Rect<i32>, state: ViewState);

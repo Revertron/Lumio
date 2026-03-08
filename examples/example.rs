@@ -10,7 +10,7 @@ use speedy2d::window::{WindowCreationOptions, WindowPosition, WindowSize};
 use lumio::prelude::*;
 
 const WIDTH: u32 = 1920;
-const HEIGHT: u32 = 1080;
+const HEIGHT: u32 = 1200;
 const TITLE: &'static str = "Lumio";
 
 // Usually you will not use the `examples` part

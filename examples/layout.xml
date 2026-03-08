@@ -16,6 +16,18 @@
         <RadioButton id="rb3" text="Option C" group="options" checked="true"/>
     </Frame>
 
+    <Frame width="min" direction="horizontal">
+        <!-- Pipe-separated attribute -->
+        <ComboBox id="combo1" width="240" items="Option A|Option B|Option C" selected="0"/>
+
+        <!-- Nested Item tags -->
+        <ComboBox id="combo1" width="240" selected="1">
+            <Item text="Option A"/>
+            <Item text="Option B"/>
+            <Item text="Option C"/>
+        </ComboBox>
+    </Frame>
+
     <Frame width="min" height="min">
         <!--<Frame id="content" font="Akkurat" direction="vertical" width="min" padding="4">
             <Button id="btn4" text="Akkurat 4" width="max" margin_top="4"/>

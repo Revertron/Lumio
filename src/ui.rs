@@ -14,7 +14,7 @@ use super::traits::{Element, View};
 use super::types::Point;
 use super::themes::Typeface;
 
-use super::views::{Button, Edit, Label, CheckBox, RadioButton, List, RecyclerView, ImageButton, ImageView, PopupMenu, Dialog};
+use super::views::{Button, Edit, Label, CheckBox, RadioButton, ComboBox, List, RecyclerView, ImageButton, ImageView, PopupMenu, Dialog};
 
 /// Controls how a popup interacts with the rest of the UI.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -67,6 +67,7 @@ impl UI {
         ui.register::<Button>("Button");
         ui.register::<CheckBox>("CheckBox");
         ui.register::<RadioButton>("RadioButton");
+        ui.register::<ComboBox>("ComboBox");
         ui.register::<Edit>("Edit");
         ui.register::<List>("List");
         ui.register::<RecyclerView>("RecyclerView");
@@ -268,15 +269,27 @@ impl UI {
                     stack.push(element);
                 },
                 Ok(Event::Empty(ref e)) => {
-                    let element = UI::parse_element(&mut ui, e);
-                    let parent = stack.pop().unwrap();
-                    {
-                        element.borrow_mut().set_parent(Some(Rc::downgrade(&parent)));
-                        let mut ref_mut = parent.borrow_mut();
-                        let container = ref_mut.as_container_mut().unwrap();
-                        container.add_view(element);
+                    let tag_name = String::from_utf8(e.name().0.to_vec()).unwrap();
+                    if tag_name == "Item" {
+                        // Handle <Item text="..."/> inside ComboBox
+                        if let Some(parent) = stack.last() {
+                            let text = UI::get_attribute(e, "text").unwrap_or_default();
+                            let mut ref_mut = parent.borrow_mut();
+                            if let Some(combo) = ref_mut.as_any_mut().downcast_mut::<ComboBox>() {
+                                combo.add_item(&text);
+                            }
+                        }
+                    } else {
+                        let element = UI::parse_element(&mut ui, e);
+                        let parent = stack.pop().unwrap();
+                        {
+                            element.borrow_mut().set_parent(Some(Rc::downgrade(&parent)));
+                            let mut ref_mut = parent.borrow_mut();
+                            let container = ref_mut.as_container_mut().unwrap();
+                            container.add_view(element);
+                        }
+                        stack.push(parent);
                     }
-                    stack.push(parent);
                 },
                 Ok(Event::End(_)) => {
                     // TODO check that it is the same tag
@@ -287,6 +300,7 @@ impl UI {
                         }
                         Some(parent) => {
                             {
+                                element.borrow_mut().set_parent(Some(Rc::downgrade(&parent)));
                                 let mut ref_mut = parent.borrow_mut();
                                 let container = ref_mut.as_container_mut().unwrap();
                                 container.add_view(element);
@@ -328,6 +342,19 @@ impl UI {
             //println!("Attribute: {} = {}", &name, &value);
         }
         view
+    }
+
+    fn get_attribute(e: &BytesStart, name: &str) -> Option<String> {
+        for attr in e.attributes().flatten() {
+            let key = String::from_utf8(attr.key.0.to_vec()).unwrap();
+            if key == name {
+                return Some(match attr.value {
+                    Cow::Borrowed(c) => String::from_utf8(c.to_vec()).unwrap(),
+                    Cow::Owned(c) => String::from_utf8(c.to_vec()).unwrap(),
+                });
+            }
+        }
+        None
     }
 
     pub fn get_width(&self) -> u32 {

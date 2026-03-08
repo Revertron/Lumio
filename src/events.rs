@@ -6,6 +6,7 @@ pub enum EventType {
     MouseDown,
     MouseMove,
     MouseUp,
+    SelectionChanged,
 }
 
 #[allow(dead_code)]

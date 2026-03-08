@@ -284,6 +284,19 @@ impl<'h> Theme for Classic<'h> {
         self.graphics.draw_circle((cx, cy), dot_radius, color);
     }
 
+    fn draw_combobox_arrow(&mut self, rect: Rect<i32>, _state: ViewState) {
+        let cx = (rect.min.x + rect.max.x) as f32 / 2.0;
+        let cy = (rect.min.y + rect.max.y) as f32 / 2.0;
+        let half_w = (4.0 * self.scale).round() as f32;
+        let half_h = (2.0 * self.scale).round() as f32;
+        let color = Color::from_hex_rgb(Classic::BLACK);
+        // Filled downward triangle
+        self.graphics.draw_triangle_three_color(
+            [Vector2::new(cx - half_w, cy - half_h), Vector2::new(cx + half_w, cy - half_h), Vector2::new(cx, cy + half_h)],
+            [color, color, color],
+        );
+    }
+
     fn draw_list_back(&mut self, rect: Rect<i32>, state: ViewState) {
         self.draw_edit_back(rect, state);
     }
