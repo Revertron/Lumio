@@ -14,7 +14,7 @@ use super::traits::{Element, View};
 use super::types::Point;
 use super::themes::Typeface;
 
-use super::views::{Button, Edit, Label, CheckBox, List, RecyclerView, ImageButton, ImageView, PopupMenu, Dialog};
+use super::views::{Button, Edit, Label, CheckBox, RadioButton, List, RecyclerView, ImageButton, ImageView, PopupMenu, Dialog};
 
 /// Controls how a popup interacts with the rest of the UI.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -66,6 +66,7 @@ impl UI {
         ui.register::<Label>("Label");
         ui.register::<Button>("Button");
         ui.register::<CheckBox>("CheckBox");
+        ui.register::<RadioButton>("RadioButton");
         ui.register::<Edit>("Edit");
         ui.register::<List>("List");
         ui.register::<RecyclerView>("RecyclerView");
@@ -113,6 +114,31 @@ impl UI {
                     return root.get_view(id);
                 }
                 None
+            }
+        }
+    }
+
+    pub fn find_with(&self, predicate: &dyn Fn(&dyn View) -> bool) -> Vec<Element> {
+        let mut result = Vec::new();
+        // Search overlays
+        for entry in &self.overlays {
+            Self::collect_matching(&entry.element, predicate, &mut result);
+        }
+        // Search root
+        if let Some(root) = &self.root {
+            Self::collect_matching(root, predicate, &mut result);
+        }
+        result
+    }
+
+    fn collect_matching(element: &Element, predicate: &dyn Fn(&dyn View) -> bool, result: &mut Vec<Element>) {
+        let view = element.borrow();
+        if predicate(&*view) {
+            result.push(Rc::clone(element));
+        }
+        if let Some(container) = view.as_container() {
+            for child in container.get_views() {
+                Self::collect_matching(&child, predicate, result);
             }
         }
     }

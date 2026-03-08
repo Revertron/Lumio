@@ -235,6 +235,55 @@ impl<'h> Theme for Classic<'h> {
         self.graphics.draw_line((top_left.x + width / 3f32, bottom_right.y - height / 8f32), (bottom_right.x, top_left.y + height / 8f32), self.scale as f32, color);
     }
 
+    fn draw_radiobutton_back(&mut self, rect: Rect<i32>, _state: ViewState) {
+        let cx = (rect.min.x + rect.max.x) as f32 / 2.0;
+        let cy = (rect.min.y + rect.max.y) as f32 / 2.0;
+        let radius = (rect.max.x - rect.min.x) as f32 / 2.0;
+        let color = Color::from_hex_rgb(0xffffff);
+        self.graphics.draw_circle((cx, cy), radius, color);
+    }
+
+    fn draw_radiobutton_body(&mut self, rect: Rect<i32>, state: ViewState) {
+        let cx = (rect.min.x + rect.max.x) as f32 / 2.0;
+        let cy = (rect.min.y + rect.max.y) as f32 / 2.0;
+        let radius = (rect.max.x - rect.min.x) as f32 / 2.0;
+        let border = self.scale as f32;
+        // Draw outer circle border using lines approximating a circle
+        let color = Color::from_hex_rgb(Classic::LIGHT);
+        let segments = 32;
+        for i in 0..segments {
+            let angle1 = 2.0 * std::f32::consts::PI * i as f32 / segments as f32;
+            let angle2 = 2.0 * std::f32::consts::PI * (i + 1) as f32 / segments as f32;
+            let x1 = cx + radius * angle1.cos();
+            let y1 = cy + radius * angle1.sin();
+            let x2 = cx + radius * angle2.cos();
+            let y2 = cy + radius * angle2.sin();
+            self.graphics.draw_line((x1, y1), (x2, y2), border, color);
+        }
+        if state.focused {
+            let color = Color::from_hex_rgb(Classic::DARK);
+            let outer_radius = radius + border * 2.0;
+            for i in 0..segments {
+                let angle1 = 2.0 * std::f32::consts::PI * i as f32 / segments as f32;
+                let angle2 = 2.0 * std::f32::consts::PI * (i + 1) as f32 / segments as f32;
+                let x1 = cx + outer_radius * angle1.cos();
+                let y1 = cy + outer_radius * angle1.sin();
+                let x2 = cx + outer_radius * angle2.cos();
+                let y2 = cy + outer_radius * angle2.sin();
+                self.graphics.draw_line((x1, y1), (x2, y2), border, color);
+            }
+        }
+    }
+
+    fn draw_radiobutton_indicator(&mut self, rect: Rect<i32>, _state: ViewState) {
+        let cx = (rect.min.x + rect.max.x) as f32 / 2.0;
+        let cy = (rect.min.y + rect.max.y) as f32 / 2.0;
+        let radius = (rect.max.x - rect.min.x) as f32 / 2.0;
+        let dot_radius = radius * 0.45;
+        let color = Color::from_hex_rgb(Classic::BLACK);
+        self.graphics.draw_circle((cx, cy), dot_radius, color);
+    }
+
     fn draw_list_back(&mut self, rect: Rect<i32>, state: ViewState) {
         self.draw_edit_back(rect, state);
     }

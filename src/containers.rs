@@ -120,6 +120,10 @@ impl Container for Frame {
     fn get_view_count(&self) -> usize {
         self.views.len()
     }
+
+    fn get_views(&self) -> Vec<Element> {
+        self.views.clone()
+    }
 }
 
 impl View for Frame {
@@ -229,6 +233,7 @@ impl View for Frame {
         theme.push_clip();
         theme.clip_rect(rect);
         theme.draw_panel_back(rect, self.state.borrow().state);
+        #[cfg(debug_assertions)]
         theme.draw_panel_body(rect, self.state.borrow().state);
         for v in self.views.iter() {
             let v = v.try_borrow().unwrap();

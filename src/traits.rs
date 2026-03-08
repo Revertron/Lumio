@@ -142,4 +142,5 @@ pub trait Container: View {
     fn add_view(&mut self, view: Element);
     fn get_view(&self, id: &str) -> Option<Element>;
     fn get_view_count(&self) -> usize;
+    fn get_views(&self) -> Vec<Element> { Vec::new() }
 }
