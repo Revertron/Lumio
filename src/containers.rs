@@ -204,13 +204,13 @@ impl View for Frame {
             match &state.width {
                 Dimension::Min => ww = w,
                 Dimension::Max => ww = new_width,
-                Dimension::Dip(dip) => ww = *dip as i32,
+                Dimension::Dip(dip) => ww = (*dip as f64 * scale).round() as i32,
                 Dimension::Percent(p) => ww = (width as f32 * p / 100f32).round() as i32
             }
             match &state.height {
                 Dimension::Min => hh = h,
                 Dimension::Max => hh = new_height,
-                Dimension::Dip(dip) => hh = *dip as i32,
+                Dimension::Dip(dip) => hh = (*dip as f64 * scale).round() as i32,
                 Dimension::Percent(p) => hh = (height as f32 * p / 100f32).round() as i32
             }
             (ww, hh)
@@ -249,8 +249,6 @@ impl View for Frame {
             theme.draw_rect(super::types::rect((r.min.x, r.min.y), (r.min.x + 1, r.max.y)), border_color);
             theme.draw_rect(super::types::rect((r.max.x - 1, r.min.y), (r.max.x, r.max.y)), border_color);
         }
-        #[cfg(debug_assertions)]
-        theme.draw_panel_body(rect, state.state);
         drop(state);
         for v in self.views.iter() {
             let v = v.try_borrow().unwrap();

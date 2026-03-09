@@ -709,13 +709,13 @@ impl View for Edit {
             let ww = match &state.main.width {
                 Dimension::Min => w,
                 Dimension::Max => new_width,
-                Dimension::Dip(dip) => *dip as i32,
+                Dimension::Dip(dip) => (*dip as f64 * scale).round() as i32,
                 Dimension::Percent(p) => (width as f32 * p / 100f32).round() as i32
             };
             let hh = match &state.main.height {
                 Dimension::Min => h,
                 Dimension::Max => new_height,
-                Dimension::Dip(dip) => *dip as i32,
+                Dimension::Dip(dip) => (*dip as f64 * scale).round() as i32,
                 Dimension::Percent(p) => (height as f32 * p / 100f32).round() as i32
             };
             (ww, hh)

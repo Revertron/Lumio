@@ -664,13 +664,13 @@ impl View for RecyclerView {
             let ww = match &state.width {
                 Dimension::Min => 0,
                 Dimension::Max => new_width,
-                Dimension::Dip(dip) => *dip as i32,
+                Dimension::Dip(dip) => (*dip as f64 * scale).round() as i32,
                 Dimension::Percent(p) => (width as f32 * p / 100f32).round() as i32
             };
             let hh = match &state.height {
                 Dimension::Min => 0,
                 Dimension::Max => new_height,
-                Dimension::Dip(dip) => *dip as i32,
+                Dimension::Dip(dip) => (*dip as f64 * scale).round() as i32,
                 Dimension::Percent(p) => (height as f32 * p / 100f32).round() as i32
             };
             (ww, hh)
@@ -765,7 +765,7 @@ impl View for RecyclerView {
         let state = self.state.borrow();
         let scale = state.scale;
         let width = match &state.width {
-            Dimension::Dip(dip) => *dip as i32,  // Unscaled, matching layout_content
+            Dimension::Dip(dip) => (*dip as f64 * scale).round() as i32,
             _ => {
                 // For Max/Min/Percent, use the current rect size minus padding
                 let rect = self.get_rect();
@@ -774,7 +774,7 @@ impl View for RecyclerView {
             }
         };
         let height = match &state.height {
-            Dimension::Dip(dip) => *dip as i32,  // Unscaled, matching layout_content
+            Dimension::Dip(dip) => (*dip as f64 * scale).round() as i32,
             _ => {
                 let rect = self.get_rect();
                 let padding = self.get_padding(scale);

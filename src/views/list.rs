@@ -132,13 +132,13 @@ impl View for List {
             match &state.width {
                 Dimension::Min => ww = 0,
                 Dimension::Max => ww = new_width,
-                Dimension::Dip(dip) => ww = *dip as i32,
+                Dimension::Dip(dip) => ww = (*dip as f64 * scale).round() as i32,
                 Dimension::Percent(p) => ww = (width as f32 * p / 100f32).round() as i32
             }
             match &state.height {
                 Dimension::Min => hh = 0,
                 Dimension::Max => hh = new_height,
-                Dimension::Dip(dip) => hh = *dip as i32,
+                Dimension::Dip(dip) => hh = (*dip as f64 * scale).round() as i32,
                 Dimension::Percent(p) => hh = (height as f32 * p / 100f32).round() as i32
             }
             (ww, hh)
@@ -229,7 +229,7 @@ impl View for List {
         let state = self.state.borrow();
         let scale = state.scale;
         let width = match &state.width {
-            Dimension::Dip(dip) => *dip as i32,  // Unscaled, matching layout_content
+            Dimension::Dip(dip) => (*dip as f64 * scale).round() as i32,
             _ => {
                 // For Max/Min/Percent, use the current rect size minus padding
                 let rect = self.get_rect();
@@ -238,7 +238,7 @@ impl View for List {
             }
         };
         let height = match &state.height {
-            Dimension::Dip(dip) => *dip as i32,  // Unscaled, matching layout_content
+            Dimension::Dip(dip) => (*dip as f64 * scale).round() as i32,
             _ => {
                 let rect = self.get_rect();
                 let padding = self.get_padding(scale);
