@@ -775,7 +775,7 @@ impl View for Edit {
             }
 
             // Draw text
-            let color = theme.get_text_color(state.main.state, &state.main.foreground);
+            let color = theme.get_text_color(state.main.state, state.main.foreground.as_ref());
             theme.draw_text(text_x, text_y, color, text);
         } else if !self.placeholder.borrow().is_empty() {
             // Draw placeholder text when empty
@@ -901,6 +901,19 @@ impl View for Edit {
     }
     fn set_tooltip(&mut self, tooltip: Option<String>) {
         self.base_set_tooltip(tooltip);
+    }
+
+    fn get_background(&self) -> Option<u32> {
+        self.base_get_background()
+    }
+    fn set_background(&mut self, color: Option<u32>) {
+        self.base_set_background(color);
+    }
+    fn get_border_color(&self) -> Option<u32> {
+        self.base_get_border_color()
+    }
+    fn set_border_color(&mut self, color: Option<u32>) {
+        self.base_set_border_color(color);
     }
 
     fn on_event(&mut self, event: EventType, func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {

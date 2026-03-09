@@ -57,8 +57,9 @@ pub struct FieldsMain {
     pub id: String,
     pub state: ViewState,
     pub break_line: bool,
-    pub background: MainSelector,
-    pub foreground: MainSelector,
+    pub background: Option<MainSelector>,
+    pub foreground: Option<MainSelector>,
+    pub border_color: Option<u32>,
     pub parent: Option<WeakElement>,
     pub font_manager: FontManager,
     pub tooltip: Option<String>
@@ -78,8 +79,9 @@ impl FieldsMain {
             id: random_string(16),
             state: ViewState::default(),
             break_line: false,
-            background: MainSelector::new(),
-            foreground: MainSelector::new(),
+            background: None,
+            foreground: None,
+            border_color: None,
             parent: None,
             font_manager: FontManager::new(),
             tooltip: None

@@ -263,7 +263,7 @@ impl View for TabView {
             if let Some(ref text) = tab.cached_title {
                 let text_x = tr.min.x as f32 + (tr.width() as f32 - text.width()) / 2.0;
                 let text_y = tr.min.y as f32 + (tr.height() as f32 - text.height()) / 2.0;
-                let color = theme.get_text_color(view_state, &self.state.borrow().foreground);
+                let color = theme.get_text_color(view_state, self.state.borrow().foreground.as_ref());
                 theme.draw_text(text_x.round(), text_y.round(), color, text);
             }
         }
@@ -278,7 +278,7 @@ impl View for TabView {
             if let Some(ref text) = tab.cached_title {
                 let text_x = tr.min.x as f32 + (tr.width() as f32 - text.width()) / 2.0;
                 let text_y = tr.min.y as f32 + (tr.height() as f32 - text.height()) / 2.0;
-                let color = theme.get_text_color(view_state, &self.state.borrow().foreground);
+                let color = theme.get_text_color(view_state, self.state.borrow().foreground.as_ref());
                 theme.draw_text(text_x.round(), text_y.round(), color, text);
             }
         }
@@ -390,6 +390,19 @@ impl View for TabView {
     }
     fn set_tooltip(&mut self, tooltip: Option<String>) {
         self.base_set_tooltip(tooltip);
+    }
+
+    fn get_background(&self) -> Option<u32> {
+        self.base_get_background()
+    }
+    fn set_background(&mut self, color: Option<u32>) {
+        self.base_set_background(color);
+    }
+    fn get_border_color(&self) -> Option<u32> {
+        self.base_get_border_color()
+    }
+    fn set_border_color(&mut self, color: Option<u32>) {
+        self.base_set_border_color(color);
     }
 
     fn as_container(&self) -> Option<&dyn Container> {

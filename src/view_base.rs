@@ -1,5 +1,6 @@
 use std::cell::RefCell;
-use crate::themes::{FontStyle, Typeface};
+use crate::styles::selector::{DrawState, MainSelector};
+use crate::themes::{FontStyle, Typeface, ViewState};
 use crate::traits::{Element, WeakElement};
 use crate::types::Rect;
 use crate::views::{Borders, Dimension, FieldsMain};
@@ -180,6 +181,36 @@ pub trait ViewBasics: HasMainFields {
         self.main_fields().borrow_mut().tooltip = tooltip;
     }
 
+    fn base_get_background(&self) -> Option<u32> {
+        let fields = self.main_fields().borrow();
+        if let Some(ref selector) = fields.background {
+            if let Some(DrawState::Color(c)) = selector.get_state(&ViewState::no_focus()) {
+                return Some(*c);
+            }
+        }
+        None
+    }
+
+    fn base_set_background(&self, color: Option<u32>) {
+        let mut fields = self.main_fields().borrow_mut();
+        match color {
+            Some(c) => {
+                let mut selector = MainSelector::new();
+                selector.add_state(ViewState::no_focus(), DrawState::Color(c));
+                fields.background = Some(selector);
+            }
+            None => fields.background = None,
+        }
+    }
+
+    fn base_get_border_color(&self) -> Option<u32> {
+        self.main_fields().borrow().border_color
+    }
+
+    fn base_set_border_color(&self, color: Option<u32>) {
+        self.main_fields().borrow_mut().border_color = color;
+    }
+
     /// Handle common properties in set_any. Returns true if handled, false if not.
     fn base_set_any(&self, name: &str, value: &str) -> bool {
         let fields = self.main_fields();
@@ -260,7 +291,31 @@ pub trait ViewBasics: HasMainFields {
                 fields.borrow_mut().tooltip = Some(value.to_owned());
                 true
             }
+            "background" => {
+                if let Some(color) = parse_hex_color(value) {
+                    let mut selector = MainSelector::new();
+                    selector.add_state(ViewState::no_focus(), DrawState::Color(color));
+                    fields.borrow_mut().background = Some(selector);
+                }
+                true
+            }
+            "border_color" => {
+                if let Some(color) = parse_hex_color(value) {
+                    fields.borrow_mut().border_color = Some(color);
+                }
+                true
+            }
             _ => false
         }
+    }
+}
+
+/// Parse a hex color string like `#RRGGBB` or `#AARRGGBB` into a u32.
+fn parse_hex_color(s: &str) -> Option<u32> {
+    let hex = s.strip_prefix('#')?;
+    match hex.len() {
+        6 => u32::from_str_radix(hex, 16).ok().map(|c| 0xFF000000 | c),
+        8 => u32::from_str_radix(hex, 16).ok(),
+        _ => None,
     }
 }

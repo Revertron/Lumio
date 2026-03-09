@@ -113,6 +113,13 @@ pub trait View: Downcast {
     #[allow(unused_variables)]
     fn set_tooltip(&mut self, tooltip: Option<String>) {}
 
+    fn get_background(&self) -> Option<u32> { None }
+    #[allow(unused_variables)]
+    fn set_background(&mut self, color: Option<u32>) {}
+    fn get_border_color(&self) -> Option<u32> { None }
+    #[allow(unused_variables)]
+    fn set_border_color(&mut self, color: Option<u32>) {}
+
     fn as_container(&self) -> Option<&dyn Container> { None }
     fn as_container_mut(&mut self) -> Option<&mut dyn Container> { None }
 

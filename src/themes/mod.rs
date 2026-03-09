@@ -11,8 +11,8 @@ use super::types::Rect;
 pub trait Theme {
     fn clear_screen(&mut self);
     fn typeface() -> Typeface where Self: Sized;
-    fn get_back_color(&self, state: ViewState, selector: &MainSelector) -> u32;
-    fn get_text_color(&self, state: ViewState, selector: &MainSelector) -> u32;
+    fn get_back_color(&self, state: ViewState, selector: Option<&MainSelector>) -> u32;
+    fn get_text_color(&self, state: ViewState, selector: Option<&MainSelector>) -> u32;
     fn set_clip(&mut self, rect: Rect<i32>);
     fn clip_rect(&mut self, rect: Rect<i32>) -> Rect<i32>;
     fn push_clip(&mut self);

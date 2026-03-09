@@ -232,9 +232,26 @@ impl View for Frame {
         //println!("Drawing frame {} in rect: {:?}", self.get_id(), &rect);
         theme.push_clip();
         theme.clip_rect(rect);
-        theme.draw_panel_back(rect, self.state.borrow().state);
+        let state = self.state.borrow();
+        if let Some(bg) = state.background.as_ref() {
+            if let Some(crate::styles::selector::DrawState::Color(c)) = bg.get_state(&state.state) {
+                theme.draw_rect(rect, *c);
+            } else {
+                theme.draw_panel_back(rect, state.state);
+            }
+        } else {
+            theme.draw_panel_back(rect, state.state);
+        }
+        if let Some(border_color) = state.border_color {
+            let r = rect;
+            theme.draw_rect(super::types::rect((r.min.x, r.min.y), (r.max.x, r.min.y + 1)), border_color);
+            theme.draw_rect(super::types::rect((r.min.x, r.max.y - 1), (r.max.x, r.max.y)), border_color);
+            theme.draw_rect(super::types::rect((r.min.x, r.min.y), (r.min.x + 1, r.max.y)), border_color);
+            theme.draw_rect(super::types::rect((r.max.x - 1, r.min.y), (r.max.x, r.max.y)), border_color);
+        }
         #[cfg(debug_assertions)]
-        theme.draw_panel_body(rect, self.state.borrow().state);
+        theme.draw_panel_body(rect, state.state);
+        drop(state);
         for v in self.views.iter() {
             let v = v.try_borrow().unwrap();
             v.paint(start, theme);
@@ -354,6 +371,18 @@ impl View for Frame {
     }
     fn set_tooltip(&mut self, tooltip: Option<String>) {
         self.base_set_tooltip(tooltip);
+    }
+    fn get_background(&self) -> Option<u32> {
+        self.base_get_background()
+    }
+    fn set_background(&mut self, color: Option<u32>) {
+        self.base_set_background(color);
+    }
+    fn get_border_color(&self) -> Option<u32> {
+        self.base_get_border_color()
+    }
+    fn set_border_color(&mut self, color: Option<u32>) {
+        self.base_set_border_color(color);
     }
 
     fn as_container(&self) -> Option<&dyn Container> {

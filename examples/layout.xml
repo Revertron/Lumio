@@ -12,7 +12,7 @@
 
     <Separator width="max" height="3" padding="1" />
 
-    <Frame width="min" height="min" direction="vertical" padding="0">
+    <Frame width="min" height="min" direction="vertical" padding_right="4" background="#FFDD44">
         <RadioButton id="rb1" text="Option A" group="options"/>
         <RadioButton id="rb2" text="Option B" group="options"/>
         <RadioButton id="rb3" text="Option C" group="options" checked="true"/>
@@ -31,19 +31,6 @@
     </Frame>
 
     <Frame width="min" height="min">
-        <!--<Frame id="content" font="Akkurat" direction="vertical" width="min" padding="4">
-            <Button id="btn4" text="Akkurat 4" width="max" margin_top="4"/>
-            <Button id="btn5" text="Bold 5" font_style="Bold" width="max" margin_top="4"/>
-            <Button id="btn6" text="Button 6" width="max" margin_top="4"/>
-        </Frame>
-        <Frame id="wrapping" font="Akkurat" width="min" padding="8" breaking="true">
-            <Label id="label2" text="Horizontal layout with breaks" width="min" break="true"/>
-            <Button id="btn4-1" text="Button 1-1" width="min"/>
-            <Button id="btn5-1" text="Button 1-2 with break" width="min" break="true"/>
-            <Button id="btn6-1" text="Button 2-1" width="min"/>
-            <Button id="btn6-1" text="Button 3-1" width="min"/>
-            <Button id="btn6-1" text="Button 3-2" width="min"/>
-        </Frame>-->
         <List id="list1" width="300" height="500" margin_left="4"/>
         <ImageView id="my_image" width="218" margin_left="4" image="cats.jpg" />
         <RecyclerView id="my_list" width="max" height="500" margin_left="4" margin_right="4" padding="5" />

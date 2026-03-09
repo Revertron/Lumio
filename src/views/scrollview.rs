@@ -438,6 +438,19 @@ impl View for ScrollView {
         self.base_set_tooltip(tooltip);
     }
 
+    fn get_background(&self) -> Option<u32> {
+        self.base_get_background()
+    }
+    fn set_background(&mut self, color: Option<u32>) {
+        self.base_set_background(color);
+    }
+    fn get_border_color(&self) -> Option<u32> {
+        self.base_get_border_color()
+    }
+    fn set_border_color(&mut self, color: Option<u32>) {
+        self.base_set_border_color(color);
+    }
+
     fn as_container(&self) -> Option<&dyn Container> {
         Some(self as &dyn Container)
     }

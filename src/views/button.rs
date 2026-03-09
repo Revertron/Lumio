@@ -159,7 +159,7 @@ impl View for Button {
         if let Some(text) = &state.cached_text {
             let x = (self.get_rect_width() as f32 - text.width()) / 2f32;
             let y = (self.get_rect_height() as f32 - text.height()) / 2f32;
-            let color = theme.get_text_color(state.main.state, &state.main.foreground);
+            let color = theme.get_text_color(state.main.state, state.main.foreground.as_ref());
             theme.draw_text((rect.min.x as f32 + x).round(), (rect.min.y as f32 + y).round(), color, text);
         }
 
@@ -253,6 +253,19 @@ impl View for Button {
     }
     fn set_tooltip(&mut self, tooltip: Option<String>) {
         self.base_set_tooltip(tooltip);
+    }
+
+    fn get_background(&self) -> Option<u32> {
+        self.base_get_background()
+    }
+    fn set_background(&mut self, color: Option<u32>) {
+        self.base_set_background(color);
+    }
+    fn get_border_color(&self) -> Option<u32> {
+        self.base_get_border_color()
+    }
+    fn set_border_color(&mut self, color: Option<u32>) {
+        self.base_set_border_color(color);
     }
 
     fn on_event(&mut self, event: EventType, func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {

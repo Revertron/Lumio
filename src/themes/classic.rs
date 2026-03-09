@@ -66,23 +66,27 @@ impl<'h> Theme for Classic<'h> {
         Typeface::default()
     }
 
-    fn get_back_color(&self, state: ViewState, selector: &MainSelector) -> u32 {
-        if let Some(s) = selector.get_state(&state) {
-            match s {
-                DrawState::Transparent => return 0x00000000,
-                DrawState::Color(c) => return *c,
-                _ => {}
+    fn get_back_color(&self, state: ViewState, selector: Option<&MainSelector>) -> u32 {
+        if let Some(selector) = selector {
+            if let Some(s) = selector.get_state(&state) {
+                match s {
+                    DrawState::Transparent => return 0x00000000,
+                    DrawState::Color(c) => return *c,
+                    _ => {}
+                }
             }
         }
         Classic::BACKGROUND
     }
 
-    fn get_text_color(&self, state: ViewState, selector: &MainSelector) -> u32 {
-        if let Some(s) = selector.get_state(&state) {
-            match s {
-                DrawState::Transparent => return 0x00000000,
-                DrawState::Color(c) => return *c,
-                _ => {}
+    fn get_text_color(&self, state: ViewState, selector: Option<&MainSelector>) -> u32 {
+        if let Some(selector) = selector {
+            if let Some(s) = selector.get_state(&state) {
+                match s {
+                    DrawState::Transparent => return 0x00000000,
+                    DrawState::Color(c) => return *c,
+                    _ => {}
+                }
             }
         }
         if !state.enabled {

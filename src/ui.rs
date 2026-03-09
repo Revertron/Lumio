@@ -278,18 +278,6 @@ impl UI {
         }
         // Paint tooltip on top of everything
         if let Some(tooltip) = &self.tooltip_popup {
-            let r = tooltip.element.borrow().get_rect();
-            let tr = super::types::rect(
-                (tooltip.x, tooltip.y),
-                (tooltip.x + r.width(), tooltip.y + r.height())
-            );
-            // Draw tooltip background and border
-            theme.draw_rect(tr, 0xFFFFDD);
-            theme.draw_rect(super::types::rect((tr.min.x, tr.min.y), (tr.max.x, tr.min.y + 1)), 0x808080);
-            theme.draw_rect(super::types::rect((tr.min.x, tr.max.y - 1), (tr.max.x, tr.max.y)), 0x808080);
-            theme.draw_rect(super::types::rect((tr.min.x, tr.min.y), (tr.min.x + 1, tr.max.y)), 0x808080);
-            theme.draw_rect(super::types::rect((tr.max.x - 1, tr.min.y), (tr.max.x, tr.max.y)), 0x808080);
-            // Draw tooltip text
             tooltip.element.borrow().paint(Point::from((tooltip.x, tooltip.y)), theme);
         }
     }
@@ -503,6 +491,8 @@ impl UI {
             f.set_width(Dimension::Min);
             f.set_height(Dimension::Min);
             f.set_padding(3, 6, 6, 3);
+            f.set_background(Some(0xFFFFFFDD));
+            f.set_border_color(Some(0xFF808080));
             label.borrow_mut().set_parent(Some(Rc::downgrade(&frame)));
             f.as_container_mut().unwrap().add_view(label);
         }
