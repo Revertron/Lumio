@@ -172,6 +172,14 @@ pub trait ViewBasics: HasMainFields {
         fields.rect.max.y = y + fields.rect.height();
     }
 
+    fn base_get_tooltip(&self) -> Option<String> {
+        self.main_fields().borrow().tooltip.clone()
+    }
+
+    fn base_set_tooltip(&self, tooltip: Option<String>) {
+        self.main_fields().borrow_mut().tooltip = tooltip;
+    }
+
     /// Handle common properties in set_any. Returns true if handled, false if not.
     fn base_set_any(&self, name: &str, value: &str) -> bool {
         let fields = self.main_fields();
@@ -246,6 +254,10 @@ pub trait ViewBasics: HasMainFields {
             }
             "break" => {
                 fields.borrow_mut().break_line = value.parse().unwrap_or(false);
+                true
+            }
+            "tooltip" => {
+                fields.borrow_mut().tooltip = Some(value.to_owned());
                 true
             }
             _ => false

@@ -109,6 +109,10 @@ pub trait View: Downcast {
         Point { x, y }
     }
 
+    fn get_tooltip(&self) -> Option<String> { None }
+    #[allow(unused_variables)]
+    fn set_tooltip(&mut self, tooltip: Option<String>) {}
+
     fn as_container(&self) -> Option<&dyn Container> { None }
     fn as_container_mut(&mut self) -> Option<&mut dyn Container> { None }
 

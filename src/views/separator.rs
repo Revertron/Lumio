@@ -151,6 +151,12 @@ impl View for Separator {
     fn get_id(&self) -> String {
         self.base_get_id()
     }
+    fn get_tooltip(&self) -> Option<String> {
+        self.base_get_tooltip()
+    }
+    fn set_tooltip(&mut self, tooltip: Option<String>) {
+        self.base_set_tooltip(tooltip);
+    }
 
     fn on_event(&mut self, _event: EventType, _func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {
         // No events for separator

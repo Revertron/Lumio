@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::time::Instant;
 
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::Reader;
@@ -15,6 +16,7 @@ use super::types::Point;
 use super::themes::Typeface;
 
 use super::views::{Button, Edit, Label, CheckBox, RadioButton, ComboBox, ScrollView, ProgressBar, TabView, List, RecyclerView, ImageButton, ImageView, PopupMenu, Dialog, Separator};
+use super::views::Dimension;
 
 /// Controls how a popup interacts with the rest of the UI.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -47,6 +49,15 @@ struct PopupEntry {
     mode: PopupMode,
 }
 
+const TOOLTIP_DELAY_MS: u128 = 700;
+const TOOLTIP_ID: &str = "__tooltip__";
+
+struct TooltipPopup {
+    element: Element,
+    x: i32,
+    y: i32,
+}
+
 pub struct UI {
     width: u32,
     height: u32,
@@ -57,12 +68,20 @@ pub struct UI {
     on_start: Option<Box<dyn FnMut(&mut UI)>>,
     overlays: Vec<PopupEntry>,
     mouse_pos: Vector2<i32>,
+    tooltip_view_id: Option<String>,
+    tooltip_hover_start: Option<Instant>,
+    tooltip_showing: bool,
+    tooltip_popup: Option<TooltipPopup>,
 }
 
 #[allow(dead_code)]
 impl UI {
     pub fn new(width: u32, height: u32, typeface: Typeface, scale: f64) -> Self {
-        let mut ui = UI { width, height, typeface, scale, root: None, types: HashMap::new(), on_start: None, overlays: Vec::new(), mouse_pos: Vector2::new(0, 0) };
+        let mut ui = UI {
+            width, height, typeface, scale, root: None, types: HashMap::new(),
+            on_start: None, overlays: Vec::new(), mouse_pos: Vector2::new(0, 0),
+            tooltip_view_id: None, tooltip_hover_start: None, tooltip_showing: false, tooltip_popup: None,
+        };
         ui.register::<Label>("Label");
         ui.register::<Button>("Button");
         ui.register::<CheckBox>("CheckBox");
@@ -243,6 +262,8 @@ impl UI {
         if let Some(root) = root {
             redraw |= root.borrow_mut().update(self);
         }
+        // Update tooltip
+        redraw |= self.update_tooltip();
         redraw
     }
 
@@ -254,6 +275,22 @@ impl UI {
         // Paint overlays on top, in order (last = topmost)
         for entry in &self.overlays {
             entry.element.borrow().paint(Point::from((entry.x, entry.y)), theme);
+        }
+        // Paint tooltip on top of everything
+        if let Some(tooltip) = &self.tooltip_popup {
+            let r = tooltip.element.borrow().get_rect();
+            let tr = super::types::rect(
+                (tooltip.x, tooltip.y),
+                (tooltip.x + r.width(), tooltip.y + r.height())
+            );
+            // Draw tooltip background and border
+            theme.draw_rect(tr, 0xFFFFDD);
+            theme.draw_rect(super::types::rect((tr.min.x, tr.min.y), (tr.max.x, tr.min.y + 1)), 0x808080);
+            theme.draw_rect(super::types::rect((tr.min.x, tr.max.y - 1), (tr.max.x, tr.max.y)), 0x808080);
+            theme.draw_rect(super::types::rect((tr.min.x, tr.min.y), (tr.min.x + 1, tr.max.y)), 0x808080);
+            theme.draw_rect(super::types::rect((tr.max.x - 1, tr.min.y), (tr.max.x, tr.max.y)), 0x808080);
+            // Draw tooltip text
+            tooltip.element.borrow().paint(Point::from((tooltip.x, tooltip.y)), theme);
         }
     }
 
@@ -379,6 +416,136 @@ impl UI {
         self.overlays.iter().any(|e| e.mode == PopupMode::Modal)
     }
 
+    /// Walks the view tree to find the deepest view under (x, y) that has a tooltip.
+    /// Coordinates are in absolute window space.
+    fn hit_test_tooltip(element: &Element, x: i32, y: i32, offset_x: i32, offset_y: i32) -> Option<(String, String)> {
+        let view = element.borrow();
+        let rect = view.get_rect();
+        let abs_x = rect.min.x + offset_x;
+        let abs_y = rect.min.y + offset_y;
+        let abs_max_x = rect.max.x + offset_x;
+        let abs_max_y = rect.max.y + offset_y;
+
+        if x < abs_x || x >= abs_max_x || y < abs_y || y >= abs_max_y {
+            return None;
+        }
+
+        // Check children first (deepest match wins)
+        if let Some(container) = view.as_container() {
+            for child in container.get_views().iter().rev() {
+                if let Some(result) = Self::hit_test_tooltip(child, x, y, abs_x, abs_y) {
+                    return Some(result);
+                }
+            }
+        }
+
+        // Then check this view
+        if let Some(tooltip) = view.get_tooltip() {
+            if !tooltip.is_empty() {
+                return Some((view.get_id(), tooltip));
+            }
+        }
+
+        None
+    }
+
+    fn update_tooltip(&mut self) -> bool {
+        // Don't show tooltips when popups are open
+        if !self.overlays.is_empty() {
+            return self.dismiss_tooltip();
+        }
+
+        let hit = self.root.as_ref().and_then(|root| {
+            Self::hit_test_tooltip(root, self.mouse_pos.x, self.mouse_pos.y, 0, 0)
+        });
+
+        match hit {
+            Some((view_id, tooltip_text)) => {
+                if self.tooltip_view_id.as_deref() == Some(&view_id) {
+                    // Same view — check if it's time to show
+                    if !self.tooltip_showing {
+                        if let Some(start) = &self.tooltip_hover_start {
+                            if start.elapsed().as_millis() >= TOOLTIP_DELAY_MS {
+                                self.show_tooltip(&tooltip_text);
+                                return true;
+                            }
+                        }
+                    }
+                    false
+                } else {
+                    // Different view — reset timer
+                    let dismissed = self.dismiss_tooltip();
+                    self.tooltip_view_id = Some(view_id);
+                    self.tooltip_hover_start = Some(Instant::now());
+                    dismissed
+                }
+            }
+            None => {
+                // No tooltip view under cursor
+                self.dismiss_tooltip()
+            }
+        }
+    }
+
+    fn show_tooltip(&mut self, text: &str) {
+        let label: Element = Rc::new(RefCell::new(Label::default()));
+        {
+            let mut l = label.borrow_mut();
+            l.set_any("text", text);
+            l.set_width(Dimension::Min);
+            l.set_height(Dimension::Min);
+        }
+
+        let frame: Element = Rc::new(RefCell::new(Frame::default()));
+        {
+            let mut f = frame.borrow_mut();
+            f.set_id(TOOLTIP_ID);
+            f.set_width(Dimension::Min);
+            f.set_height(Dimension::Min);
+            f.set_padding(3, 6, 6, 3);
+            label.borrow_mut().set_parent(Some(Rc::downgrade(&frame)));
+            f.as_container_mut().unwrap().add_view(label);
+        }
+
+        // Layout to determine size
+        let typeface = self.typeface.clone();
+        let w = self.width as i32;
+        let h = self.height as i32;
+        frame.borrow_mut().layout_content(0, 0, w, h, &typeface, self.scale);
+
+        let rect = frame.borrow().get_rect();
+        let pw = rect.width();
+        let ph = rect.height();
+
+        // Position below and to the right of the cursor
+        let mut ox = self.mouse_pos.x;
+        let mut oy = self.mouse_pos.y + 20;
+
+        // Clamp to window bounds
+        ox = ox.max(0).min(w - pw);
+        oy = oy.max(0).min(h - ph);
+
+        self.tooltip_popup = Some(TooltipPopup { element: frame, x: ox, y: oy });
+        self.tooltip_showing = true;
+    }
+
+    fn dismiss_tooltip(&mut self) -> bool {
+        if self.tooltip_showing {
+            self.tooltip_popup = None;
+            self.tooltip_showing = false;
+            self.tooltip_view_id = None;
+            self.tooltip_hover_start = None;
+            true
+        } else if self.tooltip_view_id.is_some() {
+            // Had a pending tooltip but hadn't shown yet
+            self.tooltip_view_id = None;
+            self.tooltip_hover_start = None;
+            false
+        } else {
+            false
+        }
+    }
+
     pub fn on_mouse_move(&mut self, position: Vector2<i32>) -> bool {
         self.mouse_pos = position;
         // Dispatch to overlays first (reverse order = topmost first)
@@ -402,6 +569,7 @@ impl UI {
     }
 
     pub fn on_mouse_button_down(&mut self, position: Vector2<i32>, button: MouseButton) -> bool {
+        self.dismiss_tooltip();
         // Dispatch to overlays first
         let entries: Vec<(Element, i32, i32)> = self.overlays.iter().rev()
             .map(|e| (Rc::clone(&e.element), e.x, e.y))

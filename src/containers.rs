@@ -349,6 +349,12 @@ impl View for Frame {
     fn get_id(&self) -> String {
         self.base_get_id()
     }
+    fn get_tooltip(&self) -> Option<String> {
+        self.base_get_tooltip()
+    }
+    fn set_tooltip(&mut self, tooltip: Option<String>) {
+        self.base_set_tooltip(tooltip);
+    }
 
     fn as_container(&self) -> Option<&dyn Container> {
         Some(self as &dyn Container)

@@ -1,8 +1,8 @@
 <Frame id="main" width="min" height="max" direction="vertical" font="Noto Sans" font_style="Regular" padding="0">
     <Label id="label1" text="Label with NotoSans font" padding="4"/>
     <Frame id="buttons1" direction="horizontal" padding="0" width="min">
-        <Button id="btn1" text="Button 1" margin="4"/>
-        <Button id="btn2" text="Button 2" margin="4" width="300"/>
+        <Button id="btn1" text="Button 1" margin="4" tooltip="This is Button 1"/>
+        <Button id="btn2" text="Button 2" margin="4" width="300" tooltip="A wider button"/>
         <Button id="btn3" text="Popup menu" margin="4"/>
     </Frame>
 
@@ -23,9 +23,9 @@
         <ComboBox id="combo1" width="240" items="Option A|Option B|Option C" selected="0"/>
 
         <!-- Nested Item tags -->
-        <ComboBox id="combo1" width="240" selected="1">
-            <Item text="Option A"/>
-            <Item text="Option B"/>
+        <ComboBox id="combo1" width="240" selected="2">
+            <Item text="Very long Option A"/>
+            <Item text="Very long Option B"/>
             <Item text="Option C"/>
         </ComboBox>
     </Frame>

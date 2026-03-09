@@ -60,7 +60,8 @@ pub struct FieldsMain {
     pub background: MainSelector,
     pub foreground: MainSelector,
     pub parent: Option<WeakElement>,
-    pub font_manager: FontManager
+    pub font_manager: FontManager,
+    pub tooltip: Option<String>
 }
 
 impl FieldsMain {
@@ -80,7 +81,8 @@ impl FieldsMain {
             background: MainSelector::new(),
             foreground: MainSelector::new(),
             parent: None,
-            font_manager: FontManager::new()
+            font_manager: FontManager::new(),
+            tooltip: None
         }
     }
 

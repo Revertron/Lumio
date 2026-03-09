@@ -242,6 +242,12 @@ impl View for ImageButton {
     fn get_id(&self) -> String {
         self.base_get_id()
     }
+    fn get_tooltip(&self) -> Option<String> {
+        self.base_get_tooltip()
+    }
+    fn set_tooltip(&mut self, tooltip: Option<String>) {
+        self.base_set_tooltip(tooltip);
+    }
 
     fn on_event(&mut self, event: EventType, func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {
         self.listeners.borrow_mut().insert(event, func);
