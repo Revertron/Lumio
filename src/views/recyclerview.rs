@@ -465,12 +465,27 @@ impl RecyclerView {
 
     /// Internal: Recycle off-screen views and bind visible ones
     fn recycle_and_fill(&self, typeface: &Typeface, scale: f64) {
+        // Remember if a full relayout was requested (e.g. due to resize)
+        let full_relayout = *self.needs_layout.borrow();
         // Clear needs_layout flag at start (it may be set again if heights change)
         *self.needs_layout.borrow_mut() = false;
 
         // Check if adapter exists
         if self.adapter.borrow().is_none() {
             return;
+        }
+
+        // On full relayout (e.g. resize), recycle ALL attached holders so they get
+        // freshly created and bound. This is necessary because text views cache their
+        // laid-out text and skip re-layout when layout_content is called again.
+        if full_relayout {
+            let adapter_ref = self.adapter.borrow();
+            let adapter = adapter_ref.as_ref().unwrap();
+            let mut attached = self.attached_holders.borrow_mut();
+            for holder in attached.drain(..) {
+                adapter.on_view_recycled(&holder);
+                self.recycler.recycle(holder);
+            }
         }
 
         let self_rect = self.state.borrow().rect;

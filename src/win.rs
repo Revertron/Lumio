@@ -63,7 +63,6 @@ impl<T> WindowHandler<T> for Win<T> {
     }
 
     fn on_resize(&mut self, helper: &mut WindowHelper<T>, size_pixels: Vector2<u32>) {
-        println!("on_resize");
         if size_pixels.x == 0 || size_pixels.y == 0 {
             return;
         }
