@@ -568,6 +568,31 @@ impl<'h> Theme for Classic<'h> {
         );
     }
 
+    fn draw_separator(&mut self, rect: Rect<i32>, _state: ViewState) {
+        let border: f32 = self.scale as f32;
+        let border_half: f32 = (self.scale / 2.0) as f32;
+        // Determine orientation from rect aspect ratio
+        if rect.width() >= rect.height() {
+            // Horizontal separator: center the etched line pair vertically
+            let cy = (rect.min.y + rect.max.y) as f32 / 2.0;
+            let x1 = rect.min.x as f32;
+            let x2 = rect.max.x as f32;
+            let color = Color::from_hex_rgb(Classic::LIGHT);
+            self.graphics.draw_line((x1, cy - border_half), (x2, cy - border_half), border, color);
+            let color = Color::from_hex_rgb(0xffffff);
+            self.graphics.draw_line((x1, cy + border_half), (x2, cy + border_half), border, color);
+        } else {
+            // Vertical separator: center the etched line pair horizontally
+            let cx = (rect.min.x + rect.max.x) as f32 / 2.0;
+            let y1 = rect.min.y as f32;
+            let y2 = rect.max.y as f32;
+            let color = Color::from_hex_rgb(Classic::LIGHT);
+            self.graphics.draw_line((cx - border_half, y1), (cx - border_half, y2), border, color);
+            let color = Color::from_hex_rgb(0xffffff);
+            self.graphics.draw_line((cx + border_half, y1), (cx + border_half, y2), border, color);
+        }
+    }
+
     fn draw_image(&mut self, rect: Rect<i32>, image_bytes: &[u8]) {
         let cache_key = image_bytes.as_ptr() as usize;
         if !self.image_cache.contains_key(&cache_key) {

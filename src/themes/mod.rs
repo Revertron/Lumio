@@ -67,6 +67,9 @@ pub trait Theme {
     fn draw_tab_active(&mut self, rect: Rect<i32>, state: ViewState);
     fn draw_tab_inactive(&mut self, rect: Rect<i32>, state: ViewState);
     fn draw_tab_content_area(&mut self, rect: Rect<i32>, state: ViewState);
+
+    // Separator drawing method
+    fn draw_separator(&mut self, rect: Rect<i32>, state: ViewState);
 }
 
 #[allow(unused)]

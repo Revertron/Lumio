@@ -17,10 +17,11 @@ use crate::view_base::{HasMainFields, ViewBasics};
 
 const ICON_SIZE: i32 = 16;
 const ITEM_HEIGHT: i32 = 28;
+const SEPARATOR_HEIGHT: i32 = 3;
 const ICON_TEXT_GAP: i32 = 6;
 const ITEM_PADDING_LEFT: i32 = 6;
 const ITEM_PADDING_RIGHT: i32 = 12;
-const HIGHLIGHT_COLOR: u32 = 0xff0000C0;
+const HIGHLIGHT_COLOR: u32 = 0xff0000c0;
 const HIGHLIGHT_TEXT_COLOR: u32 = 0xffffffff;
 const NORMAL_TEXT_COLOR: u32 = 0xff000000;
 
@@ -29,6 +30,7 @@ pub struct MenuItem {
     pub id: String,
     pub icon_path: String,
     pub text: String,
+    pub separator: bool,
 }
 
 pub struct PopupMenu {
@@ -72,6 +74,19 @@ impl PopupMenu {
             id: id.to_owned(),
             icon_path: icon_path.to_owned(),
             text: text.to_owned(),
+            separator: false,
+        });
+        self.icon_bytes.borrow_mut().push(None);
+        self.cached_texts.borrow_mut().push(None);
+    }
+
+    /// Adds a horizontal separator line between menu items.
+    pub fn add_separator(&mut self) {
+        self.items.borrow_mut().push(MenuItem {
+            id: String::new(),
+            icon_path: String::new(),
+            text: String::new(),
+            separator: true,
         });
         self.icon_bytes.borrow_mut().push(None);
         self.cached_texts.borrow_mut().push(None);
@@ -123,17 +138,21 @@ impl PopupMenu {
         let scale = state.scale;
         let padding = state.padding.scaled(scale);
         let item_h = (ITEM_HEIGHT as f64 * scale).round() as i32;
+        let sep_h = (SEPARATOR_HEIGHT as f64 * scale).round() as i32;
         let local_y = y - r.min.y - padding.top;
         if local_y < 0 {
             return None;
         }
-        let index = local_y / item_h;
-        let count = self.items.borrow().len() as i32;
-        if index >= 0 && index < count {
-            Some(index as usize)
-        } else {
-            None
+        let items = self.items.borrow();
+        let mut accumulated = 0;
+        for (i, item) in items.iter().enumerate() {
+            let h = if item.separator { sep_h } else { item_h };
+            if local_y < accumulated + h {
+                return if item.separator { None } else { Some(i) };
+            }
+            accumulated += h;
         }
+        None
     }
 }
 
@@ -179,8 +198,12 @@ impl View for PopupMenu {
             }
         }
 
+        let sep_h = (SEPARATOR_HEIGHT as f64 * scale).round() as i32;
+
         let content_w = pad_left + icon_size + gap + max_text_w + pad_right;
-        let content_h = item_h * self.items.borrow().len() as i32;
+        let content_h: i32 = self.items.borrow().iter()
+            .map(|item| if item.separator { sep_h } else { item_h })
+            .sum();
 
         let total_w = (padding.left + content_w + padding.right).min(width);
         let total_h = (padding.top + content_h + padding.bottom).min(height);
@@ -221,7 +244,20 @@ impl View for PopupMenu {
         let content_x = r.min.x + padding.left;
         let mut y = r.min.y + padding.top;
 
-        for (i, _item) in items.iter().enumerate() {
+        let sep_h = (SEPARATOR_HEIGHT as f64 * scale).round() as i32;
+
+        for (i, item) in items.iter().enumerate() {
+            if item.separator {
+                // Draw separator line spanning full item width
+                let sep_rect = rect(
+                    (content_x, y),
+                    (r.max.x - padding.right - 1, y + sep_h),
+                );
+                theme.draw_separator(sep_rect, state.state);
+                y += sep_h;
+                continue;
+            }
+
             let item_rect = rect(
                 (content_x, y),
                 (r.max.x - padding.right - 1, y + item_h),
@@ -311,8 +347,12 @@ impl View for PopupMenu {
             }
         }
 
+        let sep_h = (SEPARATOR_HEIGHT as f64 * scale).round() as i32;
+
         let w = pad_left + icon_size + gap + max_text_w + pad_right;
-        let h = item_h * self.items.borrow().len() as i32;
+        let h: i32 = self.items.borrow().iter()
+            .map(|item| if item.separator { sep_h } else { item_h })
+            .sum();
         (w, h)
     }
 

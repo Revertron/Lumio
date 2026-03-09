@@ -583,6 +583,7 @@ impl Edit {
         menu.add_item("copy", "", "Copy");
         menu.add_item("paste", "", "Paste");
         menu.add_item("delete", "", "Delete");
+        menu.add_separator();
         menu.add_item("select_all", "", "Select All");
 
         let edit_id = self.get_id();
@@ -630,7 +631,7 @@ impl Edit {
                             }
                         }
                     }
-                    4 => {
+                    5 => {
                         // Select All
                         if let Some(el) = ui.get_view(&edit_id) {
                             let b = el.borrow();

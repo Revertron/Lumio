@@ -10,6 +10,8 @@
 
     <CheckBox id="checkbox1" text="Create awesome GUI in Rust?" margin="4"/>
 
+    <Separator width="max" height="3" padding="1" />
+
     <Frame width="min" height="min" direction="vertical" padding="0">
         <RadioButton id="rb1" text="Option A" group="options"/>
         <RadioButton id="rb2" text="Option B" group="options"/>
