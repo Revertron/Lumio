@@ -1,0 +1,10 @@
+<Frame id="contact_item" width="max" height="min" direction="horizontal" padding="8">
+    <ImageView id="avatar" width="40" height="40" image="cats.jpg" margin_right="8"/>
+    <Frame id="contact_info" width="max" height="min" direction="vertical" padding="0">
+        <Frame id="top_row" width="max" height="min" direction="horizontal" padding="0">
+            <Label id="contact_name" text="Name" width="min" font_style="Bold" margin_right="8"/>
+            <Label id="contact_time" text="12:00" width="min"/>
+        </Frame>
+        <Label id="contact_last_msg" text="Last message..." width="min" margin_top="2"/>
+    </Frame>
+</Frame>

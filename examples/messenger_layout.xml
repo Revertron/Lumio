@@ -1,0 +1,31 @@
+<SplitPanel id="root" width="max" height="max" direction="horizontal" split_pos="360" font="Noto Sans" font_style="Regular">
+    <!-- Left panel: contact list -->
+    <Frame id="contacts_panel" width="max" height="max" direction="vertical" padding="0">
+        <Frame id="contacts_header" width="max" height="min" direction="horizontal" padding="8" background="#F0F0F0">
+            <Label id="app_title" text="Messenger" font_style="Bold" padding="4"/>
+        </Frame>
+        <Separator width="max" height="3" padding="1"/>
+        <RecyclerView id="contacts_list" width="max" height="max" padding="0"/>
+    </Frame>
+
+    <!-- Right panel: chat area -->
+    <Frame id="chat_panel" width="max" height="max" direction="vertical" padding="0">
+        <!-- Chat header -->
+        <Frame id="chat_header" width="max" height="min" direction="horizontal" padding="8" background="#F0F0F0">
+            <Label id="chat_title" text="Select a contact" font_style="Bold" padding="4"/>
+        </Frame>
+        <Separator width="max" height="3" padding="1"/>
+
+        <!-- Messages area -->
+        <RecyclerView id="messages_list" width="max" height="max" padding="0"/>
+
+        <Separator width="max" height="3" padding="1"/>
+
+        <!-- Input area -->
+        <Frame id="input_area" width="max" height="min" direction="horizontal" padding="4">
+            <Button id="btn_attach" text="+" width="32" height="32" margin="2"/>
+            <Edit id="message_input" text="" width="max" height="32" margin="2"/>
+            <ImageButton id="btn_send" image="send.png" hover_image="send-hover.png" no_inset="true" width="32" height="32" margin="2"/>
+        </Frame>
+    </Frame>
+</SplitPanel>

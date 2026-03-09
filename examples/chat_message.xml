@@ -1,0 +1,7 @@
+<Frame id="chat_msg_item" width="max" height="min" direction="vertical" padding="6">
+    <Frame id="msg_header" width="max" height="min" direction="horizontal" padding="0">
+        <Label id="msg_sender" text="Sender" width="min" font_style="Bold"/>
+        <Label id="msg_time" text="12:34" width="min" margin_left="8"/>
+    </Frame>
+    <Label id="msg_text" text="Message text" width="max" margin_top="2"/>
+</Frame>

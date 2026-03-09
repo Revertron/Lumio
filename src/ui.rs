@@ -15,7 +15,7 @@ use super::traits::{Element, View};
 use super::types::Point;
 use super::themes::Typeface;
 
-use super::views::{Button, Edit, Label, CheckBox, RadioButton, ComboBox, ScrollView, ProgressBar, TabView, List, RecyclerView, ImageButton, ImageView, PopupMenu, Dialog, Separator};
+use super::views::{Button, Edit, Label, CheckBox, RadioButton, ComboBox, ScrollView, ProgressBar, TabView, List, RecyclerView, ImageButton, ImageView, PopupMenu, Dialog, Separator, SplitPanel};
 use super::views::Dimension;
 
 /// Controls how a popup interacts with the rest of the UI.
@@ -98,6 +98,7 @@ impl UI {
         ui.register::<PopupMenu>("PopupMenu");
         ui.register::<Dialog>("Dialog");
         ui.register::<Separator>("Separator");
+        ui.register::<SplitPanel>("SplitPanel");
         ui.register::<Frame>("Frame");
         ui
     }
