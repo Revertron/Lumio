@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::cmp::{max, min};
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::time::Instant;
 use speedy2d::dimen::Vector2;
 use speedy2d::font::{TextLayout, TextOptions};
@@ -10,11 +11,12 @@ use crate::assets::get_font;
 use crate::events::EventType;
 use crate::common::{delete_char, delete_range, insert_str};
 use crate::views::Borders;
+use crate::views::popupmenu::PopupMenu;
 use crate::styles::selector::FontSelector;
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
-use crate::ui::UI;
+use crate::ui::{PopupDirection, PopupMode, UI};
 use crate::view_base::{HasMainFields, ViewBasics};
 use super::{BUTTON_MIN_HEIGHT, BUTTON_MIN_WIDTH, Dimension, FieldsMain, FieldsTexted};
 
@@ -574,6 +576,93 @@ impl Edit {
         }
         false
     }
+
+    fn open_context_menu(&self, ui: &mut UI, x: i32, y: i32) {
+        let mut menu = PopupMenu::new();
+        menu.add_item("cut", "", "Cut");
+        menu.add_item("copy", "", "Copy");
+        menu.add_item("paste", "", "Paste");
+        menu.add_item("delete", "", "Delete");
+        menu.add_item("select_all", "", "Select All");
+
+        let edit_id = self.get_id();
+        menu.on_event(EventType::Click, Box::new(move |ui: &mut UI, view: &dyn View| {
+            let menu = view.as_any().downcast_ref::<PopupMenu>().unwrap();
+            let index = menu.get_hovered_index();
+            if let Some(index) = index {
+                // Flags extracted from scoped borrows to drive subsequent &mut UI calls
+                let mut need_text_changed = false;
+                let mut need_paste = false;
+
+                match index {
+                    0 => {
+                        // Cut: copy + delete selection
+                        if let Some(el) = ui.get_view(&edit_id) {
+                            let b = el.borrow();
+                            let edit = b.as_any().downcast_ref::<Edit>().unwrap();
+                            edit.copy_to_clipboard();
+                            if edit.has_selection() && !*edit.read_only.borrow() {
+                                edit.delete_selection();
+                                need_text_changed = true;
+                            }
+                        }
+                    }
+                    1 => {
+                        // Copy
+                        if let Some(el) = ui.get_view(&edit_id) {
+                            let b = el.borrow();
+                            let edit = b.as_any().downcast_ref::<Edit>().unwrap();
+                            edit.copy_to_clipboard();
+                        }
+                    }
+                    2 => {
+                        // Paste
+                        need_paste = true;
+                    }
+                    3 => {
+                        // Delete selection
+                        if let Some(el) = ui.get_view(&edit_id) {
+                            let b = el.borrow();
+                            let edit = b.as_any().downcast_ref::<Edit>().unwrap();
+                            if edit.has_selection() && !*edit.read_only.borrow() {
+                                edit.delete_selection();
+                                need_text_changed = true;
+                            }
+                        }
+                    }
+                    4 => {
+                        // Select All
+                        if let Some(el) = ui.get_view(&edit_id) {
+                            let b = el.borrow();
+                            let edit = b.as_any().downcast_ref::<Edit>().unwrap();
+                            edit.select_all();
+                        }
+                    }
+                    _ => {}
+                }
+
+                // Deferred operations that need &mut UI (borrows above are dropped)
+                if need_paste {
+                    if let Some(el) = ui.get_view(&edit_id) {
+                        let b = el.borrow();
+                        let edit = b.as_any().downcast_ref::<Edit>().unwrap();
+                        edit.paste_from_clipboard(ui);
+                    }
+                }
+                if need_text_changed {
+                    if let Some(el) = ui.get_view(&edit_id) {
+                        let b = el.borrow();
+                        let edit = b.as_any().downcast_ref::<Edit>().unwrap();
+                        edit.on_text_changed(ui);
+                    }
+                }
+            }
+            true
+        }));
+
+        let element: Element = Rc::new(RefCell::new(menu));
+        ui.show_popup(element, x, y, PopupDirection::BottomRight, PopupMode::Popup);
+    }
 }
 
 impl View for Edit {
@@ -863,13 +952,16 @@ impl View for Edit {
         self.state.borrow().main.state != old_state
     }
 
-    fn on_mouse_button_down(&self, _ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_down(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
         if !self.state.borrow().main.rect.hit((position.x, position.y)) {
             return false;
         }
 
         if !matches!(button, MouseButton::Left) {
             self.state.borrow_mut().main.state.focused = true;
+            if matches!(button, MouseButton::Right) {
+                self.open_context_menu(ui, position.x, position.y);
+            }
             return true;
         }
 
