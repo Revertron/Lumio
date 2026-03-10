@@ -9,7 +9,7 @@ use super::super::themes::{Theme, Typeface, ViewState};
 use super::super::traits::{Element, View, WeakElement};
 use super::super::types::{Point, Rect, rect};
 use super::super::ui::UI;
-use super::super::views::{Borders, Dimension, FieldsMain};
+use super::super::views::{Borders, Dimension, FieldsMain, Visibility};
 use super::super::view_base::{HasMainFields, ViewBasics};
 
 pub struct List {
@@ -303,6 +303,19 @@ impl View for List {
         self.base_set_border_color(color);
     }
 
+    fn is_enabled(&self) -> bool {
+        self.base_is_enabled()
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.base_set_enabled(enabled);
+    }
+    fn get_visibility(&self) -> Visibility {
+        self.base_get_visibility()
+    }
+    fn set_visibility(&mut self, visibility: Visibility) {
+        self.base_set_visibility(visibility);
+    }
+
     fn on_event(&mut self, _event: EventType, _func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {
         todo!()
     }
@@ -312,6 +325,7 @@ impl View for List {
     }
 
     fn on_mouse_button_down(&self, _ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+        if !self.base_is_enabled() { return false; }
         println!("Mouse down in {}", self.get_id());
         if self.state.borrow().rect.hit((position.x, position.y)) {
             println!("hit list");

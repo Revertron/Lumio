@@ -9,4 +9,4 @@ pub use crate::views::{Label, Button, Edit, CheckBox, RadioButton, ComboBox, Scr
 pub use crate::views::{RecyclerView, RecyclerAdapter, ViewHolder};
 pub use crate::views::{PopupMenu, MenuItem};
 pub use crate::views::{Dialog, DialogButton, ButtonSide};
-pub use crate::views::{Dimension, Direction, Borders};
+pub use crate::views::{Dimension, Direction, Borders, Visibility};

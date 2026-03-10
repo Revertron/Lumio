@@ -6,7 +6,7 @@ use crate::view_base::{HasMainFields, ViewBasics};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::UI;
-use crate::views::{Borders, Dimension, FieldsMain};
+use crate::views::{Borders, Dimension, FieldsMain, Visibility};
 
 const DEFAULT_HEIGHT: i32 = 16;
 const INDETERMINATE_BLOCK_FRACTION: f64 = 0.25;
@@ -229,6 +229,19 @@ impl View for ProgressBar {
     }
     fn set_border_color(&mut self, color: Option<u32>) {
         self.base_set_border_color(color);
+    }
+
+    fn is_enabled(&self) -> bool {
+        self.base_is_enabled()
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.base_set_enabled(enabled);
+    }
+    fn get_visibility(&self) -> Visibility {
+        self.base_get_visibility()
+    }
+    fn set_visibility(&mut self, visibility: Visibility) {
+        self.base_set_visibility(visibility);
     }
 
     fn on_event(&mut self, _event: EventType, _func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {

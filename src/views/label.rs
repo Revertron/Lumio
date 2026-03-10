@@ -9,13 +9,13 @@ use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::UI;
-use crate::views::{Borders, Dimension};
+use crate::views::{Borders, Dimension, Visibility};
 use crate::styles::selector::FontSelector;
 use crate::views::{FieldsMain, FieldsTexted};
 use crate::view_base::{HasMainFields, ViewBasics};
 
 pub struct Label {
-    state: RefCell<FieldsTexted>
+    state: RefCell<FieldsTexted>,
 }
 
 impl HasMainFields for Label {
@@ -43,6 +43,48 @@ impl Label {
                 listeners: HashMap::new()
             })
         }
+    }
+
+    fn rebuild_text(&self) {
+        let state = self.state.borrow();
+        let typeface = state.main.font_manager.get_typeface(&Typeface::default());
+        let font = match get_font(&typeface.font_name, &typeface.font_style.to_string()) {
+            Some(f) => f,
+            None => return,
+        };
+        let scale = state.main.scale;
+        let padding = &state.main.padding;
+        let pad_h = (padding.left as f64 * scale).round() as i32 + (padding.right as f64 * scale).round() as i32;
+        // Use parent width for wrapping when label is width=Min
+        let available_width = if matches!(state.main.width, Dimension::Min) {
+            if let Some(parent) = state.main.parent.as_ref().and_then(|w| w.upgrade()) {
+                let parent_rect = parent.borrow().get_rect();
+                let label_x = state.main.rect.min.x;
+                (parent_rect.max.x - label_x - pad_h).max(0)
+            } else {
+                (state.main.rect.width() - pad_h).max(0)
+            }
+        } else {
+            (state.main.rect.width() - pad_h).max(0)
+        };
+        let options = match state.single_line {
+            true => TextOptions::new(),
+            false => TextOptions::new().with_wrap_to_width(available_width as f32, TextAlignment::Left),
+        };
+        let text = font.layout_text(&state.text, state.text_size, options);
+        // Update rect to fit new text
+        let new_width = text.width().ceil() as i32 + pad_h;
+        let pad_v = (padding.top as f64 * scale).round() as i32 + (padding.bottom as f64 * scale).round() as i32;
+        let new_height = text.height().ceil() as i32 + pad_v;
+        drop(state);
+        let mut state = self.state.borrow_mut();
+        if matches!(state.main.width, Dimension::Min) {
+            state.main.rect.max.x = state.main.rect.min.x + new_width;
+        }
+        if matches!(state.main.height, Dimension::Min) {
+            state.main.rect.max.y = state.main.rect.min.y + new_height;
+        }
+        state.cached_text = Some(text);
     }
 
     pub fn set_text(&mut self, text: &str) {
@@ -139,12 +181,16 @@ impl View for Label {
     }
 
     fn paint(&self, origin: Point<i32>, theme: &mut dyn Theme) {
+        // Rebuild cached text if it was invalidated (e.g. by set_text)
+        if self.state.borrow().cached_text.is_none() {
+            self.rebuild_text();
+        }
         let state = self.state.borrow();
         let mut rect = state.main.rect;
         rect.move_by(origin);
         theme.push_clip();
         theme.clip_rect(rect);
-        if let Some(text) = &self.state.borrow().cached_text {
+        if let Some(text) = &state.cached_text {
             let y = (self.get_rect_height() as f32 - text.height()) / 2f32;
             let color = theme.get_text_color(state.main.state, state.main.foreground.as_ref());
             theme.draw_text(rect.min.x as f32, (rect.min.y as f32 + y).round(), color, text);
@@ -243,6 +289,19 @@ impl View for Label {
         self.base_set_border_color(color);
     }
 
+    fn is_enabled(&self) -> bool {
+        self.base_is_enabled()
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.base_set_enabled(enabled);
+    }
+    fn get_visibility(&self) -> Visibility {
+        self.base_get_visibility()
+    }
+    fn set_visibility(&mut self, visibility: Visibility) {
+        self.base_set_visibility(visibility);
+    }
+
     fn on_event(&mut self, event: EventType, func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {
         self.state.borrow_mut().listeners.insert(event, func);
     }
@@ -250,6 +309,7 @@ impl View for Label {
     fn click(&self, _ui: &mut UI) -> bool {
         todo!()
     }
+
 }
 
 impl Default for Label {

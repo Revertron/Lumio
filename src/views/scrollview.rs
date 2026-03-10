@@ -10,7 +10,7 @@ use crate::view_base::{HasMainFields, ViewBasics};
 use crate::traits::{Container, Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::UI;
-use crate::views::{Borders, Dimension, Direction, FieldsMain};
+use crate::views::{Borders, Dimension, Direction, FieldsMain, Visibility};
 
 const SCROLLBAR_WIDTH: i32 = 16;
 const SCROLL_LINE: i32 = 20;
@@ -449,6 +449,19 @@ impl View for ScrollView {
     }
     fn set_border_color(&mut self, color: Option<u32>) {
         self.base_set_border_color(color);
+    }
+
+    fn is_enabled(&self) -> bool {
+        self.base_is_enabled()
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.base_set_enabled(enabled);
+    }
+    fn get_visibility(&self) -> Visibility {
+        self.base_get_visibility()
+    }
+    fn set_visibility(&mut self, visibility: Visibility) {
+        self.base_set_visibility(visibility);
     }
 
     fn as_container(&self) -> Option<&dyn Container> {

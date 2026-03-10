@@ -1,0 +1,47 @@
+<Frame id="root" width="max" height="max" direction="vertical" font="Noto Sans" font_style="Regular" padding="8">
+
+    <Label id="title" text="Visibility and Enabled Demo" font_style="Bold" padding_bottom="8"/>
+
+    <!-- Control buttons -->
+    <Frame id="controls" direction="horizontal" width="min" height="min" padding_bottom="8">
+        <Button id="btn_toggle_enable" text="Toggle Enable" margin="4"/>
+        <Button id="btn_hide" text="Hide" margin="4"/>
+        <Button id="btn_gone" text="Gone" margin="4"/>
+        <Button id="btn_show" text="Show" margin="4"/>
+    </Frame>
+
+    <Separator width="max" height="3" padding="1"/>
+
+    <!-- Target views that will be toggled -->
+    <Label id="status_label" text="All views are visible and enabled" padding="4"/>
+
+    <Frame id="targets" direction="horizontal" width="min" height="min" padding="4">
+        <Button id="target_btn" text="Target Button" margin="4"/>
+        <CheckBox id="target_cb" text="Target CheckBox" margin="4"/>
+        <Edit id="target_edit" text="Target Edit" width="200" margin="4"/>
+    </Frame>
+
+    <Frame id="targets2" direction="horizontal" width="min" height="min" padding="4">
+        <RadioButton id="target_rb1" text="Radio A" group="demo" margin="4"/>
+        <RadioButton id="target_rb2" text="Radio B" group="demo" margin="4" checked="true"/>
+    </Frame>
+
+    <Separator width="max" height="3" padding="1"/>
+
+    <!-- Enabled="false" from XML -->
+    <Label id="static_label" text="These are set enabled=false in XML:" padding="4"/>
+    <Frame id="disabled_row" direction="horizontal" width="min" height="min" padding="4">
+        <Button id="disabled_btn" text="Disabled in XML" margin="4" enabled="false"/>
+        <CheckBox id="disabled_cb" text="Disabled CheckBox" margin="4" enabled="false"/>
+    </Frame>
+
+    <!-- Visibility from XML -->
+    <Label id="vis_label" text="Below: hidden label (takes space), then gone label (no space), then visible:" padding="4"/>
+    <Frame id="vis_row" direction="horizontal" width="min" height="min" padding="4" border_color="#888888">
+        <Label id="vis_a" text="[Visible A]" padding="4"/>
+        <Label id="vis_hidden" text="[Hidden B]" padding="4" visibility="hidden"/>
+        <Label id="vis_gone" text="[Gone C]" padding="4" visibility="gone"/>
+        <Label id="vis_d" text="[Visible D]" padding="4"/>
+    </Frame>
+
+</Frame>

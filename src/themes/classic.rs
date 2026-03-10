@@ -27,6 +27,7 @@ pub struct Classic<'h> {
     scale: f64,
     current_clip: Rect<i32>,
     clip_stack: VecDeque<Rect<i32>>,
+    opacity_stack: Vec<f32>,
     drawable_registry: &'h DrawableRegistry,
     image_cache: &'h mut ImageCache,
 }
@@ -40,6 +41,26 @@ impl<'h> Classic<'h> {
     const DARK: u32 = 0xff404040;
     const BLACK: u32 = 0xff000000;
 
+    fn current_opacity(&self) -> f32 {
+        self.opacity_stack.last().copied().unwrap_or(1.0)
+    }
+
+    fn apply_color(&self, color: Color) -> Color {
+        let opacity = self.current_opacity();
+        if opacity >= 1.0 {
+            return color;
+        }
+        Color::from_rgba(color.r(), color.g(), color.b(), color.a() * opacity)
+    }
+
+    fn color_rgb(&self, hex: u32) -> Color {
+        self.apply_color(Color::from_hex_rgb(hex))
+    }
+
+    fn color_argb(&self, hex: u32) -> Color {
+        self.apply_color(Color::from_hex_argb(hex))
+    }
+
     pub fn new(graphics: &'h mut Graphics2D, drawable_registry: &'h DrawableRegistry, image_cache: &'h mut ImageCache, width: i32, height: i32, scale: f64) -> Self {
         let current_clip = rect((0, 0), (width, height));
         Classic {
@@ -49,6 +70,7 @@ impl<'h> Classic<'h> {
             scale,
             current_clip,
             clip_stack: VecDeque::new(),
+            opacity_stack: Vec::new(),
             drawable_registry,
             image_cache,
         }
@@ -89,9 +111,6 @@ impl<'h> Theme for Classic<'h> {
                 }
             }
         }
-        if !state.enabled {
-            return 0xff202020;
-        }
         0xff000000
     }
 
@@ -126,9 +145,9 @@ impl<'h> Theme for Classic<'h> {
         let top_left = Vector2::new(rect.min.x as f32, rect.min.y as f32);
         let bottom_right = Vector2::new(rect.max.x as f32, rect.max.y as f32);
         let color = if state.hovered || state.pressed {
-            Color::from_hex_rgb(Classic::BACKGROUND_LIGHT)
+            self.color_rgb(Classic::BACKGROUND_LIGHT)
         } else {
-            Color::from_hex_rgb(Classic::BACKGROUND)
+            self.color_rgb(Classic::BACKGROUND)
         };
         self.graphics.draw_rectangle(Rectangle::new(top_left, bottom_right), color);
     }
@@ -142,31 +161,31 @@ impl<'h> Theme for Classic<'h> {
         match state.pressed && state.hovered {
             true => {
                 let border2: f32 = (self.scale * 2f64) as f32;
-                let color = Color::from_hex_rgb(Classic::LIGHT);
+                let color = self.color_rgb(Classic::LIGHT);
                 self.graphics.draw_line((top_left.x, top_left.y + border_half), (bottom_right.x - border, top_left.y + border_half), border, color);
                 self.graphics.draw_line((top_left.x + border_half, top_left.y), (top_left.x + border_half, bottom_right.y - border), border, color);
-                let color = Color::from_hex_rgb(Classic::DARK);
+                let color = self.color_rgb(Classic::DARK);
                 self.graphics.draw_line((top_left.x + border, top_left.y + border + border_half), (bottom_right.x - border, top_left.y + border + border_half), border, color);
                 self.graphics.draw_line((top_left.x + border + border_half, top_left.y + border), (top_left.x + border + border_half, bottom_right.y - border), border, color);
 
-                let color = Color::from_hex_rgb(0xffffff);
+                let color = self.color_rgb(0xffffff);
                 self.graphics.draw_line((top_left.x + border, bottom_right.y - border - border_half), (bottom_right.x - border, bottom_right.y - border - border_half), border, color);
                 self.graphics.draw_line((bottom_right.x - border - border_half, top_left.y + border), (bottom_right.x - border - border_half, bottom_right.y - border), border, color);
             }
             false => {
-                let color = Color::from_hex_rgb(0xffffff);
+                let color = self.color_rgb(0xffffff);
                 self.graphics.draw_line((top_left.x, top_left.y + border_half), (bottom_right.x - border_half, top_left.y + border_half), border, color);
                 self.graphics.draw_line((top_left.x + border_half, top_left.y + border_half), (top_left.x + border_half, bottom_right.y - border_half), border, color);
-                let color = Color::from_hex_rgb(Classic::DARK);
+                let color = self.color_rgb(Classic::DARK);
                 self.graphics.draw_line((top_left.x - border_half, bottom_right.y - border_half), (bottom_right.x, bottom_right.y - border_half), border, color);
                 self.graphics.draw_line((bottom_right.x - border_half, top_left.y - border_half), (bottom_right.x - border_half, bottom_right.y + 0.5), border, color);
-                let color = Color::from_hex_rgb(Classic::LIGHT);
+                let color = self.color_rgb(Classic::LIGHT);
                 self.graphics.draw_line((top_left.x + border, bottom_right.y - border - border_half), (bottom_right.x - border, bottom_right.y - border - border_half), border, color);
                 self.graphics.draw_line((bottom_right.x - border - border_half, top_left.y + border), (bottom_right.x - border - border_half, bottom_right.y - border), border, color);
             }
         }
         if state.focused {
-            let color = Color::from_hex_rgb(0x000000);
+            let color = self.color_rgb(0x000000);
             let padding = border * 4f32;
             draw_dashed_rectangle(self.graphics, top_left.x + padding - 1.0, top_left.y + padding - 1.0, bottom_right.x - padding, bottom_right.y - padding, 2.5f32, border, color);
             //self.graphics.draw_line((top_left.x + border * 4f32, top_left.y + border * 4f32), (bottom_right.x - border * 4f32, top_left.y + border * 4f32), border, color);
@@ -183,7 +202,7 @@ impl<'h> Theme for Classic<'h> {
     fn draw_edit_back(&mut self, rect: Rect<i32>, state: ViewState) {
         let top_left = Vector2::new(rect.min.x as f32, rect.min.y as f32);
         let bottom_right = Vector2::new(rect.max.x as f32, rect.max.y as f32);
-        let color = Color::from_hex_rgb(0xffffff);
+        let color = self.color_rgb(0xffffff);
         self.graphics.draw_rectangle(Rectangle::new(top_left, bottom_right), color);
     }
 
@@ -194,18 +213,18 @@ impl<'h> Theme for Classic<'h> {
         let border_half: f32 = (self.scale / 2f64) as f32;
         let top_left = Vector2::new(rect.min.x as f32, rect.min.y as f32);
         let bottom_right = Vector2::new(rect.max.x as f32, rect.max.y as f32);
-        let color = Color::from_hex_rgb(Classic::LIGHT);
+        let color = self.color_rgb(Classic::LIGHT);
         self.graphics.draw_line((top_left.x, top_left.y + border_half), (bottom_right.x - border, top_left.y + border_half), border, color);
         self.graphics.draw_line((top_left.x + border_half, top_left.y), (top_left.x + border_half, bottom_right.y - border), border, color);
-        let color = Color::from_hex_rgb(Classic::DARK);
+        let color = self.color_rgb(Classic::DARK);
         self.graphics.draw_line((top_left.x + border, top_left.y + border + border_half), (bottom_right.x - border, top_left.y + border + border_half), border, color);
         self.graphics.draw_line((top_left.x + border + border_half, top_left.y + border), (top_left.x + border + border_half, bottom_right.y - border), border, color);
 
-        let color = Color::from_hex_rgb(Classic::BACKGROUND);
+        let color = self.color_rgb(Classic::BACKGROUND);
         self.graphics.draw_line((top_left.x + border, bottom_right.y - border - border_half), (bottom_right.x - border, bottom_right.y - border - border_half), border, color);
         self.graphics.draw_line((bottom_right.x - border - border_half, top_left.y + border), (bottom_right.x - border - border_half, bottom_right.y - border), border, color);
 
-        let color = Color::from_hex_rgb(0xffffff);
+        let color = self.color_rgb(0xffffff);
         self.graphics.draw_line((top_left.x + border, bottom_right.y - border_half), (bottom_right.x - border, bottom_right.y - border_half), border, color);
     }
 
@@ -215,7 +234,7 @@ impl<'h> Theme for Classic<'h> {
         }
         let top_left = Vector2::new(rect.min.x as f32, rect.min.y as f32);
         let bottom_right = Vector2::new(rect.max.x as f32, rect.max.y as f32);
-        let color = Color::from_hex_rgb(Classic::BLACK);
+        let color = self.color_rgb(Classic::BLACK);
         self.graphics.draw_rectangle(Rectangle::new(top_left, bottom_right), color);
     }
 
@@ -235,7 +254,7 @@ impl<'h> Theme for Classic<'h> {
         let bottom_right = Vector2::new(rect.max.x as f32 - self.scale as f32 * 3.0, rect.max.y as f32 - self.scale as f32 * 3.0);
         let width = bottom_right.x - top_left.x;
         let height = bottom_right.y - top_left.y;
-        let color = Color::from_hex_rgb(Classic::BLACK);
+        let color = self.color_rgb(Classic::BLACK);
         self.graphics.draw_line((top_left.x, top_left.y + height / 2f32), (top_left.x + width / 3f32, bottom_right.y - height / 8f32), self.scale as f32, color);
         self.graphics.draw_line((top_left.x + width / 3f32, bottom_right.y - height / 8f32), (bottom_right.x, top_left.y + height / 8f32), self.scale as f32, color);
     }
@@ -244,7 +263,7 @@ impl<'h> Theme for Classic<'h> {
         let cx = (rect.min.x + rect.max.x) as f32 / 2.0;
         let cy = (rect.min.y + rect.max.y) as f32 / 2.0;
         let radius = (rect.max.x - rect.min.x) as f32 / 2.0;
-        let color = Color::from_hex_rgb(0xffffff);
+        let color = self.color_rgb(0xffffff);
         self.graphics.draw_circle((cx, cy), radius, color);
     }
 
@@ -254,7 +273,7 @@ impl<'h> Theme for Classic<'h> {
         let radius = (rect.max.x - rect.min.x) as f32 / 2.0;
         let border = self.scale as f32;
         // Draw outer circle border using lines approximating a circle
-        let color = Color::from_hex_rgb(Classic::LIGHT);
+        let color = self.color_rgb(Classic::LIGHT);
         let segments = 32;
         for i in 0..segments {
             let angle1 = 2.0 * std::f32::consts::PI * i as f32 / segments as f32;
@@ -266,7 +285,7 @@ impl<'h> Theme for Classic<'h> {
             self.graphics.draw_line((x1, y1), (x2, y2), border, color);
         }
         if state.focused {
-            let color = Color::from_hex_rgb(Classic::DARK);
+            let color = self.color_rgb(Classic::DARK);
             let outer_radius = radius + border * 2.0;
             for i in 0..segments {
                 let angle1 = 2.0 * std::f32::consts::PI * i as f32 / segments as f32;
@@ -285,7 +304,7 @@ impl<'h> Theme for Classic<'h> {
         let cy = (rect.min.y + rect.max.y) as f32 / 2.0;
         let radius = (rect.max.x - rect.min.x) as f32 / 2.0;
         let dot_radius = radius * 0.45;
-        let color = Color::from_hex_rgb(Classic::BLACK);
+        let color = self.color_rgb(Classic::BLACK);
         self.graphics.draw_circle((cx, cy), dot_radius, color);
     }
 
@@ -294,7 +313,7 @@ impl<'h> Theme for Classic<'h> {
         let cy = (rect.min.y + rect.max.y) as f32 / 2.0;
         let half_w = (4.0 * self.scale).round() as f32;
         let half_h = (2.0 * self.scale).round() as f32;
-        let color = Color::from_hex_rgb(Classic::BLACK);
+        let color = self.color_rgb(Classic::BLACK);
         // Filled downward triangle
         self.graphics.draw_triangle_three_color(
             [Vector2::new(cx - half_w, cy - half_h), Vector2::new(cx + half_w, cy - half_h), Vector2::new(cx, cy + half_h)],
@@ -314,7 +333,7 @@ impl<'h> Theme for Classic<'h> {
     fn draw_panel_back(&mut self, rect: Rect<i32>, state: ViewState) {
         let top_left = Vector2::new(rect.min.x as f32, rect.min.y as f32);
         let bottom_right = Vector2::new(rect.max.x as f32, rect.max.y as f32);
-        let color = Color::from_hex_rgb(Classic::BACKGROUND);
+        let color = self.color_rgb(Classic::BACKGROUND);
         self.graphics.draw_rectangle(Rectangle::new(top_left, bottom_right), color);
     }
 
@@ -323,7 +342,7 @@ impl<'h> Theme for Classic<'h> {
         let top_left = Vector2::new(rect.min.x as f32, rect.min.y as f32);
         let bottom_right = Vector2::new(rect.max.x as f32, rect.max.y as f32);
         let border: f32 = 1f32;
-        let color = Color::from_hex_rgb(0xff808080);
+        let color = self.color_rgb(0xff808080);
         let half = 0.5f32;
         //draw_rounded_rectangle(self.graphics, rect.min.x as f32, rect.min.y as f32, rect.max.x as f32, rect.max.y as f32, 16f32, 2f32, color);
         self.graphics.draw_line((top_left.x, top_left.y + border - half), (bottom_right.x, top_left.y + border - half), border, color);
@@ -333,14 +352,14 @@ impl<'h> Theme for Classic<'h> {
     }
 
     fn draw_text(&mut self, x: f32, y: f32, color: u32, text: &FormattedTextBlock) {
-        let color = Color::from_hex_rgb(color);
+        let color = self.color_rgb(color);
         self.graphics.draw_text((x, y), color, text);
     }
 
     fn draw_rect(&mut self, rect: Rect<i32>, color: u32) {
         let top_left = Vector2::new(rect.min.x as f32, rect.min.y as f32);
         let bottom_right = Vector2::new(rect.max.x as f32, rect.max.y as f32);
-        let color = Color::from_hex_argb(color);
+        let color = self.color_argb(color);
         self.graphics.draw_rectangle(Rectangle::new(top_left, bottom_right), color);
     }
 
@@ -374,14 +393,14 @@ impl<'h> Theme for Classic<'h> {
         // Classic Win95 blue progress fill: navy blue (0x000080)
         let top_left = Vector2::new(rect.min.x as f32, rect.min.y as f32);
         let bottom_right = Vector2::new(rect.max.x as f32, rect.max.y as f32);
-        let color = Color::from_hex_rgb(0xff000080);
+        let color = self.color_rgb(0xff000080);
         self.graphics.draw_rectangle(Rectangle::new(top_left, bottom_right), color);
     }
 
     fn draw_scrollbar_track(&mut self, rect: Rect<i32>, _direction: Direction) {
         let top_left = Vector2::new(rect.min.x as f32, rect.min.y as f32);
         let bottom_right = Vector2::new(rect.max.x as f32, rect.max.y as f32);
-        let color = Color::from_hex_rgb(Classic::BACKGROUND);
+        let color = self.color_rgb(Classic::BACKGROUND);
         self.graphics.draw_rectangle(Rectangle::new(top_left, bottom_right), color);
     }
 
@@ -400,7 +419,7 @@ impl<'h> Theme for Classic<'h> {
         let cy = (rect.min.y + rect.max.y) as f32 / 2.0 - border_offset;
         let half_w = (3.0 * self.scale).round() as f32;
         let half_h = (2.0 * self.scale).round() as f32;
-        let color = Color::from_hex_rgb(Classic::BLACK);
+        let color = self.color_rgb(Classic::BLACK);
         let offset = if state.pressed { self.scale as f32 } else { 0.0 };
 
         let (p1, p2, p3) = match (direction, toward_start) {
@@ -439,7 +458,7 @@ impl<'h> Theme for Classic<'h> {
         let bottom_right = Vector2::new(rect.max.x as f32, rect.max.y as f32);
 
         // Background fill — extend past bottom to erase the content area's top border
-        let bg_color = Color::from_hex_rgb(Classic::BACKGROUND);
+        let bg_color = self.color_rgb(Classic::BACKGROUND);
         self.graphics.draw_rectangle(
             Rectangle::new(
                 Vector2::new(top_left.x + border, top_left.y + border),
@@ -449,7 +468,7 @@ impl<'h> Theme for Classic<'h> {
         );
 
         // White left border
-        let white = Color::from_hex_rgb(0xffffff);
+        let white = self.color_rgb(0xffffff);
         self.graphics.draw_line(
             (top_left.x + border_half, top_left.y),
             (top_left.x + border_half, bottom_right.y),
@@ -462,14 +481,14 @@ impl<'h> Theme for Classic<'h> {
             border, white,
         );
         // Dark right border (outer)
-        let dark = Color::from_hex_rgb(Classic::DARK);
+        let dark = self.color_rgb(Classic::DARK);
         self.graphics.draw_line(
             (bottom_right.x - border_half, top_left.y),
             (bottom_right.x - border_half, bottom_right.y),
             border, dark,
         );
         // Light right border (inner)
-        let light = Color::from_hex_rgb(Classic::LIGHT);
+        let light = self.color_rgb(Classic::LIGHT);
         self.graphics.draw_line(
             (bottom_right.x - border - border_half, top_left.y + border),
             (bottom_right.x - border - border_half, bottom_right.y),
@@ -484,7 +503,7 @@ impl<'h> Theme for Classic<'h> {
         let bottom_right = Vector2::new(rect.max.x as f32, rect.max.y as f32);
 
         // Background fill (slightly lighter for inactive)
-        let bg_color = Color::from_hex_rgb(Classic::BACKGROUND);
+        let bg_color = self.color_rgb(Classic::BACKGROUND);
         self.graphics.draw_rectangle(
             Rectangle::new(
                 Vector2::new(top_left.x + border, top_left.y + border),
@@ -494,7 +513,7 @@ impl<'h> Theme for Classic<'h> {
         );
 
         // White left border
-        let white = Color::from_hex_rgb(0xffffff);
+        let white = self.color_rgb(0xffffff);
         self.graphics.draw_line(
             (top_left.x + border_half, top_left.y),
             (top_left.x + border_half, bottom_right.y),
@@ -507,14 +526,14 @@ impl<'h> Theme for Classic<'h> {
             border, white,
         );
         // Dark right border (outer)
-        let dark = Color::from_hex_rgb(Classic::DARK);
+        let dark = self.color_rgb(Classic::DARK);
         self.graphics.draw_line(
             (bottom_right.x - border_half, top_left.y),
             (bottom_right.x - border_half, bottom_right.y),
             border, dark,
         );
         // Light right border (inner)
-        let light = Color::from_hex_rgb(Classic::LIGHT);
+        let light = self.color_rgb(Classic::LIGHT);
         self.graphics.draw_line(
             (bottom_right.x - border - border_half, top_left.y + border),
             (bottom_right.x - border - border_half, bottom_right.y),
@@ -529,11 +548,11 @@ impl<'h> Theme for Classic<'h> {
         let bottom_right = Vector2::new(rect.max.x as f32, rect.max.y as f32);
 
         // Background fill
-        let bg_color = Color::from_hex_rgb(Classic::BACKGROUND);
+        let bg_color = self.color_rgb(Classic::BACKGROUND);
         self.graphics.draw_rectangle(Rectangle::new(top_left, bottom_right), bg_color);
 
         // Raised 3D border: white top + left
-        let white = Color::from_hex_rgb(0xffffff);
+        let white = self.color_rgb(0xffffff);
         self.graphics.draw_line(
             (top_left.x, top_left.y + border_half),
             (bottom_right.x, top_left.y + border_half),
@@ -546,7 +565,7 @@ impl<'h> Theme for Classic<'h> {
         );
 
         // Dark bottom + right
-        let dark = Color::from_hex_rgb(Classic::DARK);
+        let dark = self.color_rgb(Classic::DARK);
         self.graphics.draw_line(
             (top_left.x, bottom_right.y - border_half),
             (bottom_right.x, bottom_right.y - border_half),
@@ -559,7 +578,7 @@ impl<'h> Theme for Classic<'h> {
         );
 
         // Inner shadow: light gray inside top+left
-        let light = Color::from_hex_rgb(Classic::LIGHT);
+        let light = self.color_rgb(Classic::LIGHT);
         self.graphics.draw_line(
             (top_left.x + border, bottom_right.y - border - border_half),
             (bottom_right.x - border, bottom_right.y - border - border_half),
@@ -581,20 +600,29 @@ impl<'h> Theme for Classic<'h> {
             let cy = (rect.min.y + rect.max.y) as f32 / 2.0;
             let x1 = rect.min.x as f32;
             let x2 = rect.max.x as f32;
-            let color = Color::from_hex_rgb(Classic::LIGHT);
+            let color = self.color_rgb(Classic::LIGHT);
             self.graphics.draw_line((x1, cy - border_half), (x2, cy - border_half), border, color);
-            let color = Color::from_hex_rgb(0xffffff);
+            let color = self.color_rgb(0xffffff);
             self.graphics.draw_line((x1, cy + border_half), (x2, cy + border_half), border, color);
         } else {
             // Vertical separator: center the etched line pair horizontally
             let cx = (rect.min.x + rect.max.x) as f32 / 2.0;
             let y1 = rect.min.y as f32;
             let y2 = rect.max.y as f32;
-            let color = Color::from_hex_rgb(Classic::LIGHT);
+            let color = self.color_rgb(Classic::LIGHT);
             self.graphics.draw_line((cx - border_half, y1), (cx - border_half, y2), border, color);
-            let color = Color::from_hex_rgb(0xffffff);
+            let color = self.color_rgb(0xffffff);
             self.graphics.draw_line((cx + border_half, y1), (cx + border_half, y2), border, color);
         }
+    }
+
+    fn push_opacity(&mut self, opacity: f32) {
+        let current = self.current_opacity();
+        self.opacity_stack.push(current * opacity);
+    }
+
+    fn pop_opacity(&mut self) {
+        self.opacity_stack.pop();
     }
 
     fn draw_image(&mut self, rect: Rect<i32>, image_bytes: &[u8]) {

@@ -72,6 +72,7 @@ pub struct UI {
     tooltip_hover_start: Option<Instant>,
     tooltip_showing: bool,
     tooltip_popup: Option<TooltipPopup>,
+    needs_relayout: bool,
 }
 
 #[allow(dead_code)]
@@ -80,7 +81,7 @@ impl UI {
         let mut ui = UI {
             width, height, typeface, scale, root: None, types: HashMap::new(),
             on_start: None, overlays: Vec::new(), mouse_pos: Vector2::new(0, 0),
-            tooltip_view_id: None, tooltip_hover_start: None, tooltip_showing: false, tooltip_popup: None,
+            tooltip_view_id: None, tooltip_hover_start: None, tooltip_showing: false, tooltip_popup: None, needs_relayout: false,
         };
         ui.register::<Label>("Label");
         ui.register::<Button>("Button");
@@ -191,6 +192,10 @@ impl UI {
     }
 
     pub fn relayout(&mut self) {
+        self.needs_relayout = true;
+    }
+
+    fn do_relayout(&mut self) {
         let root = self.root.clone();
         if let Some(root) = root {
             root.borrow_mut().layout_content(0, 0, self.width as i32, self.height as i32, &self.typeface.clone(), self.scale);
@@ -253,6 +258,12 @@ impl UI {
 
     pub fn update(&mut self) -> bool {
         let mut redraw = false;
+        // Perform deferred relayout if requested
+        if self.needs_relayout {
+            self.needs_relayout = false;
+            self.do_relayout();
+            redraw = true;
+        }
         // Update overlays first
         let overlays: Vec<Element> = self.overlays.iter().map(|e| Rc::clone(&e.element)).collect();
         for element in overlays {

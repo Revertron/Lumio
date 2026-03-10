@@ -14,7 +14,7 @@ use crate::traits::{Container, Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::UI;
 use crate::view_base::{HasMainFields, ViewBasics};
-use crate::views::{Borders, Dimension, FieldsMain};
+use crate::views::{Borders, Dimension, FieldsMain, Visibility};
 
 /// Horizontal padding inside each tab (in dip).
 const TAB_PADDING_H: i32 = 8;
@@ -403,6 +403,19 @@ impl View for TabView {
     }
     fn set_border_color(&mut self, color: Option<u32>) {
         self.base_set_border_color(color);
+    }
+
+    fn is_enabled(&self) -> bool {
+        self.base_is_enabled()
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.base_set_enabled(enabled);
+    }
+    fn get_visibility(&self) -> Visibility {
+        self.base_get_visibility()
+    }
+    fn set_visibility(&mut self, visibility: Visibility) {
+        self.base_set_visibility(visibility);
     }
 
     fn as_container(&self) -> Option<&dyn Container> {

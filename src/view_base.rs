@@ -3,7 +3,7 @@ use crate::styles::selector::{DrawState, MainSelector};
 use crate::themes::{FontStyle, Typeface, ViewState};
 use crate::traits::{Element, WeakElement};
 use crate::types::Rect;
-use crate::views::{Borders, Dimension, FieldsMain};
+use crate::views::{Borders, Dimension, FieldsMain, Visibility};
 
 /// Manages font/typeface inheritance and manipulation
 #[derive(Clone, Default)]
@@ -161,6 +161,22 @@ pub trait ViewBasics: HasMainFields {
         self.main_fields().borrow_mut().state.focused = focused;
     }
 
+    fn base_is_enabled(&self) -> bool {
+        self.main_fields().borrow().state.enabled
+    }
+
+    fn base_set_enabled(&self, enabled: bool) {
+        self.main_fields().borrow_mut().state.enabled = enabled;
+    }
+
+    fn base_get_visibility(&self) -> Visibility {
+        self.main_fields().borrow().visibility
+    }
+
+    fn base_set_visibility(&self, visibility: Visibility) {
+        self.main_fields().borrow_mut().visibility = visibility;
+    }
+
     fn base_set_x(&self, x: i32) {
         let mut fields = self.main_fields().borrow_mut();
         fields.rect.min.x = x;
@@ -285,6 +301,14 @@ pub trait ViewBasics: HasMainFields {
             }
             "break" => {
                 fields.borrow_mut().break_line = value.parse().unwrap_or(false);
+                true
+            }
+            "enabled" => {
+                fields.borrow_mut().state.enabled = value.parse().unwrap_or(true);
+                true
+            }
+            "visibility" => {
+                fields.borrow_mut().visibility = value.parse().unwrap_or(Visibility::Visible);
                 true
             }
             "tooltip" => {

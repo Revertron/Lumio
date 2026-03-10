@@ -8,7 +8,7 @@ use super::ui::UI;
 use super::themes::{Theme, ViewState};
 use super::types::{Rect, Point};
 use super::themes::Typeface;
-use super::views::{Borders, Dimension};
+use super::views::{Borders, Dimension, Visibility};
 
 pub type Element = Rc<RefCell<dyn View>>;
 pub type WeakElement = Weak<RefCell<dyn View>>;
@@ -108,6 +108,13 @@ pub trait View: Downcast {
         }
         Point { x, y }
     }
+
+    fn is_enabled(&self) -> bool { true }
+    #[allow(unused_variables)]
+    fn set_enabled(&mut self, enabled: bool) {}
+    fn get_visibility(&self) -> Visibility { Visibility::Visible }
+    #[allow(unused_variables)]
+    fn set_visibility(&mut self, visibility: Visibility) {}
 
     fn get_tooltip(&self) -> Option<String> { None }
     #[allow(unused_variables)]

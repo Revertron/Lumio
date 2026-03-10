@@ -9,7 +9,7 @@ use super::super::themes::{Theme, Typeface, ViewState};
 use super::super::traits::{Element, View, WeakElement};
 use super::super::types::{Point, Rect, rect};
 use super::super::ui::UI;
-use super::super::views::{Borders, Dimension, FieldsMain};
+use super::super::views::{Borders, Dimension, FieldsMain, Visibility};
 use super::super::view_base::{HasMainFields, ViewBasics};
 
 // ============================================================================
@@ -839,15 +839,30 @@ impl View for RecyclerView {
         self.base_set_border_color(color);
     }
 
+    fn is_enabled(&self) -> bool {
+        self.base_is_enabled()
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.base_set_enabled(enabled);
+    }
+    fn get_visibility(&self) -> Visibility {
+        self.base_get_visibility()
+    }
+    fn set_visibility(&mut self, visibility: Visibility) {
+        self.base_set_visibility(visibility);
+    }
+
     fn on_event(&mut self, _event: EventType, _func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {
         // TODO: implement
     }
 
     fn click(&self, _ui: &mut UI) -> bool {
+        if !self.base_is_enabled() { return false; }
         false
     }
 
     fn on_mouse_button_down(&self, _ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+        if !self.base_is_enabled() { return false; }
         if !self.state.borrow().rect.hit((position.x, position.y)) {
             return false;
         }
@@ -875,6 +890,7 @@ impl View for RecyclerView {
     }
 
     fn on_mouse_button_up(&self, _ui: &mut UI, _position: Vector2<i32>, button: MouseButton) -> bool {
+        if !self.base_is_enabled() { return false; }
         if matches!(button, MouseButton::Left) {
             if self.state.borrow().state.pressed {
                 self.state.borrow_mut().state.pressed = false;

@@ -18,7 +18,7 @@ use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::{PopupDirection, PopupMode, UI};
 use crate::view_base::{HasMainFields, ViewBasics};
-use super::{BUTTON_MIN_HEIGHT, BUTTON_MIN_WIDTH, Dimension, FieldsMain, FieldsTexted};
+use super::{BUTTON_MIN_HEIGHT, BUTTON_MIN_WIDTH, Dimension, FieldsMain, FieldsTexted, Visibility};
 
 const SELECTION_COLOR: u32 = 0xff0078d7;
 const PLACEHOLDER_COLOR: u32 = 0xff808080;
@@ -923,11 +923,25 @@ impl View for Edit {
         self.base_set_border_color(color);
     }
 
+    fn is_enabled(&self) -> bool {
+        self.base_is_enabled()
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.base_set_enabled(enabled);
+    }
+    fn get_visibility(&self) -> Visibility {
+        self.base_get_visibility()
+    }
+    fn set_visibility(&mut self, visibility: Visibility) {
+        self.base_set_visibility(visibility);
+    }
+
     fn on_event(&mut self, event: EventType, func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {
         self.state.borrow_mut().listeners.insert(event, func);
     }
 
     fn click(&self, ui: &mut UI) -> bool {
+        if !self.base_is_enabled() { return false; }
         if let Some(mut click) = self.state.borrow_mut().listeners.remove(&EventType::Click) {
             let result = click(ui, self as &dyn View);
             self.state.borrow_mut().listeners.insert(EventType::Click, click);
@@ -980,6 +994,7 @@ impl View for Edit {
     }
 
     fn on_mouse_button_down(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+        if !self.base_is_enabled() { return false; }
         if !self.state.borrow().main.rect.hit((position.x, position.y)) {
             return false;
         }
@@ -1039,6 +1054,7 @@ impl View for Edit {
     }
 
     fn on_mouse_button_up(&self, _ui: &mut UI, _position: Vector2<i32>, button: MouseButton) -> bool {
+        if !self.base_is_enabled() { return false; }
         if matches!(button, MouseButton::Left) && self.state.borrow().main.state.pressed {
             self.state.borrow_mut().main.state.pressed = false;
             return true;
@@ -1047,6 +1063,7 @@ impl View for Edit {
     }
 
     fn on_key_down(&self, ui: &mut UI, virtual_key_code: Option<VirtualKeyCode>, _scancode: KeyScancode, state: ModifiersState) -> bool {
+        if !self.base_is_enabled() { return false; }
         if let Some(code) = virtual_key_code {
             let shift = state.shift();
             let ctrl = state.ctrl();
@@ -1113,6 +1130,7 @@ impl View for Edit {
     }
 
     fn on_key_char(&self, ui: &mut UI, ch: char, state: ModifiersState) -> bool {
+        if !self.base_is_enabled() { return false; }
         // When Ctrl is held, ignore character input — Ctrl+key combos are handled in on_key_down
         if state.ctrl() {
             return false;

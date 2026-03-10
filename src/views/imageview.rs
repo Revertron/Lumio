@@ -12,7 +12,7 @@ use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::UI;
-use crate::views::{Borders, Dimension, FieldsMain};
+use crate::views::{Borders, Dimension, FieldsMain, Visibility};
 use crate::view_base::{HasMainFields, ViewBasics};
 
 const DEFAULT_IMAGE_SIZE: u32 = 32;
@@ -261,11 +261,25 @@ impl View for ImageView {
         self.base_set_border_color(color);
     }
 
+    fn is_enabled(&self) -> bool {
+        self.base_is_enabled()
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.base_set_enabled(enabled);
+    }
+    fn get_visibility(&self) -> Visibility {
+        self.base_get_visibility()
+    }
+    fn set_visibility(&mut self, visibility: Visibility) {
+        self.base_set_visibility(visibility);
+    }
+
     fn on_event(&mut self, event: EventType, func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {
         self.listeners.borrow_mut().insert(event, func);
     }
 
     fn click(&self, ui: &mut UI) -> bool {
+        if !self.base_is_enabled() { return false; }
         let listener = self.listeners.borrow_mut().remove(&EventType::Click);
         if let Some(mut click) = listener {
             let result = click(ui, self as &dyn View);
@@ -292,6 +306,7 @@ impl View for ImageView {
     }
 
     fn on_mouse_button_down(&self, _ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+        if !self.base_is_enabled() { return false; }
         let hit = self.state.borrow().rect.hit((position.x, position.y));
         if hit {
             let mut state = self.state.borrow_mut();
@@ -304,6 +319,7 @@ impl View for ImageView {
     }
 
     fn on_mouse_button_up(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+        if !self.base_is_enabled() { return false; }
         let hit = self.state.borrow().rect.hit((position.x, position.y));
         if matches!(button, MouseButton::Left) {
             if self.state.borrow().state.pressed {

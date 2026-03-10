@@ -14,7 +14,7 @@ use crate::view_base::{HasMainFields, ViewBasics};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::UI;
-use crate::views::{Borders, Dimension};
+use crate::views::{Borders, Dimension, Visibility};
 use crate::styles::selector::FontSelector;
 use crate::views::{FieldsMain, FieldsTexted};
 use crate::views::{BUTTON_MIN_HEIGHT, BUTTON_MIN_WIDTH};
@@ -354,11 +354,25 @@ impl View for RadioButton {
         self.base_set_border_color(color);
     }
 
+    fn is_enabled(&self) -> bool {
+        self.base_is_enabled()
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.base_set_enabled(enabled);
+    }
+    fn get_visibility(&self) -> Visibility {
+        self.base_get_visibility()
+    }
+    fn set_visibility(&mut self, visibility: Visibility) {
+        self.base_set_visibility(visibility);
+    }
+
     fn on_event(&mut self, event: EventType, func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {
         self.state.borrow_mut().listeners.insert(event, func);
     }
 
     fn click(&self, ui: &mut UI) -> bool {
+        if !self.base_is_enabled() { return false; }
         // RadioButton always sets checked to true (no toggle off)
         self.state.borrow_mut().main.state.checked = true;
         // Uncheck siblings in the same group
@@ -380,6 +394,7 @@ impl View for RadioButton {
     }
 
     fn on_mouse_button_down(&self, _ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+        if !self.base_is_enabled() { return false; }
         let hit = self.state.borrow().main.rect.hit((position.x, position.y));
         if hit {
             let mut state = self.state.borrow_mut();
@@ -393,6 +408,7 @@ impl View for RadioButton {
     }
 
     fn on_mouse_button_up(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+        if !self.base_is_enabled() { return false; }
         let hit = self.state.borrow().main.rect.hit((position.x, position.y));
         if matches!(button, MouseButton::Left) {
             if self.state.borrow().main.state.pressed {

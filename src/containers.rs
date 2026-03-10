@@ -10,7 +10,7 @@ use super::themes::{Theme, Typeface, ViewState};
 use super::traits::{Container, Element, View, WeakElement};
 use super::types::{Point, Rect, rect};
 use super::ui::UI;
-use super::views::{Dimension, Direction, FieldsMain};
+use super::views::{Dimension, Direction, FieldsMain, Visibility};
 use super::view_base::{HasMainFields, ViewBasics};
 
 pub struct Frame {
@@ -33,12 +33,17 @@ impl Frame {
         let mut focused = -1;
         for i in 0..self.views.len() {
             let v = &self.views[i];
-            if v.borrow().is_focused() {
+            let vb = v.borrow();
+            if vb.get_visibility() != Visibility::Visible || !vb.is_enabled() {
+                continue;
+            }
+            if vb.is_focused() {
                 focused = i as i32;
                 continue;
             }
-            if let Some(state) = v.borrow().get_state() {
+            if let Some(state) = vb.get_state() {
                 if state.focusable && focused >= 0 {
+                    drop(vb);
                     let previous = &self.views[focused as usize];
                     previous.borrow().set_focused(false);
                     v.borrow().set_focused(true);
@@ -53,12 +58,17 @@ impl Frame {
         let mut focused = -1;
         for i in (0..self.views.len()).rev() {
             let v = &self.views[i];
-            if v.borrow().is_focused() {
+            let vb = v.borrow();
+            if vb.get_visibility() != Visibility::Visible || !vb.is_enabled() {
+                continue;
+            }
+            if vb.is_focused() {
                 focused = i as i32;
                 continue;
             }
-            if let Some(state) = v.borrow().get_state() {
+            if let Some(state) = vb.get_state() {
                 if state.focusable && focused >= 0 {
+                    drop(vb);
                     let previous = &self.views[focused as usize];
                     previous.borrow().set_focused(false);
                     v.borrow().set_focused(true);
@@ -102,6 +112,9 @@ impl Frame {
         let mut max_height = 0;
         for v in self.views.iter() {
             let mut v = v.try_borrow_mut().unwrap();
+            if v.get_visibility() == Visibility::Gone {
+                continue;
+            }
             let margins = v.get_margin(scale);
             v.layout_content(xx + margins.left, yy + margins.top, new_width - xx - padding.right, new_height - yy - padding.bottom, typeface, scale);
             let (w, h) = v.calculate_full_size(scale);
@@ -145,6 +158,10 @@ impl Frame {
 
         for v in self.views.iter() {
             let mut v = v.try_borrow_mut().unwrap();
+            if v.get_visibility() == Visibility::Gone {
+                child_is_max.push(false);
+                continue;
+            }
             let margins = v.get_margin(scale);
             let bounds = v.get_bounds();
 
@@ -190,6 +207,9 @@ impl Frame {
 
         for (i, v) in self.views.iter().enumerate() {
             let mut v = v.try_borrow_mut().unwrap();
+            if v.get_visibility() == Visibility::Gone {
+                continue;
+            }
             let margins = v.get_margin(scale);
             let is_max = child_is_max[i];
 
@@ -380,7 +400,17 @@ impl View for Frame {
         drop(state);
         for v in self.views.iter() {
             let v = v.try_borrow().unwrap();
+            if v.get_visibility() != Visibility::Visible {
+                continue;
+            }
+            let disabled = !v.is_enabled();
+            if disabled {
+                theme.push_opacity(0.5);
+            }
             v.paint(start, theme);
+            if disabled {
+                theme.pop_opacity();
+            }
         }
         theme.pop_clip();
     }
@@ -422,6 +452,9 @@ impl View for Frame {
         let mut rect = rect((-1, -1), (0, 0));
         for v in self.views.iter() {
             let v = v.borrow();
+            if v.get_visibility() == Visibility::Gone {
+                continue;
+            }
             // Get maximum occupied area
             let view_rect = v.get_rect();
             let margins = v.get_margin(scale);
@@ -511,6 +544,19 @@ impl View for Frame {
         self.base_set_border_color(color);
     }
 
+    fn is_enabled(&self) -> bool {
+        self.base_is_enabled()
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.base_set_enabled(enabled);
+    }
+    fn get_visibility(&self) -> Visibility {
+        self.base_get_visibility()
+    }
+    fn set_visibility(&mut self, visibility: Visibility) {
+        self.base_set_visibility(visibility);
+    }
+
     fn as_container(&self) -> Option<&dyn Container> {
         Some(self as &dyn Container)
     }
@@ -530,6 +576,9 @@ impl View for Frame {
 
     fn update(&mut self, ui: &mut UI) -> bool {
         for v in self.views.iter() {
+            if v.borrow().get_visibility() != Visibility::Visible {
+                continue;
+            }
             if v.borrow_mut().update(ui) {
                 return true;
             }
@@ -541,7 +590,11 @@ impl View for Frame {
         let position = (position.x - self.state.borrow().rect.min.x, position.y - self.state.borrow().rect.min.y);
         let mut processed = false;
         for v in self.views.iter().rev() {
-            processed |= v.borrow().on_mouse_move(ui, Vector2::from(position));
+            let vb = v.borrow();
+            if vb.get_visibility() != Visibility::Visible || !vb.is_enabled() {
+                continue;
+            }
+            processed |= vb.on_mouse_move(ui, Vector2::from(position));
         }
         processed
     }
@@ -551,6 +604,12 @@ impl View for Frame {
         let position = (position.x - self.state.borrow().rect.min.x, position.y - self.state.borrow().rect.min.y);
         let focused;
         for v in self.views.iter().rev() {
+            {
+                let vb = v.borrow();
+                if vb.get_visibility() != Visibility::Visible || !vb.is_enabled() {
+                    continue;
+                }
+            }
             let f = v.borrow().is_focused();
             if v.borrow().on_mouse_button_down(ui, Vector2::from(position), button) {
                 // If focused changed to true
@@ -571,6 +630,12 @@ impl View for Frame {
     fn on_mouse_button_up(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
         let position = (position.x - self.state.borrow().rect.min.x, position.y - self.state.borrow().rect.min.y);
         for v in self.views.iter().rev() {
+            {
+                let vb = v.borrow();
+                if vb.get_visibility() != Visibility::Visible || !vb.is_enabled() {
+                    continue;
+                }
+            }
             if v.borrow().on_mouse_button_up(ui, Vector2::from(position), button) {
                 return true;
             }
@@ -581,6 +646,12 @@ impl View for Frame {
     fn on_mouse_wheel_scroll(&self, ui: &mut UI, position: Vector2<i32>, distance: speedy2d::window::MouseScrollDistance) -> bool {
         let position = (position.x - self.state.borrow().rect.min.x, position.y - self.state.borrow().rect.min.y);
         for v in self.views.iter().rev() {
+            {
+                let vb = v.borrow();
+                if vb.get_visibility() != Visibility::Visible || !vb.is_enabled() {
+                    continue;
+                }
+            }
             if v.borrow().on_mouse_wheel_scroll(ui, Vector2::from(position), distance) {
                 return true;
             }
@@ -590,6 +661,12 @@ impl View for Frame {
 
     fn on_key_down(&self, ui: &mut UI, virtual_key_code: Option<VirtualKeyCode>, scancode: KeyScancode, state: ModifiersState) -> bool {
         for v in self.views.iter() {
+            {
+                let vb = v.borrow();
+                if vb.get_visibility() != Visibility::Visible || !vb.is_enabled() {
+                    continue;
+                }
+            }
             if v.borrow().is_focused() {
                 println!("Found focused view {}", v.borrow().get_id());
                 if v.borrow().on_key_down(ui, virtual_key_code, scancode, state.clone()) {
@@ -625,6 +702,12 @@ impl View for Frame {
 
     fn on_key_up(&self, ui: &mut UI, virtual_key_code: Option<VirtualKeyCode>, scancode: KeyScancode, state: ModifiersState) -> bool {
         for v in self.views.iter() {
+            {
+                let vb = v.borrow();
+                if vb.get_visibility() != Visibility::Visible || !vb.is_enabled() {
+                    continue;
+                }
+            }
             if v.borrow().is_focused() {
                 if v.borrow().on_key_up(ui, virtual_key_code, scancode, state.clone()) {
                     return true;
@@ -636,6 +719,12 @@ impl View for Frame {
 
     fn on_key_char(&self, ui: &mut UI, unicode_codepoint: char, state: ModifiersState) -> bool {
         for v in self.views.iter() {
+            {
+                let vb = v.borrow();
+                if vb.get_visibility() != Visibility::Visible || !vb.is_enabled() {
+                    continue;
+                }
+            }
             if v.borrow().is_focused() {
                 if v.borrow().on_key_char(ui, unicode_codepoint, state.clone()) {
                     return true;

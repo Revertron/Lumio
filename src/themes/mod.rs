@@ -70,6 +70,10 @@ pub trait Theme {
 
     // Separator drawing method
     fn draw_separator(&mut self, rect: Rect<i32>, state: ViewState);
+
+    // Opacity stack for disabled views
+    fn push_opacity(&mut self, _opacity: f32) {}
+    fn pop_opacity(&mut self) {}
 }
 
 #[allow(unused)]

@@ -59,6 +59,7 @@ pub struct FieldsMain {
     pub id: String,
     pub state: ViewState,
     pub break_line: bool,
+    pub visibility: Visibility,
     pub background: Option<MainSelector>,
     pub foreground: Option<MainSelector>,
     pub border_color: Option<u32>,
@@ -81,6 +82,7 @@ impl FieldsMain {
             id: random_string(16),
             state: ViewState::default(),
             break_line: false,
+            visibility: Visibility::Visible,
             background: None,
             foreground: None,
             border_color: None,
@@ -200,6 +202,32 @@ impl FromStr for Dimension {
                     Dimension::Dip(int)
                 }
             }
+        };
+        Ok(result)
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum Visibility {
+    Visible,
+    Hidden,
+    Gone,
+}
+
+impl Default for Visibility {
+    fn default() -> Self {
+        Visibility::Visible
+    }
+}
+
+impl FromStr for Visibility {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let result = match s {
+            "hidden" => Visibility::Hidden,
+            "gone" => Visibility::Gone,
+            _ => Visibility::Visible,
         };
         Ok(result)
     }
