@@ -15,6 +15,7 @@ pub mod tabview;
 pub mod dialog;
 pub mod separator;
 pub mod splitpanel;
+pub mod statusbar;
 
 use super::themes::{Typeface, ViewState};
 use super::traits::{View, WeakElement};
@@ -44,6 +45,7 @@ pub use self::tabview::TabView;
 pub use self::dialog::{Dialog, DialogButton, ButtonSide};
 pub use self::separator::Separator;
 pub use self::splitpanel::SplitPanel;
+pub use self::statusbar::StatusBar;
 
 pub const BUTTON_MIN_WIDTH: i32 = 80;
 pub const BUTTON_MIN_HEIGHT: i32 = 24;

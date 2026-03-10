@@ -48,4 +48,6 @@
     </Frame>
 
     <Edit id="edit4" text="Fourth very very very long text to edit and test clipping" width="max" margin="4"/>
+
+    <StatusBar id="statusbar"/>
 </Frame>

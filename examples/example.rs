@@ -258,6 +258,15 @@ fn on_start(ui: &mut UI) {
         }
     }
 
+    // Add sections to StatusBar
+    if let Some(sb) = ui.get_view("statusbar") {
+        if let Some(statusbar) = sb.borrow_mut().downcast_mut::<StatusBar>() {
+            statusbar.add_section("status", "Ready");
+            statusbar.add_section("info", "Lumio GUI Example");
+            statusbar.add_section("pos", "Ln 1, Col 1");
+        }
+    }
+
     // Trigger layout after setting adapter so RecyclerView displays items immediately
     ui.relayout();
 }
