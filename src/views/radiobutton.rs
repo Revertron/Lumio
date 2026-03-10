@@ -85,6 +85,12 @@ impl RadioButton {
         *self.group.borrow_mut() = group.to_owned();
     }
 
+    pub fn set_single_line(&self, single_line: bool) {
+        let mut state = self.state.borrow_mut();
+        state.single_line = single_line;
+        state.cached_text = None;
+    }
+
     /// Returns the checked RadioButton in the given group, or None if none is checked.
     pub fn get_selected(ui: &UI, group: &str) -> Option<Element> {
         let results = ui.find_with(&|view: &dyn View| {
@@ -173,6 +179,7 @@ impl View for RadioButton {
             }
             "font" => { self.set_font(value) }
             "font_style" => { self.set_font_style(value) }
+            "single_line" => { self.state.borrow_mut().single_line = value.parse().unwrap_or(true) }
             &_ => {}
         }
     }

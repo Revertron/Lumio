@@ -9,7 +9,7 @@ use lumio::prelude::*;
 
 const WIDTH: u32 = 1920;
 const HEIGHT: u32 = 1000;
-const TITLE: &str = "Lumio Messenger";
+const TITLE: &str = "Mimir";
 
 const ASSETS: Dir = include_dir!("$CARGO_MANIFEST_DIR/examples/assets");
 
@@ -86,18 +86,21 @@ impl RecyclerAdapter for ContactAdapter {
         if let Some(frame) = holder.item_view.borrow().downcast_ref::<Frame>() {
             if let Some(container) = frame.as_container() {
                 if let Some(v) = container.get_view("contact_name") {
-                    if let Some(label) = v.borrow_mut().downcast_mut::<lumio::views::Label>() {
+                    if let Some(label) = v.borrow_mut().downcast_mut::<Label>() {
                         label.set_text(&contact.name);
+                        label.set_single_line(true);
                     }
                 }
                 if let Some(v) = container.get_view("contact_time") {
-                    if let Some(label) = v.borrow_mut().downcast_mut::<lumio::views::Label>() {
+                    if let Some(label) = v.borrow_mut().downcast_mut::<Label>() {
                         label.set_text(&contact.time);
+                        label.set_single_line(true);
                     }
                 }
                 if let Some(v) = container.get_view("contact_last_msg") {
-                    if let Some(label) = v.borrow_mut().downcast_mut::<lumio::views::Label>() {
+                    if let Some(label) = v.borrow_mut().downcast_mut::<Label>() {
                         label.set_text(&contact.last_message);
+                        label.set_single_line(true);
                     }
                 }
             }
@@ -144,17 +147,19 @@ impl RecyclerAdapter for ChatAdapter {
         if let Some(frame) = holder.item_view.borrow().downcast_ref::<Frame>() {
             if let Some(container) = frame.as_container() {
                 if let Some(v) = container.get_view("msg_sender") {
-                    if let Some(label) = v.borrow_mut().downcast_mut::<lumio::views::Label>() {
+                    if let Some(label) = v.borrow_mut().downcast_mut::<Label>() {
                         label.set_text(&msg.sender);
+                        label.set_single_line(true);
                     }
                 }
                 if let Some(v) = container.get_view("msg_time") {
-                    if let Some(label) = v.borrow_mut().downcast_mut::<lumio::views::Label>() {
+                    if let Some(label) = v.borrow_mut().downcast_mut::<Label>() {
                         label.set_text(&msg.time);
+                        label.set_single_line(true);
                     }
                 }
                 if let Some(v) = container.get_view("msg_text") {
-                    if let Some(label) = v.borrow_mut().downcast_mut::<lumio::views::Label>() {
+                    if let Some(label) = v.borrow_mut().downcast_mut::<Label>() {
                         label.set_text(&msg.text);
                     }
                 }
@@ -256,18 +261,18 @@ fn on_start(ui: &mut UI) {
     ui.relayout();
 
     // Debug: print rects of key views
-    for id in &["root", "contacts_panel", "chat_panel", "contacts_list", "messages_list", "contacts_header", "chat_header"] {
+    /*for id in &["root", "contacts_panel", "chat_panel", "contacts_list", "messages_list", "contacts_header", "chat_header"] {
         if let Some(v) = ui.get_view(id) {
             let rect = v.borrow().get_rect();
             println!("  {} rect: {:?}", id, rect);
         }
-    }
+    }*/
 }
 
 fn load_chat(ui: &mut UI, contact_name: &str) {
     // Update header
     if let Some(v) = ui.get_view("chat_title") {
-        if let Some(label) = v.borrow_mut().downcast_mut::<lumio::views::Label>() {
+        if let Some(label) = v.borrow_mut().downcast_mut::<Label>() {
             label.set_text(contact_name);
         }
     }

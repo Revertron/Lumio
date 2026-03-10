@@ -74,6 +74,12 @@ impl CheckBox {
         self.state.borrow_mut().main.state.checked = checked;
     }
 
+    pub fn set_single_line(&self, single_line: bool) {
+        let mut state = self.state.borrow_mut();
+        state.single_line = single_line;
+        state.cached_text = None;
+    }
+
     fn get_typeface(&self, parent_typeface: &Typeface) -> Typeface {
         self.state.borrow().main.font_manager.get_typeface(parent_typeface)
     }
@@ -120,6 +126,7 @@ impl View for CheckBox {
             "text" => { self.set_text(value) }
             "font" => { self.set_font(value) }
             "font_style" => { self.set_font_style(value) }
+            "single_line" => { self.state.borrow_mut().single_line = value.parse().unwrap_or(true) }
             &_ => {}
         }
     }

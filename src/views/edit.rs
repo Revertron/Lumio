@@ -124,6 +124,12 @@ impl Edit {
         *self.max_length.borrow_mut() = max_length;
     }
 
+    pub fn set_single_line(&self, single_line: bool) {
+        let mut state = self.state.borrow_mut();
+        state.single_line = single_line;
+        state.cached_text = None;
+    }
+
     pub fn select_all(&self) {
         let len = self.state.borrow().text.chars().count();
         *self.selection_anchor.borrow_mut() = Some(0);
@@ -678,6 +684,7 @@ impl View for Edit {
             "font_style" => { self.set_font_style(value) }
             "placeholder" => { self.set_placeholder(value) }
             "readonly" => { self.set_read_only(value == "true") }
+            "single_line" => { self.state.borrow_mut().single_line = value.parse().unwrap_or(true) }
             "maxlength" => {
                 if let Ok(n) = value.parse::<usize>() {
                     self.set_max_length(Some(n));

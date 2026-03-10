@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::cmp::max;
 use std::collections::HashMap;
 
 use speedy2d::font::{TextAlignment, TextLayout, TextOptions};
@@ -12,7 +11,7 @@ use crate::types::{Point, Rect, rect};
 use crate::ui::UI;
 use crate::views::{Borders, Dimension};
 use crate::styles::selector::FontSelector;
-use crate::views::{BUTTON_MIN_HEIGHT, BUTTON_MIN_WIDTH, FieldsMain, FieldsTexted};
+use crate::views::{FieldsMain, FieldsTexted};
 use crate::view_base::{HasMainFields, ViewBasics};
 
 pub struct Label {
@@ -38,7 +37,7 @@ impl Label {
                 text: text.to_owned(),
                 text_size,
                 line_height: 0f32,
-                single_line: true,
+                single_line: false,
                 cached_text: None,
                 font: FontSelector::new(),
                 listeners: HashMap::new()
@@ -51,6 +50,12 @@ impl Label {
         state.text.clear();
         state.text.push_str(text);
         let _ = state.cached_text.take();
+    }
+
+    pub fn set_single_line(&self, single_line: bool) {
+        let mut state = self.state.borrow_mut();
+        state.single_line = single_line;
+        state.cached_text = None;
     }
 
     fn get_typeface(&self, parent_typeface: &Typeface) -> Typeface {
@@ -76,6 +81,7 @@ impl View for Label {
             "text" => { self.set_text(value) }
             "font" => { self.set_font(value) }
             "font_style" => { self.set_font_style(value) }
+            "single_line" => { self.state.borrow_mut().single_line = value.parse().unwrap_or(false) }
             &_ => {}
         }
     }
@@ -88,22 +94,38 @@ impl View for Label {
         self.base_get_parent()
     }
 
-    fn layout_content(&mut self, x: i32, y: i32, width: i32, _height: i32, typeface: &Typeface, scale: f64) -> Rect<i32> {
+    fn layout_content(&mut self, x: i32, y: i32, width: i32, height: i32, typeface: &Typeface, scale: f64) -> Rect<i32> {
         if self.state.borrow().cached_text.is_some() {
             // TODO check if area changed
             return self.get_rect();
         }
 
         self.base_set_scale(scale);
+        let padding = self.get_padding(scale);
+        let horizontal = padding.left + padding.right;
+        let vertical = padding.top + padding.bottom;
+        let (new_width, new_height) = self.calculate_size(width - horizontal, height - vertical, scale);
         let typeface = self.get_typeface(typeface);
         if let Some(font) = get_font(&typeface.font_name, &typeface.font_style.to_string()) {
-            let options = TextOptions::new()
-                .with_wrap_to_width(width as f32, TextAlignment::Left);
+            let single_line = self.state.borrow().single_line;
+            let options = match single_line {
+                true => TextOptions::new(),
+                false => TextOptions::new().with_wrap_to_width(new_width as f32, TextAlignment::Left),
+            };
             let text = font.layout_text(&self.state.borrow().text, self.state.borrow().text_size, options);
             self.state.borrow_mut().cached_text = Some(text);
         }
-        let (width, height) = self.calculate_full_size(scale);
-        let rect = rect((x, y), (x + width, y + height));
+        let (content_width, content_height) = self.calculate_full_size(scale);
+        let (b_width, b_height) = self.get_bounds();
+        let final_width = match b_width {
+            Dimension::Min => content_width,
+            _ => new_width + horizontal,
+        };
+        let final_height = match b_height {
+            Dimension::Min => content_height,
+            _ => new_height + vertical,
+        };
+        let rect = rect((x, y), (x + final_width, y + final_height));
         self.set_rect(rect.clone());
         rect
     }
@@ -112,7 +134,7 @@ impl View for Label {
         let state = self.state.borrow();
         match &state.cached_text {
             Some(text) => text.width() <= width as f32 && text.height() <= height as f32,
-            None => width <= BUTTON_MIN_WIDTH && height <= BUTTON_MIN_HEIGHT
+            None => true
         }
     }
 
@@ -123,10 +145,9 @@ impl View for Label {
         theme.push_clip();
         theme.clip_rect(rect);
         if let Some(text) = &self.state.borrow().cached_text {
-            let x = (self.get_rect_width() as f32 - text.width()) / 2f32;
             let y = (self.get_rect_height() as f32 - text.height()) / 2f32;
             let color = theme.get_text_color(state.main.state, state.main.foreground.as_ref());
-            theme.draw_text((rect.min.x as f32 + x).round(), (rect.min.y as f32 + y).round(), color, text);
+            theme.draw_text(rect.min.x as f32, (rect.min.y as f32 + y).round(), color, text);
         }
         theme.pop_clip();
     }
@@ -166,10 +187,10 @@ impl View for Label {
     fn get_content_size(&self) -> (i32, i32) {
         let state = self.state.borrow();
         match &state.cached_text {
-            None => (BUTTON_MIN_WIDTH, BUTTON_MIN_HEIGHT),
+            None => (0, 0),
             Some(text) => {
-                let width = max(text.width().round() as i32, BUTTON_MIN_WIDTH);
-                let height = max(text.height().round() as i32, BUTTON_MIN_HEIGHT);
+                let width = text.width().round() as i32;
+                let height = text.height().round() as i32;
                 (width, height)
             }
         }

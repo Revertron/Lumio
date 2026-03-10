@@ -2,7 +2,7 @@
     <!-- Left panel: contact list -->
     <Frame id="contacts_panel" width="max" height="max" direction="vertical" padding="0">
         <Frame id="contacts_header" width="max" height="min" direction="horizontal" padding="8" background="#F0F0F0">
-            <Label id="app_title" text="Messenger" font_style="Bold" padding="4"/>
+            <Label id="app_title" text="Revertron" font_style="Bold" padding="4"/>
         </Frame>
         <RecyclerView id="contacts_list" width="max" height="max" padding="0"/>
     </Frame>
@@ -23,7 +23,7 @@
         <Frame id="input_area" width="max" height="min" direction="horizontal" padding="4">
             <Button id="btn_attach" text="+" width="32" height="32" margin="2"/>
             <Edit id="message_input" text="" width="max" height="32" margin="2"/>
-            <ImageButton id="btn_send" image="send.png" hover_image="send-hover.png" no_inset="true" width="32" height="32" margin="2"/>
+            <ImageButton id="btn_send" image="send.png" hover_image="send-hover.png" no_inset="true" width="24" height="24" margin="2" margin_right="8"/>
         </Frame>
     </Frame>
 </SplitPanel>
