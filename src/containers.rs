@@ -93,6 +93,165 @@ impl Frame {
     fn set_direction(&mut self, direction: Direction) {
         self.direction = direction;
     }
+
+    /// Single-pass layout for breaking horizontal layouts (original algorithm).
+    fn layout_single_pass(&self, new_width: i32, new_height: i32, padding: &Borders, typeface: &Typeface, scale: f64) {
+        let mut xx = padding.left;
+        let mut yy = padding.top;
+        let max_x = new_width - padding.right;
+        let mut max_height = 0;
+        for v in self.views.iter() {
+            let mut v = v.try_borrow_mut().unwrap();
+            let margins = v.get_margin(scale);
+            v.layout_content(xx + margins.left, yy + margins.top, new_width - xx - padding.right, new_height - yy - padding.bottom, typeface, scale);
+            let (w, h) = v.calculate_full_size(scale);
+            match self.direction {
+                Direction::Horizontal => xx = xx + w + margins.left + margins.right,
+                Direction::Vertical => yy = yy + h + margins.top + margins.bottom
+            }
+            if xx > max_x {
+                yy += max_height + margins.top;
+                xx = padding.left + margins.left;
+                v.layout_content(xx, yy + margins.top, new_width - xx - padding.right, new_height - yy - padding.bottom, typeface, scale);
+                let (w, h) = v.calculate_full_size(scale);
+                xx += w;
+                max_height = h + margins.bottom;
+            }
+            if v.is_break() {
+                let (_, h) = v.calculate_full_size(scale);
+                xx = padding.left;
+                yy += h + margins.bottom;
+            }
+            if h > max_height {
+                max_height = h;
+            }
+        }
+    }
+
+    /// Two-pass layout: measures non-Max children first, then distributes remaining space to Max children.
+    fn layout_two_pass(&self, new_width: i32, new_height: i32, padding: &Borders, typeface: &Typeface, scale: f64) {
+        let is_vertical = self.direction == Direction::Vertical;
+
+        let total_available = if is_vertical {
+            new_height - padding.top - padding.bottom
+        } else {
+            new_width - padding.left - padding.right
+        };
+
+        // Pass 1: Measure non-Max children, count Max children
+        let mut fixed_consumed: i32 = 0;
+        let mut max_count: i32 = 0;
+        let mut child_is_max: Vec<bool> = Vec::with_capacity(self.views.len());
+
+        for v in self.views.iter() {
+            let mut v = v.try_borrow_mut().unwrap();
+            let margins = v.get_margin(scale);
+            let bounds = v.get_bounds();
+
+            let is_max = if is_vertical {
+                matches!(bounds.1, Dimension::Max)
+            } else {
+                matches!(bounds.0, Dimension::Max)
+            };
+
+            let (margin_before, margin_after) = if is_vertical {
+                (margins.top, margins.bottom)
+            } else {
+                (margins.left, margins.right)
+            };
+
+            if is_max {
+                max_count += 1;
+                // Reserve space for margins only; the child's content space is computed later
+                fixed_consumed += margin_before + margin_after;
+            } else {
+                // Layout at temporary position to measure size
+                v.layout_content(
+                    padding.left + margins.left,
+                    padding.top + margins.top,
+                    new_width - padding.left - padding.right,
+                    new_height - padding.top - padding.bottom,
+                    typeface, scale
+                );
+                let (w, h) = v.calculate_full_size(scale);
+                let size = if is_vertical { h } else { w };
+                fixed_consumed += size + margin_before + margin_after;
+            }
+            child_is_max.push(is_max);
+        }
+
+        // Compute space for Max children (per_max excludes Max children's margins)
+        let remaining = (total_available - fixed_consumed).max(0);
+        let per_max = if max_count > 0 { remaining / max_count } else { 0 };
+        let mut extra = if max_count > 0 { remaining % max_count } else { 0 };
+
+        // Pass 2: Layout Max children at final positions, move non-Max children
+        let mut cursor = if is_vertical { padding.top } else { padding.left };
+
+        for (i, v) in self.views.iter().enumerate() {
+            let mut v = v.try_borrow_mut().unwrap();
+            let margins = v.get_margin(scale);
+            let is_max = child_is_max[i];
+
+            let (margin_before, margin_after) = if is_vertical {
+                (margins.top, margins.bottom)
+            } else {
+                (margins.left, margins.right)
+            };
+
+            if is_max {
+                // per_max is the content space (margins already reserved in fixed_consumed).
+                // layout_content's width/height param is "available space" — calculate_size
+                // for Max subtracts margins internally, so pass per_max + margins.
+                let mut slot = per_max;
+                if extra > 0 {
+                    slot += 1;
+                    extra -= 1;
+                }
+                let avail = slot + margin_before + margin_after;
+
+                if is_vertical {
+                    v.layout_content(
+                        padding.left + margins.left,
+                        cursor + margins.top,
+                        new_width - padding.left - padding.right,
+                        avail,
+                        typeface, scale
+                    );
+                } else {
+                    v.layout_content(
+                        cursor + margins.left,
+                        padding.top + margins.top,
+                        avail,
+                        new_height - padding.top - padding.bottom,
+                        typeface, scale
+                    );
+                }
+                // Advance cursor by the child's actual rect size + margins
+                let child_rect = v.get_rect();
+                let size = if is_vertical { child_rect.height() } else { child_rect.width() };
+                cursor += size + margin_before + margin_after;
+            } else {
+                // Move to correct final position (don't re-call layout_content,
+                // as some views like Label cache their layout and skip re-layout)
+                let old_rect = v.get_rect();
+                let (new_x, new_y) = if is_vertical {
+                    (padding.left + margins.left, cursor + margins.top)
+                } else {
+                    (cursor + margins.left, padding.top + margins.top)
+                };
+                if old_rect.min.x != new_x || old_rect.min.y != new_y {
+                    let moved = rect(
+                        (new_x, new_y),
+                        (new_x + old_rect.width(), new_y + old_rect.height())
+                    );
+                    v.set_rect(moved);
+                }
+                let size = if is_vertical { old_rect.height() } else { old_rect.width() };
+                cursor += size + margin_before + margin_after;
+            }
+        }
+    }
 }
 
 impl Container for Frame {
@@ -151,49 +310,18 @@ impl View for Frame {
 
     fn layout_content(&mut self, x: i32, y: i32, width: i32, height: i32, typeface: &Typeface, scale: f64) -> Rect<i32> {
         self.base_set_scale(scale);
-        //println!("Laying out for {},{} - {},{}", x, y, width, height);
         let (new_width, new_height) = self.calculate_size(width, height, scale);
-        //println!("New width {}, new height {}", new_width, new_height);
 
         let padding = self.get_padding(scale);
-        let mut xx = padding.left;
-        let mut yy = padding.top;
-        let max_x = new_width - padding.right;
-        let mut max_height = 0;
         let typeface = match self.state.borrow().font_manager.get() {
             None => typeface.clone(),
             Some(t) => t
         };
-        for v in self.views.iter() {
-            let mut v = v.try_borrow_mut().unwrap();
-            let margins = v.get_margin(scale);
-            v.layout_content(xx + margins.left, yy + margins.top, new_width - xx - padding.right, new_height - yy - padding.bottom, &typeface, scale);
-            // Get maximum occupied area
-            let (w, h) = v.calculate_full_size(scale);
-            match self.direction {
-                Direction::Horizontal => xx = xx + w + margins.left + margins.right,
-                Direction::Vertical => yy = yy + h + margins.top + margins.bottom
-            }
-            if self.breaking && self.direction == Direction::Horizontal {
-                if xx > max_x {
-                    yy += max_height + margins.top;
-                    xx = padding.left + margins.left;
-                    v.layout_content(xx, yy + margins.top, new_width - xx - padding.right, new_height - yy - padding.bottom, &typeface, scale);
-                    // Get maximum occupied area
-                    let (w, h) = v.calculate_full_size(scale);
-                    xx += w;
-                    max_height = h + margins.bottom;
-                }
-                if v.is_break() {
-                    let (_, h) = v.calculate_full_size(scale);
-                    xx = padding.left;
-                    yy += h + margins.bottom;
-                }
-            }
-            if h > max_height {
-                max_height = h;
-            }
-            //println!("View {} is at rect {:?}", &v.get_id(), &v.get_rect());
+
+        if self.breaking && self.direction == Direction::Horizontal {
+            self.layout_single_pass(new_width, new_height, &padding, &typeface, scale);
+        } else {
+            self.layout_two_pass(new_width, new_height, &padding, &typeface, scale);
         }
 
         let (w, h) = self.calculate_full_size(scale);

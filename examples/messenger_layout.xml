@@ -4,7 +4,6 @@
         <Frame id="contacts_header" width="max" height="min" direction="horizontal" padding="8" background="#F0F0F0">
             <Label id="app_title" text="Messenger" font_style="Bold" padding="4"/>
         </Frame>
-        <Separator width="max" height="3" padding="1"/>
         <RecyclerView id="contacts_list" width="max" height="max" padding="0"/>
     </Frame>
 
@@ -14,7 +13,6 @@
         <Frame id="chat_header" width="max" height="min" direction="horizontal" padding="8" background="#F0F0F0">
             <Label id="chat_title" text="Select a contact" font_style="Bold" padding="4"/>
         </Frame>
-        <Separator width="max" height="3" padding="1"/>
 
         <!-- Messages area -->
         <RecyclerView id="messages_list" width="max" height="max" padding="0"/>
