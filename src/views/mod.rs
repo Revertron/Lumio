@@ -16,6 +16,7 @@ pub mod dialog;
 pub mod separator;
 pub mod splitpanel;
 pub mod statusbar;
+pub mod memo;
 
 use super::themes::{Typeface, ViewState};
 use super::traits::{View, WeakElement};
@@ -46,6 +47,7 @@ pub use self::dialog::{Dialog, DialogButton, ButtonSide};
 pub use self::separator::Separator;
 pub use self::splitpanel::SplitPanel;
 pub use self::statusbar::StatusBar;
+pub use self::memo::Memo;
 
 pub const BUTTON_MIN_WIDTH: i32 = 80;
 pub const BUTTON_MIN_HEIGHT: i32 = 24;

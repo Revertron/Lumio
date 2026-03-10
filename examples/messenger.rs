@@ -291,7 +291,7 @@ fn on_send_click(ui: &mut UI, _view: &dyn View) -> bool {
     // Read the message from the input field
     let text = {
         if let Some(edit) = ui.get_view("message_input") {
-            if let Some(e) = edit.borrow().downcast_ref::<Edit>() {
+            if let Some(e) = edit.borrow().downcast_ref::<Memo>() {
                 let t = e.get_text().to_string();
                 t
             } else {
@@ -306,12 +306,13 @@ fn on_send_click(ui: &mut UI, _view: &dyn View) -> bool {
         return false;
     }
 
-    // Clear the input
+    // Clear the input and shrink back to one line
     if let Some(edit) = ui.get_view("message_input") {
-        if let Some(e) = edit.borrow_mut().downcast_mut::<Edit>() {
-            e.set_text("");
+        if let Some(e) = edit.borrow().downcast_ref::<Memo>() {
+            e.reset();
         }
     }
+    ui.relayout();
 
     println!("Send: {}", text);
     true

@@ -22,7 +22,7 @@
         <!-- Input area -->
         <Frame id="input_area" width="max" height="min" direction="horizontal" padding="4">
             <Button id="btn_attach" text="+" width="32" height="32" margin="2"/>
-            <Edit id="message_input" text="" width="max" height="32" margin="2"/>
+            <Memo id="message_input" text="" width="max" height="min" max_lines="3" margin="2" placeholder="Type a message..."/>
             <ImageButton id="btn_send" image="send.png" hover_image="send-hover.png" no_inset="true" width="24" height="24" margin="2" margin_right="8"/>
         </Frame>
     </Frame>
