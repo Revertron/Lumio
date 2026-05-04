@@ -11,7 +11,7 @@ use crate::traits::{Container, Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::UI;
 use crate::view_base::{HasMainFields, ViewBasics};
-use crate::views::{Borders, Dimension, Direction, FieldsMain, Visibility};
+use crate::views::{Borders, Dimension, Direction, FieldsMain, Gravity, Visibility};
 
 const DEFAULT_DIVIDER_SIZE: i32 = 4;
 const DEFAULT_MIN_PANE_SIZE: i32 = 50;
@@ -391,6 +391,14 @@ impl View for SplitPanel {
 
     fn set_margin(&self, top: i32, left: i32, right: i32, bottom: i32) {
         self.base_set_margin(top, left, right, bottom);
+    }
+
+    fn get_gravity(&self) -> Gravity {
+        self.base_get_gravity()
+    }
+
+    fn set_gravity(&self, gravity: Gravity) {
+        self.base_set_gravity(gravity);
     }
 
     fn get_bounds(&self) -> (Dimension, Dimension) {

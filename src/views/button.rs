@@ -13,7 +13,7 @@ use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::UI;
-use crate::views::{Borders, Dimension, Visibility};
+use crate::views::{Borders, Dimension, Gravity, Visibility};
 use crate::styles::selector::FontSelector;
 use crate::views::{FieldsMain, FieldsTexted};
 use crate::view_base::{HasMainFields, ViewBasics};
@@ -82,6 +82,12 @@ impl Button {
         self.state.borrow_mut().main.font_manager.set_font_style(style);
     }
 
+    fn set_font_size(&self, size: f32) {
+        let mut state = self.state.borrow_mut();
+        state.main.font_manager.set_font_size(size);
+        state.cached_text = None;
+    }
+
     fn layout_text(&self, max_width: i32, single_line: bool, scale: f64) {
         if max_width <= 0 {
             self.state.borrow_mut().cached_text = None;
@@ -94,7 +100,8 @@ impl Button {
                     true => TextOptions::new(),
                     false => TextOptions::new().with_wrap_to_width(max_width as f32, TextAlignment::Left)
                 };
-                let size = self.state.borrow().text_size * scale as f32;
+                let base_size = typeface.font_size.unwrap_or(self.state.borrow().text_size);
+                let size = base_size * scale as f32;
                 let text = font.layout_text(&self.state.borrow().text, size, options);
                 self.state.borrow_mut().cached_text = Some(text);
             }
@@ -114,6 +121,11 @@ impl View for Button {
             "text" => { self.set_text(value) }
             "font" => { self.set_font(value) }
             "font_style" => { self.set_font_style(value) }
+            "font_size" => {
+                if let Ok(size) = value.parse::<f32>() {
+                    self.set_font_size(size);
+                }
+            }
             "single_line" => { self.state.borrow_mut().single_line = value.parse().unwrap_or(true) }
             &_ => {}
         }
@@ -202,6 +214,14 @@ impl View for Button {
 
     fn set_margin(&self, top: i32, left: i32, right: i32, bottom: i32) {
         self.base_set_margin(top, left, right, bottom);
+    }
+
+    fn get_gravity(&self) -> Gravity {
+        self.base_get_gravity()
+    }
+
+    fn set_gravity(&self, gravity: Gravity) {
+        self.base_set_gravity(gravity);
     }
 
     fn get_bounds(&self) -> (Dimension, Dimension) {

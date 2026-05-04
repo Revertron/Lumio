@@ -3,7 +3,7 @@ use crate::styles::selector::{DrawState, MainSelector};
 use crate::themes::{FontStyle, Typeface, ViewState};
 use crate::traits::{Element, WeakElement};
 use crate::types::Rect;
-use crate::views::{Borders, Dimension, FieldsMain, Visibility};
+use crate::views::{Borders, Dimension, FieldsMain, Gravity, Visibility};
 
 /// Manages font/typeface inheritance and manipulation
 #[derive(Clone, Default)]
@@ -16,17 +16,22 @@ impl FontManager {
         Self { typeface: None }
     }
 
-    /// Get the effective typeface, inheriting from parent if not fully specified
+    /// Get the effective typeface, inheriting from parent if not fully specified.
+    /// Each field inherits independently when this view did not set it.
     pub fn get_typeface(&self, parent_typeface: &Typeface) -> Typeface {
         match &self.typeface {
             None => parent_typeface.clone(),
             Some(t) => {
-                if t.font_name.is_empty() {
-                    let mut parent = parent_typeface.clone();
-                    parent.font_style = t.font_style.clone();
-                    parent
+                let font_name = if t.font_name.is_empty() {
+                    parent_typeface.font_name.clone()
                 } else {
-                    t.clone()
+                    t.font_name.clone()
+                };
+                let font_size = t.font_size.or(parent_typeface.font_size);
+                Typeface {
+                    font_name,
+                    font_style: t.font_style.clone(),
+                    font_size
                 }
             }
         }
@@ -36,7 +41,8 @@ impl FontManager {
         let typeface = match self.typeface.take() {
             None => Typeface {
                 font_name: font_name.to_owned(),
-                font_style: FontStyle::Regular
+                font_style: FontStyle::Regular,
+                font_size: None
             },
             Some(mut t) => {
                 t.font_name = font_name.to_owned();
@@ -51,12 +57,29 @@ impl FontManager {
         let typeface = match self.typeface.take() {
             None => Typeface {
                 font_name: String::new(),
-                font_style
+                font_style,
+                font_size: None
             },
             Some(t) => Typeface {
                 font_name: t.font_name,
-                font_style
+                font_style,
+                font_size: t.font_size
             },
+        };
+        self.typeface = Some(typeface);
+    }
+
+    pub fn set_font_size(&mut self, size: f32) {
+        let typeface = match self.typeface.take() {
+            None => Typeface {
+                font_name: String::new(),
+                font_style: FontStyle::Regular,
+                font_size: Some(size)
+            },
+            Some(mut t) => {
+                t.font_size = Some(size);
+                t
+            }
         };
         self.typeface = Some(typeface);
     }
@@ -227,6 +250,14 @@ pub trait ViewBasics: HasMainFields {
         self.main_fields().borrow_mut().border_color = color;
     }
 
+    fn base_get_gravity(&self) -> Gravity {
+        self.main_fields().borrow().gravity
+    }
+
+    fn base_set_gravity(&self, gravity: Gravity) {
+        self.main_fields().borrow_mut().gravity = gravity;
+    }
+
     /// Handle common properties in set_any. Returns true if handled, false if not.
     fn base_set_any(&self, name: &str, value: &str) -> bool {
         let fields = self.main_fields();
@@ -323,15 +354,45 @@ pub trait ViewBasics: HasMainFields {
                 }
                 true
             }
+            "text_color" => {
+                if let Some(color) = parse_hex_color(value) {
+                    fields.borrow_mut().foreground = Some(uniform_color_selector(color));
+                }
+                true
+            }
             "border_color" => {
                 if let Some(color) = parse_hex_color(value) {
                     fields.borrow_mut().border_color = Some(color);
                 }
                 true
             }
+            "gravity" => {
+                if let Ok(g) = value.parse::<Gravity>() {
+                    fields.borrow_mut().gravity = g;
+                }
+                true
+            }
             _ => false
         }
     }
+}
+
+/// Build a `MainSelector` that returns the given color for every possible `ViewState`.
+/// Used by XML attributes like `text_color` where the user wants a single color regardless
+/// of focus/hover/press state.
+fn uniform_color_selector(color: u32) -> MainSelector {
+    let mut selector = MainSelector::new();
+    for bits in 0u8..64 {
+        selector.add_state(ViewState {
+            enabled: bits & 1 != 0,
+            focusable: bits & 2 != 0,
+            focused: bits & 4 != 0,
+            hovered: bits & 8 != 0,
+            pressed: bits & 16 != 0,
+            checked: bits & 32 != 0,
+        }, DrawState::Color(color));
+    }
+    selector
 }
 
 /// Parse a hex color string like `#RRGGBB` or `#AARRGGBB` into a u32.

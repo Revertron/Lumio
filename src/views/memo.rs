@@ -10,7 +10,7 @@ use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDist
 use crate::assets::get_font;
 use crate::events::EventType;
 use crate::common::{delete_char, delete_range, insert_str};
-use crate::views::Borders;
+use crate::views::{Borders, Gravity};
 use crate::views::popupmenu::PopupMenu;
 use crate::styles::selector::FontSelector;
 use crate::themes::{Theme, Typeface, ViewState};
@@ -246,7 +246,14 @@ impl Memo {
         self.state.borrow_mut().main.font_manager.set_font_style(style);
     }
 
-    fn layout_text(&self, width: i32, _scale: f64) {
+    fn set_font_size(&self, size: f32) {
+        let mut state = self.state.borrow_mut();
+        state.main.font_manager.set_font_size(size);
+        state.cached_text = None;
+        state.line_height = 0f32;
+    }
+
+    fn layout_text(&self, width: i32, scale: f64) {
         let state = self.state.borrow();
         let typeface = state.main.font_manager.get();
         if let Some(typeface) = typeface {
@@ -255,7 +262,10 @@ impl Memo {
                 let available_width = (width - padding.left - padding.right).max(1) as f32;
                 let options = TextOptions::new().with_wrap_to_width(available_width, TextAlignment::Left);
                 let text_str = if state.text.is_empty() { " " } else { &state.text };
-                let text = font.layout_text(text_str, state.text_size, options);
+                let base_size = typeface.font_size
+                    .map(|dip| dip * scale as f32)
+                    .unwrap_or(state.text_size);
+                let text = font.layout_text(text_str, base_size, options);
 
                 // Build line_offsets: start char index of each visual line
                 let chars: Vec<char> = state.text.chars().collect();
@@ -306,7 +316,10 @@ impl Memo {
                 let padding = state.main.padding.scaled(state.main.scale);
                 let available_width = (state.main.rect.width() - padding.left - padding.right).max(1) as f32;
                 let options = TextOptions::new().with_wrap_to_width(available_width, TextAlignment::Left);
-                return Some(font.layout_text(&placeholder, state.text_size, options));
+                let base_size = typeface.font_size
+                    .map(|dip| dip * state.main.scale as f32)
+                    .unwrap_or(state.text_size);
+                return Some(font.layout_text(&placeholder, base_size, options));
             }
         }
         None
@@ -321,7 +334,11 @@ impl Memo {
         if let Some(typeface) = typeface {
             if let Some(font) = get_font(&typeface.font_name, &typeface.font_style.to_string()) {
                 let options = TextOptions::new();
-                let text = font.layout_text("W", self.state.borrow().text_size, options);
+                let scale = self.state.borrow().main.scale;
+                let base_size = typeface.font_size
+                    .map(|dip| dip * scale as f32)
+                    .unwrap_or(self.state.borrow().text_size);
+                let text = font.layout_text("W", base_size, options);
                 self.state.borrow_mut().line_height = text.height();
             }
         }
@@ -953,6 +970,11 @@ impl View for Memo {
             "text" => { self.set_text(value) }
             "font" => { self.set_font(value) }
             "font_style" => { self.set_font_style(value) }
+            "font_size" => {
+                if let Ok(size) = value.parse::<f32>() {
+                    self.set_font_size(size);
+                }
+            }
             "placeholder" => { self.set_placeholder(value) }
             "readonly" => { self.set_read_only(value == "true") }
             "maxlength" => {
@@ -1121,6 +1143,14 @@ impl View for Memo {
 
     fn set_margin(&self, top: i32, left: i32, right: i32, bottom: i32) {
         self.base_set_margin(top, left, right, bottom);
+    }
+
+    fn get_gravity(&self) -> Gravity {
+        self.base_get_gravity()
+    }
+
+    fn set_gravity(&self, gravity: Gravity) {
+        self.base_set_gravity(gravity);
     }
 
     fn get_bounds(&self) -> (Dimension, Dimension) {

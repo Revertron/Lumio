@@ -15,7 +15,7 @@ use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::{PopupDirection, PopupMode, UI};
 use crate::view_base::{HasMainFields, ViewBasics};
-use crate::views::{Borders, Dimension, FieldsMain, FieldsTexted, Visibility};
+use crate::views::{Borders, Dimension, FieldsMain, FieldsTexted, Gravity, Visibility};
 use crate::views::{BUTTON_MIN_HEIGHT, BUTTON_MIN_WIDTH};
 use crate::styles::selector::FontSelector;
 
@@ -124,6 +124,12 @@ impl ComboBox {
         self.state.borrow_mut().main.font_manager.set_font_style(style);
     }
 
+    fn set_font_size(&self, size: f32) {
+        let mut state = self.state.borrow_mut();
+        state.main.font_manager.set_font_size(size);
+        state.cached_text = None;
+    }
+
     fn layout_text(&self, max_width: i32, scale: f64) {
         if max_width <= 0 {
             self.state.borrow_mut().cached_text = None;
@@ -139,7 +145,8 @@ impl ComboBox {
                     return;
                 }
                 let options = TextOptions::new();
-                let size = self.state.borrow().text_size * scale_i as f32;
+                let base_size = typeface.font_size.unwrap_or(self.state.borrow().text_size);
+                let size = base_size * scale_i as f32;
                 let text = font.layout_text(&self.state.borrow().text, size, options);
                 self.state.borrow_mut().cached_text = Some(text);
             }
@@ -196,6 +203,11 @@ impl View for ComboBox {
             }
             "font" => { self.set_font(value) }
             "font_style" => { self.set_font_style(value) }
+            "font_size" => {
+                if let Ok(size) = value.parse::<f32>() {
+                    self.set_font_size(size);
+                }
+            }
             &_ => {}
         }
     }
@@ -302,6 +314,14 @@ impl View for ComboBox {
 
     fn set_margin(&self, top: i32, left: i32, right: i32, bottom: i32) {
         self.base_set_margin(top, left, right, bottom);
+    }
+
+    fn get_gravity(&self) -> Gravity {
+        self.base_get_gravity()
+    }
+
+    fn set_gravity(&self, gravity: Gravity) {
+        self.base_set_gravity(gravity);
     }
 
     fn get_bounds(&self) -> (Dimension, Dimension) {
@@ -517,7 +537,8 @@ impl ComboDropdown {
             Some(t) => t,
             None => return,
         };
-        let text_size = DEFAULT_TEXT_SIZE * scale as f32;
+        let base_size = typeface.font_size.unwrap_or(DEFAULT_TEXT_SIZE);
+        let text_size = base_size * scale as f32;
         if let Some(font) = get_font(&typeface.font_name, &typeface.font_style.to_string()) {
             let mut cached = self.cached_texts.borrow_mut();
             for (i, item) in self.items.iter().enumerate() {
@@ -663,6 +684,14 @@ impl View for ComboDropdown {
 
     fn set_margin(&self, top: i32, left: i32, right: i32, bottom: i32) {
         self.base_set_margin(top, left, right, bottom);
+    }
+
+    fn get_gravity(&self) -> Gravity {
+        self.base_get_gravity()
+    }
+
+    fn set_gravity(&self, gravity: Gravity) {
+        self.base_set_gravity(gravity);
     }
 
     fn get_bounds(&self) -> (Dimension, Dimension) {

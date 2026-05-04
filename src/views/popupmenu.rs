@@ -12,7 +12,7 @@ use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::UI;
-use crate::views::{Borders, Dimension, FieldsMain, Visibility};
+use crate::views::{Borders, Dimension, FieldsMain, Gravity, Visibility};
 use crate::view_base::{HasMainFields, ViewBasics};
 
 const ICON_SIZE: i32 = 16;
@@ -117,7 +117,8 @@ impl PopupMenu {
     fn layout_texts(&self, typeface: &Typeface, scale: f64) {
         let items = self.items.borrow();
         let mut cached = self.cached_texts.borrow_mut();
-        let text_size = DEFAULT_TEXT_SIZE * scale as f32;
+        let base_size = typeface.font_size.unwrap_or(DEFAULT_TEXT_SIZE);
+        let text_size = base_size * scale as f32;
         if let Some(font) = get_font(&typeface.font_name, &typeface.font_style.to_string()) {
             for (i, item) in items.iter().enumerate() {
                 if cached[i].is_none() {
@@ -323,6 +324,14 @@ impl View for PopupMenu {
 
     fn set_margin(&self, top: i32, left: i32, right: i32, bottom: i32) {
         self.base_set_margin(top, left, right, bottom);
+    }
+
+    fn get_gravity(&self) -> Gravity {
+        self.base_get_gravity()
+    }
+
+    fn set_gravity(&self, gravity: Gravity) {
+        self.base_set_gravity(gravity);
     }
 
     fn get_bounds(&self) -> (Dimension, Dimension) {

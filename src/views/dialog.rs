@@ -13,7 +13,7 @@ use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::UI;
-use crate::views::{Borders, Dimension, FieldsMain, Visibility};
+use crate::views::{Borders, Dimension, FieldsMain, Gravity, Visibility};
 use crate::views::button::Button;
 use crate::view_base::{HasMainFields, ViewBasics};
 
@@ -133,7 +133,8 @@ impl Dialog {
             return;
         }
         if let Some(font) = get_font(&typeface.font_name, &typeface.font_style.to_string()) {
-            let size = DEFAULT_TEXT_SIZE * scale as f32;
+            let base_size = typeface.font_size.unwrap_or(DEFAULT_TEXT_SIZE);
+            let size = base_size * scale as f32;
             let options = TextOptions::new().with_wrap_to_width(max_width as f32, TextAlignment::Left);
             let block = font.layout_text(&msg, size, options);
             *self.cached_message.borrow_mut() = Some(block);
@@ -433,6 +434,14 @@ impl View for Dialog {
 
     fn set_margin(&self, top: i32, left: i32, right: i32, bottom: i32) {
         self.base_set_margin(top, left, right, bottom);
+    }
+
+    fn get_gravity(&self) -> Gravity {
+        self.base_get_gravity()
+    }
+
+    fn set_gravity(&self, gravity: Gravity) {
+        self.base_set_gravity(gravity);
     }
 
     fn get_bounds(&self) -> (Dimension, Dimension) {

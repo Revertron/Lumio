@@ -2,6 +2,7 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
+use downcast_rs::{impl_downcast, Downcast};
 use speedy2d::dimen::Vector2;
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
 use super::super::events::EventType;
@@ -9,7 +10,7 @@ use super::super::themes::{Theme, Typeface, ViewState};
 use super::super::traits::{Element, View, WeakElement};
 use super::super::types::{Point, Rect, rect};
 use super::super::ui::UI;
-use super::super::views::{Borders, Dimension, FieldsMain, Visibility};
+use super::super::views::{Borders, Dimension, FieldsMain, Gravity, Visibility};
 use super::super::view_base::{HasMainFields, ViewBasics};
 
 // ============================================================================
@@ -65,7 +66,7 @@ impl ViewHolder {
 // RecyclerAdapter - Bridges data and views
 // ============================================================================
 
-pub trait RecyclerAdapter {
+pub trait RecyclerAdapter: Downcast {
     /// Total number of items
     fn get_item_count(&self) -> usize;
 
@@ -88,6 +89,7 @@ pub trait RecyclerAdapter {
     /// Optional: Called when ViewHolder is recycled (cleanup)
     fn on_view_recycled(&self, _holder: &ViewHolder) {}
 }
+impl_downcast!(RecyclerAdapter);
 
 // ============================================================================
 // LayoutManager - Controls positioning
@@ -129,6 +131,22 @@ pub trait LayoutManager {
 
     /// Get the current height for an item
     fn get_item_height(&self, position: usize) -> i32;
+
+    /// Notify the layout manager that `count` items were inserted at `position`.
+    /// Default: no-op.
+    fn items_inserted(&self, _position: usize, _count: usize) {}
+
+    /// Notify the layout manager that `count` items were removed starting at `position`.
+    /// Default: no-op.
+    fn items_removed(&self, _position: usize, _count: usize) {}
+
+    /// Notify the layout manager that the item at `from` moved to `to`.
+    /// Default: no-op.
+    fn items_moved(&self, _from: usize, _to: usize) {}
+
+    /// Invalidate cached layout for `position` so it is remeasured on next bind.
+    /// Default: no-op.
+    fn invalidate_item(&self, _position: usize) {}
 }
 
 // ============================================================================
@@ -296,6 +314,62 @@ impl LayoutManager for LinearLayoutManager {
     fn get_item_height(&self, position: usize) -> i32 {
         self.get_height(position)
     }
+
+    fn items_inserted(&self, position: usize, count: usize) {
+        if count == 0 {
+            return;
+        }
+        let mut heights = self.item_heights.borrow_mut();
+        let pos = position.min(heights.len());
+        heights.splice(pos..pos, std::iter::repeat_n(self.default_item_height, count));
+
+        let mut cumulative = self.cumulative_positions.borrow_mut();
+        if cumulative.len() > pos {
+            cumulative.truncate(pos);
+        }
+    }
+
+    fn items_removed(&self, position: usize, count: usize) {
+        if count == 0 {
+            return;
+        }
+        let mut heights = self.item_heights.borrow_mut();
+        if position >= heights.len() {
+            return;
+        }
+        let end = (position + count).min(heights.len());
+        heights.drain(position..end);
+
+        let mut cumulative = self.cumulative_positions.borrow_mut();
+        if cumulative.len() > position {
+            cumulative.truncate(position);
+        }
+    }
+
+    fn items_moved(&self, from: usize, to: usize) {
+        if from == to {
+            return;
+        }
+        let mut heights = self.item_heights.borrow_mut();
+        if from >= heights.len() || to >= heights.len() {
+            return;
+        }
+        let h = heights.remove(from);
+        heights.insert(to, h);
+
+        let mut cumulative = self.cumulative_positions.borrow_mut();
+        let trunc_at = from.min(to);
+        if cumulative.len() > trunc_at {
+            cumulative.truncate(trunc_at);
+        }
+    }
+
+    fn invalidate_item(&self, position: usize) {
+        let mut cumulative = self.cumulative_positions.borrow_mut();
+        if cumulative.len() > position {
+            cumulative.truncate(position);
+        }
+    }
 }
 
 // ============================================================================
@@ -419,6 +493,33 @@ impl RecyclerView {
         *self.needs_layout.borrow_mut() = true;
     }
 
+    /// Run a closure with mutable access to the adapter, downcast to a concrete type `A`.
+    /// Returns `None` if no adapter is set or the adapter's type does not match `A`.
+    ///
+    /// The closure must finish (be dropped) before calling any `notify_item_*` method,
+    /// since those methods need to borrow the adapter immutably.
+    pub fn with_adapter_as<A, R, F>(&self, f: F) -> Option<R>
+    where
+        A: RecyclerAdapter,
+        F: FnOnce(&mut A) -> R,
+    {
+        let mut guard = self.adapter.borrow_mut();
+        let adapter = guard.as_mut()?;
+        adapter.downcast_mut::<A>().map(f)
+    }
+
+    /// Run a closure with mutable access to the adapter as a trait object.
+    /// Returns `None` if no adapter is set.
+    ///
+    /// The closure must finish before calling any `notify_item_*` method.
+    pub fn with_adapter_mut<R, F>(&self, f: F) -> Option<R>
+    where
+        F: FnOnce(&mut dyn RecyclerAdapter) -> R,
+    {
+        let mut guard = self.adapter.borrow_mut();
+        guard.as_deref_mut().map(f)
+    }
+
     /// Set layout manager
     pub fn set_layout_manager(&self, manager: Box<dyn LayoutManager>) {
         self.layout_manager.replace(manager);
@@ -430,11 +531,239 @@ impl RecyclerView {
         *self.needs_layout.borrow_mut() = true;
     }
 
-    /// Scroll to position
+    /// Notify that the item at `position` has changed and needs to be rebound.
+    /// If the item is currently visible, it is rebound and remeasured.
+    pub fn notify_item_changed(&self, position: usize) {
+        self.notify_item_range_changed(position, 1);
+    }
+
+    /// Notify that `count` items starting at `position` have changed.
+    /// Visible items in the range are rebound and remeasured.
+    pub fn notify_item_range_changed(&self, position: usize, count: usize) {
+        if count == 0 {
+            return;
+        }
+        if self.adapter.borrow().is_none() {
+            return;
+        }
+
+        let end = position + count;
+
+        // Snapshot affected holders so we can drop the attached_holders borrow
+        // before calling adapter.bind_view_holder.
+        let affected: Vec<ViewHolder> = self.attached_holders.borrow()
+            .iter()
+            .filter(|h| {
+                let p = h.get_position();
+                p >= position && p < end
+            })
+            .cloned()
+            .collect();
+
+        if !affected.is_empty() {
+            let adapter_ref = self.adapter.borrow();
+            let adapter = adapter_ref.as_ref().unwrap();
+            for holder in &affected {
+                let p = holder.get_position();
+                adapter.bind_view_holder(holder, p);
+            }
+        }
+
+        // Invalidate cached cumulative positions from `position` onward so heights
+        // are re-summed once the items remeasure on the next paint.
+        {
+            let lm = self.layout_manager.borrow();
+            lm.invalidate_item(position);
+        }
+        *self.needs_layout.borrow_mut() = true;
+    }
+
+    /// Notify that a single item was inserted at `position`.
+    pub fn notify_item_inserted(&self, position: usize) {
+        self.notify_item_range_inserted(position, 1);
+    }
+
+    /// Notify that `count` items were inserted starting at `position`.
+    /// Adjusts attached holders' positions and `selected_position` accordingly.
+    pub fn notify_item_range_inserted(&self, position: usize, count: usize) {
+        if count == 0 {
+            return;
+        }
+        if self.adapter.borrow().is_none() {
+            return;
+        }
+
+        debug_assert!(
+            position <= self.adapter.borrow().as_ref().unwrap().get_item_count(),
+            "notify_item_range_inserted: position {} out of bounds (item_count={})",
+            position,
+            self.adapter.borrow().as_ref().unwrap().get_item_count()
+        );
+
+        self.layout_manager.borrow().items_inserted(position, count);
+
+        for holder in self.attached_holders.borrow().iter() {
+            let p = holder.get_position();
+            if p >= position {
+                holder.set_position(p + count);
+            }
+        }
+
+        {
+            let mut sel = self.selected_position.borrow_mut();
+            if let Some(s) = *sel {
+                if s >= position {
+                    *sel = Some(s + count);
+                }
+            }
+        }
+
+        *self.needs_layout.borrow_mut() = true;
+    }
+
+    /// Notify that a single item was removed at `position`.
+    pub fn notify_item_removed(&self, position: usize) {
+        self.notify_item_range_removed(position, 1);
+    }
+
+    /// Notify that `count` items were removed starting at `position`.
+    /// Recycles holders for removed items, shifts positions for following items,
+    /// and adjusts `selected_position`.
+    pub fn notify_item_range_removed(&self, position: usize, count: usize) {
+        if count == 0 {
+            return;
+        }
+        if self.adapter.borrow().is_none() {
+            return;
+        }
+
+        let end = position + count;
+
+        self.layout_manager.borrow().items_removed(position, count);
+
+        // Partition attached_holders: recycle those in the removed range,
+        // shift positions for those past it.
+        let removed: Vec<ViewHolder> = {
+            let mut attached = self.attached_holders.borrow_mut();
+            let mut removed = Vec::new();
+            attached.retain(|h| {
+                let p = h.get_position();
+                if p >= position && p < end {
+                    removed.push(h.clone());
+                    false
+                } else {
+                    if p >= end {
+                        h.set_position(p - count);
+                    }
+                    true
+                }
+            });
+            removed
+        };
+
+        if !removed.is_empty() {
+            let adapter_ref = self.adapter.borrow();
+            let adapter = adapter_ref.as_ref().unwrap();
+            for holder in removed {
+                adapter.on_view_recycled(&holder);
+                self.recycler.recycle(holder);
+            }
+        }
+
+        {
+            let mut sel = self.selected_position.borrow_mut();
+            if let Some(s) = *sel {
+                if s >= position && s < end {
+                    *sel = None;
+                } else if s >= end {
+                    *sel = Some(s - count);
+                }
+            }
+        }
+
+        *self.needs_layout.borrow_mut() = true;
+    }
+
+    /// Notify that the item at `from` has moved to `to`.
+    /// Updates positions on attached holders in place (no full relayout) and
+    /// rebinds the moved holder if it remains visible.
+    pub fn notify_item_moved(&self, from: usize, to: usize) {
+        if from == to {
+            return;
+        }
+        if self.adapter.borrow().is_none() {
+            return;
+        }
+
+        self.layout_manager.borrow().items_moved(from, to);
+
+        let shift = |p: usize| -> usize {
+            if p == from {
+                to
+            } else if from < to && p > from && p <= to {
+                p - 1
+            } else if from > to && p >= to && p < from {
+                p + 1
+            } else {
+                p
+            }
+        };
+
+        // Apply position shifts and capture the moved holder (if attached) so we can
+        // rebind it under its new position outside the attached_holders borrow.
+        let moved_holder: Option<ViewHolder> = {
+            let attached = self.attached_holders.borrow();
+            let mut moved = None;
+            for holder in attached.iter() {
+                let old = holder.get_position();
+                let new = shift(old);
+                if old != new {
+                    holder.set_position(new);
+                }
+                if old == from {
+                    moved = Some(holder.clone());
+                }
+            }
+            moved
+        };
+
+        if let Some(holder) = moved_holder {
+            let adapter_ref = self.adapter.borrow();
+            let adapter = adapter_ref.as_ref().unwrap();
+            adapter.bind_view_holder(&holder, to);
+        }
+
+        {
+            let mut sel = self.selected_position.borrow_mut();
+            if let Some(s) = *sel {
+                *sel = Some(shift(s));
+            }
+        }
+
+        *self.needs_layout.borrow_mut() = true;
+    }
+
+    /// Scroll so the item at `position` is at the top of the viewport.
+    /// `scroll_y` is stored as a non-positive offset (0 = top, -max_scroll = bottom)
+    /// to match the convention used by paint and the wheel handler.
     pub fn scroll_to_position(&self, position: usize) {
         let offset = self.layout_manager.borrow().get_scroll_for_position(position);
-        *self.scroll_y.borrow_mut() = offset.min(*self.max_scroll.borrow()).max(0);
+        let max = *self.max_scroll.borrow();
+        *self.scroll_y.borrow_mut() = (-offset).max(-max).min(0);
         *self.needs_layout.borrow_mut() = true;
+    }
+
+    /// Scroll all the way to the end of the content.
+    pub fn scroll_to_end(&self) {
+        let max = *self.max_scroll.borrow();
+        *self.scroll_y.borrow_mut() = -max;
+        *self.needs_layout.borrow_mut() = true;
+    }
+
+    /// True when the viewport is at (or past) the bottom of the content.
+    /// Useful for "stick to bottom" patterns like chat lists.
+    pub fn is_scrolled_to_end(&self) -> bool {
+        *self.scroll_y.borrow() <= -*self.max_scroll.borrow()
     }
 
     /// Set item click listener
@@ -445,11 +774,12 @@ impl RecyclerView {
         *self.on_item_click.borrow_mut() = Some(Box::new(callback));
     }
 
-    /// Scroll by delta
+    /// Scroll by delta. `scroll_y` is non-positive; `delta` follows the same sign
+    /// convention used by paint (negative = scroll content up to reveal lower items).
     pub fn scroll_by(&self, delta: i32) {
         let mut scroll = self.scroll_y.borrow_mut();
         let max = *self.max_scroll.borrow();
-        *scroll = (*scroll + delta).clamp(0, max);
+        *scroll = (*scroll + delta).clamp(-max, 0);
     }
 
     /// Get item at position
@@ -755,6 +1085,14 @@ impl View for RecyclerView {
         self.base_set_margin(top, left, right, bottom);
     }
 
+    fn get_gravity(&self) -> Gravity {
+        self.base_get_gravity()
+    }
+
+    fn set_gravity(&self, gravity: Gravity) {
+        self.base_set_gravity(gravity);
+    }
+
     fn get_bounds(&self) -> (Dimension, Dimension) {
         self.base_get_bounds()
     }
@@ -819,6 +1157,19 @@ impl View for RecyclerView {
     fn get_id(&self) -> String {
         self.base_get_id()
     }
+    fn is_enabled(&self) -> bool {
+        self.base_is_enabled()
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.base_set_enabled(enabled);
+    }
+
+    fn get_visibility(&self) -> Visibility {
+        self.base_get_visibility()
+    }
+    fn set_visibility(&mut self, visibility: Visibility) {
+        self.base_set_visibility(visibility);
+    }
     fn get_tooltip(&self) -> Option<String> {
         self.base_get_tooltip()
     }
@@ -839,19 +1190,6 @@ impl View for RecyclerView {
         self.base_set_border_color(color);
     }
 
-    fn is_enabled(&self) -> bool {
-        self.base_is_enabled()
-    }
-    fn set_enabled(&mut self, enabled: bool) {
-        self.base_set_enabled(enabled);
-    }
-    fn get_visibility(&self) -> Visibility {
-        self.base_get_visibility()
-    }
-    fn set_visibility(&mut self, visibility: Visibility) {
-        self.base_set_visibility(visibility);
-    }
-
     fn on_event(&mut self, _event: EventType, _func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {
         // TODO: implement
     }
@@ -859,6 +1197,11 @@ impl View for RecyclerView {
     fn click(&self, _ui: &mut UI) -> bool {
         if !self.base_is_enabled() { return false; }
         false
+    }
+
+    fn update(&mut self, _ui: &mut UI) -> bool {
+        // Return true if we need to trigger a relayout/repaint
+        *self.needs_layout.borrow()
     }
 
     fn on_mouse_button_down(&self, _ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
@@ -1016,11 +1359,6 @@ impl View for RecyclerView {
             }
         }
         true
-    }
-
-    fn update(&mut self, _ui: &mut UI) -> bool {
-        // Return true if we need to trigger a relayout/repaint
-        *self.needs_layout.borrow()
     }
 }
 

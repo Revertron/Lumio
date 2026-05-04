@@ -15,6 +15,7 @@ pub mod styles;
 pub mod view_base;
 pub mod drawing;
 pub mod prelude;
+pub mod svg;
 
 #[cfg(test)]
 mod tests;

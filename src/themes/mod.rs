@@ -54,6 +54,11 @@ pub trait Theme {
     /// The image is cached by the byte slice pointer for efficiency.
     fn draw_image(&mut self, rect: Rect<i32>, image_bytes: &[u8]);
 
+    /// Draw a pre-decoded RGBA8 image of the given pixel size into `rect`.
+    /// `cache_key` is a caller-supplied stable key used to avoid re-uploading
+    /// the same buffer on subsequent frames.
+    fn draw_raw_image(&mut self, _rect: Rect<i32>, _rgba: &[u8], _size: (u32, u32), _cache_key: u64) {}
+
     // Progress bar drawing methods
     fn draw_progressbar_track(&mut self, rect: Rect<i32>);
     fn draw_progressbar_fill(&mut self, rect: Rect<i32>);
@@ -111,12 +116,13 @@ impl From<String> for FontStyle {
 #[derive(Clone)]
 pub struct Typeface {
     pub font_name: String,
-    pub font_style: FontStyle
+    pub font_style: FontStyle,
+    pub font_size: Option<f32>
 }
 
 impl Default for Typeface {
     fn default() -> Self {
-        Typeface { font_name: String::from("NotoSans"), font_style: FontStyle::Regular }
+        Typeface { font_name: String::from("NotoSans"), font_style: FontStyle::Regular, font_size: None }
     }
 }
 

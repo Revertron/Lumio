@@ -69,7 +69,8 @@ pub struct FieldsMain {
     pub border_color: Option<u32>,
     pub parent: Option<WeakElement>,
     pub font_manager: FontManager,
-    pub tooltip: Option<String>
+    pub tooltip: Option<String>,
+    pub gravity: Gravity
 }
 
 impl FieldsMain {
@@ -92,7 +93,8 @@ impl FieldsMain {
             border_color: None,
             parent: None,
             font_manager: FontManager::new(),
-            tooltip: None
+            tooltip: None,
+            gravity: Gravity::default()
         }
     }
 
@@ -260,3 +262,94 @@ impl FromStr for Direction {
         Ok(result)
     }
 }
+
+/// Hint for a parent container telling it where this view should sit
+/// inside the space allocated to it. Components combine with `|`,
+/// e.g. `Gravity::RIGHT | Gravity::CENTER_VERTICAL`. In a linear `Frame`
+/// only the cross-axis component takes effect (horizontal in a vertical
+/// frame, vertical in a horizontal frame).
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct Gravity(u8);
+
+impl Gravity {
+    pub const LEFT: Gravity              = Gravity(0b0000_0001);
+    pub const RIGHT: Gravity             = Gravity(0b0000_0010);
+    pub const CENTER_HORIZONTAL: Gravity = Gravity(0b0000_0100);
+    pub const TOP: Gravity               = Gravity(0b0000_1000);
+    pub const BOTTOM: Gravity            = Gravity(0b0001_0000);
+    pub const CENTER_VERTICAL: Gravity   = Gravity(0b0010_0000);
+
+    pub const TOP_LEFT: Gravity     = Gravity(Self::TOP.0 | Self::LEFT.0);
+    pub const TOP_RIGHT: Gravity    = Gravity(Self::TOP.0 | Self::RIGHT.0);
+    pub const BOTTOM_LEFT: Gravity  = Gravity(Self::BOTTOM.0 | Self::LEFT.0);
+    pub const BOTTOM_RIGHT: Gravity = Gravity(Self::BOTTOM.0 | Self::RIGHT.0);
+    pub const CENTER: Gravity       = Gravity(Self::CENTER_HORIZONTAL.0 | Self::CENTER_VERTICAL.0);
+
+    pub fn horizontal(self) -> HAlign {
+        if self.0 & Self::CENTER_HORIZONTAL.0 != 0 {
+            HAlign::Center
+        } else if self.0 & Self::RIGHT.0 != 0 {
+            HAlign::Right
+        } else {
+            HAlign::Left
+        }
+    }
+
+    pub fn vertical(self) -> VAlign {
+        if self.0 & Self::CENTER_VERTICAL.0 != 0 {
+            VAlign::Center
+        } else if self.0 & Self::BOTTOM.0 != 0 {
+            VAlign::Bottom
+        } else {
+            VAlign::Top
+        }
+    }
+}
+
+impl Default for Gravity {
+    fn default() -> Self {
+        Gravity::TOP_LEFT
+    }
+}
+
+impl std::ops::BitOr for Gravity {
+    type Output = Gravity;
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Gravity(self.0 | rhs.0)
+    }
+}
+
+impl FromStr for Gravity {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut bits: u8 = 0;
+        let mut horizontal_set = false;
+        let mut vertical_set = false;
+        for token in s.split('|') {
+            match token.trim() {
+                "left" => { bits |= Gravity::LEFT.0; horizontal_set = true; }
+                "right" => { bits |= Gravity::RIGHT.0; horizontal_set = true; }
+                "center_horizontal" => { bits |= Gravity::CENTER_HORIZONTAL.0; horizontal_set = true; }
+                "top" => { bits |= Gravity::TOP.0; vertical_set = true; }
+                "bottom" => { bits |= Gravity::BOTTOM.0; vertical_set = true; }
+                "center_vertical" => { bits |= Gravity::CENTER_VERTICAL.0; vertical_set = true; }
+                "center" => {
+                    bits |= Gravity::CENTER.0;
+                    horizontal_set = true;
+                    vertical_set = true;
+                }
+                _ => {}
+            }
+        }
+        if !horizontal_set { bits |= Gravity::LEFT.0; }
+        if !vertical_set { bits |= Gravity::TOP.0; }
+        Ok(Gravity(bits))
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum HAlign { Left, Center, Right }
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum VAlign { Top, Center, Bottom }

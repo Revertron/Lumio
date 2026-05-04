@@ -9,7 +9,7 @@ use super::super::themes::{Theme, Typeface, ViewState};
 use super::super::traits::{Element, View, WeakElement};
 use super::super::types::{Point, Rect, rect};
 use super::super::ui::UI;
-use super::super::views::{Borders, Dimension, FieldsMain, Visibility};
+use super::super::views::{Borders, Dimension, FieldsMain, Gravity, Visibility};
 use super::super::view_base::{HasMainFields, ViewBasics};
 
 pub struct List {
@@ -46,10 +46,11 @@ impl List {
         self.texts.borrow_mut().clear();
         let typeface = self.state.borrow().font_manager.get().unwrap();
         let scale = self.state.borrow().scale as f32;
+        let base_size = typeface.font_size.unwrap_or(self.text_size);
         for i in self.items.borrow().iter() {
             if let Some(font) = get_font(&typeface.font_name, &typeface.font_style.to_string()) {
                 let options = TextOptions::new();
-                let text = font.layout_text(&i, self.text_size * scale, options);
+                let text = font.layout_text(&i, base_size * scale, options);
                 self.texts.borrow_mut().push(Some(text));
             }
         }
@@ -110,7 +111,15 @@ impl View for List {
         if self.base_set_any(name, value) {
             return;
         }
-        // No List-specific properties
+        match name {
+            "font_size" => {
+                if let Ok(size) = value.parse::<f32>() {
+                    self.state.borrow_mut().font_manager.set_font_size(size);
+                    self.text_size = size;
+                }
+            }
+            _ => {}
+        }
     }
 
     fn set_parent(&self, parent: Option<WeakElement>) {
@@ -218,6 +227,14 @@ impl View for List {
 
     fn set_margin(&self, top: i32, left: i32, right: i32, bottom: i32) {
         self.base_set_margin(top, left, right, bottom);
+    }
+
+    fn get_gravity(&self) -> Gravity {
+        self.base_get_gravity()
+    }
+
+    fn set_gravity(&self, gravity: Gravity) {
+        self.base_set_gravity(gravity);
     }
 
     fn get_bounds(&self) -> (Dimension, Dimension) {

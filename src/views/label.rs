@@ -9,7 +9,7 @@ use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::UI;
-use crate::views::{Borders, Dimension, Visibility};
+use crate::views::{Borders, Dimension, Gravity, Visibility};
 use crate::styles::selector::FontSelector;
 use crate::views::{FieldsMain, FieldsTexted};
 use crate::view_base::{HasMainFields, ViewBasics};
@@ -71,7 +71,10 @@ impl Label {
             true => TextOptions::new(),
             false => TextOptions::new().with_wrap_to_width(available_width as f32, TextAlignment::Left),
         };
-        let text = font.layout_text(&state.text, state.text_size, options);
+        let base_size = typeface.font_size
+            .map(|dip| dip * scale as f32)
+            .unwrap_or(state.text_size);
+        let text = font.layout_text(&state.text, base_size, options);
         // Update rect to fit new text
         let new_width = text.width().ceil() as i32 + pad_h;
         let pad_v = (padding.top as f64 * scale).round() as i32 + (padding.bottom as f64 * scale).round() as i32;
@@ -111,6 +114,12 @@ impl Label {
     fn set_font_style(&self, style: &str) {
         self.state.borrow_mut().main.font_manager.set_font_style(style);
     }
+
+    fn set_font_size(&self, size: f32) {
+        let mut state = self.state.borrow_mut();
+        state.main.font_manager.set_font_size(size);
+        state.cached_text = None;
+    }
 }
 
 impl View for Label {
@@ -123,6 +132,11 @@ impl View for Label {
             "text" => { self.set_text(value) }
             "font" => { self.set_font(value) }
             "font_style" => { self.set_font_style(value) }
+            "font_size" => {
+                if let Ok(size) = value.parse::<f32>() {
+                    self.set_font_size(size);
+                }
+            }
             "single_line" => { self.state.borrow_mut().single_line = value.parse().unwrap_or(false) }
             &_ => {}
         }
@@ -148,13 +162,17 @@ impl View for Label {
         let vertical = padding.top + padding.bottom;
         let (new_width, new_height) = self.calculate_size(width - horizontal, height - vertical, scale);
         let typeface = self.get_typeface(typeface);
+        self.state.borrow_mut().main.font_manager.set(Some(typeface.clone()));
         if let Some(font) = get_font(&typeface.font_name, &typeface.font_style.to_string()) {
             let single_line = self.state.borrow().single_line;
             let options = match single_line {
                 true => TextOptions::new(),
                 false => TextOptions::new().with_wrap_to_width(new_width as f32, TextAlignment::Left),
             };
-            let text = font.layout_text(&self.state.borrow().text, self.state.borrow().text_size, options);
+            let base_size = typeface.font_size
+                .map(|dip| dip * scale as f32)
+                .unwrap_or(self.state.borrow().text_size);
+            let text = font.layout_text(&self.state.borrow().text, base_size, options);
             self.state.borrow_mut().cached_text = Some(text);
         }
         let (content_width, content_height) = self.calculate_full_size(scale);
@@ -224,6 +242,14 @@ impl View for Label {
 
     fn set_margin(&self, top: i32, left: i32, right: i32, bottom: i32) {
         self.base_set_margin(top, left, right, bottom);
+    }
+
+    fn get_gravity(&self) -> Gravity {
+        self.base_get_gravity()
+    }
+
+    fn set_gravity(&self, gravity: Gravity) {
+        self.base_set_gravity(gravity);
     }
 
     fn get_bounds(&self) -> (Dimension, Dimension) {

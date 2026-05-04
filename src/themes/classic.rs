@@ -4,7 +4,8 @@ use std::io::Cursor;
 use speedy2d::color::Color;
 use speedy2d::dimen::Vector2;
 use speedy2d::font::FormattedTextBlock;
-use speedy2d::image::{ImageHandle, ImageSmoothingMode};
+use speedy2d::dimen::UVec2;
+use speedy2d::image::{ImageDataType, ImageHandle, ImageSmoothingMode};
 use speedy2d::Graphics2D;
 use speedy2d::shape::Rectangle;
 use super::super::styles::selector::{DrawState, MainSelector};
@@ -352,7 +353,7 @@ impl<'h> Theme for Classic<'h> {
     }
 
     fn draw_text(&mut self, x: f32, y: f32, color: u32, text: &FormattedTextBlock) {
-        let color = self.color_rgb(color);
+        let color = self.color_argb(color);
         self.graphics.draw_text((x, y), color, text);
     }
 
@@ -640,6 +641,33 @@ impl<'h> Theme for Classic<'h> {
             }
         }
         if let Some(handle) = self.image_cache.get(&cache_key) {
+            let speedy_rect = Rectangle::from_tuples(
+                (rect.min.x as f32, rect.min.y as f32),
+                (rect.max.x as f32, rect.max.y as f32),
+            );
+            self.graphics.draw_rectangle_image(speedy_rect, handle);
+        }
+    }
+
+    fn draw_raw_image(&mut self, rect: Rect<i32>, rgba: &[u8], size: (u32, u32), cache_key: u64) {
+        let key = cache_key as usize;
+        if !self.image_cache.contains_key(&key) {
+            match self.graphics.create_image_from_raw_pixels(
+                ImageDataType::RGBA,
+                ImageSmoothingMode::Linear,
+                UVec2::new(size.0, size.1),
+                rgba,
+            ) {
+                Ok(handle) => {
+                    self.image_cache.insert(key, handle);
+                }
+                Err(e) => {
+                    println!("Error uploading raw image: {}", e);
+                    return;
+                }
+            }
+        }
+        if let Some(handle) = self.image_cache.get(&key) {
             let speedy_rect = Rectangle::from_tuples(
                 (rect.min.x as f32, rect.min.y as f32),
                 (rect.max.x as f32, rect.max.y as f32),

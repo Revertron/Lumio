@@ -197,6 +197,14 @@ impl UI {
         self.needs_relayout = true;
     }
 
+    /// Run the relayout synchronously, immediately. Useful when subsequent
+    /// code in the same callback needs to read post-layout state (e.g. a
+    /// RecyclerView's updated `max_scroll` after inserting an item).
+    pub fn force_layout(&mut self) {
+        self.needs_relayout = false;
+        self.do_relayout();
+    }
+
     fn do_relayout(&mut self) {
         let root = self.root.clone();
         if let Some(root) = root {
@@ -496,6 +504,7 @@ impl UI {
             l.set_any("text", text);
             l.set_width(Dimension::Min);
             l.set_height(Dimension::Min);
+            l.set_any("font_size", "18");
         }
 
         let frame: Element = Rc::new(RefCell::new(Frame::default()));
@@ -504,7 +513,7 @@ impl UI {
             f.set_id(TOOLTIP_ID);
             f.set_width(Dimension::Min);
             f.set_height(Dimension::Min);
-            f.set_padding(3, 6, 6, 3);
+            f.set_padding(2, 4, 4, 2);
             f.set_background(Some(0xFFFFFFDD));
             f.set_border_color(Some(0xFF808080));
             label.borrow_mut().set_parent(Some(Rc::downgrade(&frame)));

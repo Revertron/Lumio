@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 
 use image::GenericImageView;
@@ -8,11 +9,12 @@ use speedy2d::window::MouseButton;
 
 use crate::assets::get_asset;
 use crate::events::EventType;
+use crate::svg;
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::UI;
-use crate::views::{Borders, Dimension, FieldsMain, Visibility};
+use crate::views::{Borders, Dimension, FieldsMain, Gravity, Visibility};
 use crate::view_base::{HasMainFields, ViewBasics};
 
 const DEFAULT_IMAGE_SIZE: u32 = 32;
@@ -23,7 +25,17 @@ pub struct ImageView {
     image_bytes: RefCell<Option<Vec<u8>>>,
     /// Natural image dimensions (width, height) in pixels, decoded from image data
     natural_size: RefCell<(u32, u32)>,
+    image_is_svg: RefCell<bool>,
+    rasterized: RefCell<Option<(u32, u32, Vec<u8>)>>,
     listeners: RefCell<HashMap<EventType, Box<dyn FnMut(&mut UI, &dyn View) -> bool>>>,
+}
+
+fn path_size_key(path: &str, w: u32, h: u32) -> u64 {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    path.hash(&mut hasher);
+    w.hash(&mut hasher);
+    h.hash(&mut hasher);
+    hasher.finish()
 }
 
 impl HasMainFields for ImageView {
@@ -44,16 +56,26 @@ impl ImageView {
             return;
         }
         if let Some(bytes) = get_asset(&path) {
-            // Decode natural image dimensions
-            match image::load(Cursor::new(&bytes), image::ImageFormat::from_path(&path).unwrap_or(image::ImageFormat::Png)) {
-                Ok(img) => {
-                    let (w, h) = img.dimensions();
-                    *self.natural_size.borrow_mut() = (w, h);
+            let is_svg = path.to_ascii_lowercase().ends_with(".svg") || svg::looks_like_svg(&bytes);
+            if is_svg {
+                if let Ok(tree) = usvg::Tree::from_data(&bytes, &usvg::Options::default()) {
+                    let s = tree.size();
+                    *self.natural_size.borrow_mut() = (s.width().ceil() as u32, s.height().ceil() as u32);
+                } else {
+                    println!("ImageView: failed to parse SVG: {}", path);
                 }
-                Err(e) => {
-                    println!("ImageView: failed to decode image dimensions: {}", e);
+            } else {
+                match image::load(Cursor::new(&bytes), image::ImageFormat::from_path(&path).unwrap_or(image::ImageFormat::Png)) {
+                    Ok(img) => {
+                        let (w, h) = img.dimensions();
+                        *self.natural_size.borrow_mut() = (w, h);
+                    }
+                    Err(e) => {
+                        println!("ImageView: failed to decode image dimensions: {}", e);
+                    }
                 }
             }
+            *self.image_is_svg.borrow_mut() = is_svg;
             *self.image_bytes.borrow_mut() = Some(bytes);
         } else {
             println!("ImageView: asset not found: {}", path);
@@ -70,6 +92,8 @@ impl View for ImageView {
             "image" => {
                 *self.image_path.borrow_mut() = value.to_owned();
                 *self.image_bytes.borrow_mut() = None;
+                *self.image_is_svg.borrow_mut() = false;
+                *self.rasterized.borrow_mut() = None;
             }
             _ => {}
         }
@@ -108,7 +132,7 @@ impl View for ImageView {
         theme.push_clip();
         theme.clip_rect(r);
 
-        if let Some(ref bytes) = *self.image_bytes.borrow() {
+        if self.image_bytes.borrow().is_some() {
             let padding = state.padding.scaled(state.scale);
             let content_w = r.width() - padding.left - padding.right;
             let content_h = r.height() - padding.top - padding.bottom;
@@ -116,7 +140,6 @@ impl View for ImageView {
             let (nat_w, nat_h) = *self.natural_size.borrow();
             let aspect = if nat_w > 0 && nat_h > 0 { nat_w as f64 / nat_h as f64 } else { 1.0 };
 
-            // Fit image within content area preserving aspect ratio
             let (img_w, img_h) = if (content_w as f64 / aspect) <= content_h as f64 {
                 (content_w, (content_w as f64 / aspect).round() as i32)
             } else {
@@ -125,7 +148,28 @@ impl View for ImageView {
             let img_x = r.min.x + padding.left + (content_w - img_w) / 2;
             let img_y = r.min.y + padding.top + (content_h - img_h) / 2;
             let img_rect = rect((img_x, img_y), (img_x + img_w, img_y + img_h));
-            theme.draw_image(img_rect, bytes);
+
+            if *self.image_is_svg.borrow() && img_w > 0 && img_h > 0 {
+                let w = img_w as u32;
+                let h = img_h as u32;
+                let needs_render = match &*self.rasterized.borrow() {
+                    Some((cw, ch, _)) => *cw != w || *ch != h,
+                    None => true,
+                };
+                if needs_render {
+                    if let Some(ref src) = *self.image_bytes.borrow() {
+                        if let Some(rgba) = svg::rasterize(src, w, h) {
+                            *self.rasterized.borrow_mut() = Some((w, h, rgba));
+                        }
+                    }
+                }
+                if let Some((cw, ch, rgba)) = &*self.rasterized.borrow() {
+                    let key = path_size_key(&self.image_path.borrow(), *cw, *ch);
+                    theme.draw_raw_image(img_rect, rgba, (*cw, *ch), key);
+                }
+            } else if let Some(ref bytes) = *self.image_bytes.borrow() {
+                theme.draw_image(img_rect, bytes);
+            }
         }
 
         theme.pop_clip();
@@ -157,6 +201,14 @@ impl View for ImageView {
 
     fn set_margin(&self, top: i32, left: i32, right: i32, bottom: i32) {
         self.base_set_margin(top, left, right, bottom);
+    }
+
+    fn get_gravity(&self) -> Gravity {
+        self.base_get_gravity()
+    }
+
+    fn set_gravity(&self, gravity: Gravity) {
+        self.base_set_gravity(gravity);
     }
 
     fn get_bounds(&self) -> (Dimension, Dimension) {
@@ -343,6 +395,8 @@ impl Default for ImageView {
             image_path: RefCell::new(String::new()),
             image_bytes: RefCell::new(None),
             natural_size: RefCell::new((0, 0)),
+            image_is_svg: RefCell::new(false),
+            rasterized: RefCell::new(None),
             listeners: RefCell::new(HashMap::new()),
         }
     }

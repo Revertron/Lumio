@@ -10,7 +10,7 @@ use crate::view_base::{HasMainFields, ViewBasics};
 use crate::traits::{Container, Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::UI;
-use crate::views::{Borders, Dimension, Direction, FieldsMain, Visibility};
+use crate::views::{Borders, Dimension, Direction, FieldsMain, Gravity, Visibility};
 
 const SCROLLBAR_WIDTH: i32 = 16;
 const SCROLL_LINE: i32 = 20;
@@ -375,6 +375,14 @@ impl View for ScrollView {
 
     fn set_margin(&self, top: i32, left: i32, right: i32, bottom: i32) {
         self.base_set_margin(top, left, right, bottom);
+    }
+
+    fn get_gravity(&self) -> Gravity {
+        self.base_get_gravity()
+    }
+
+    fn set_gravity(&self, gravity: Gravity) {
+        self.base_set_gravity(gravity);
     }
 
     fn get_bounds(&self) -> (Dimension, Dimension) {

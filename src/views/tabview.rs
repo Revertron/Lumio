@@ -14,7 +14,7 @@ use crate::traits::{Container, Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::UI;
 use crate::view_base::{HasMainFields, ViewBasics};
-use crate::views::{Borders, Dimension, FieldsMain, Visibility};
+use crate::views::{Borders, Dimension, FieldsMain, Gravity, Visibility};
 
 /// Horizontal padding inside each tab (in dip).
 const TAB_PADDING_H: i32 = 8;
@@ -77,11 +77,19 @@ impl TabView {
         self.state.borrow_mut().font_manager.set_font_style(style);
     }
 
+    fn set_font_size(&mut self, size: f32) {
+        self.state.borrow_mut().font_manager.set_font_size(size);
+        for tab in self.tabs.iter_mut() {
+            tab.cached_title = None;
+        }
+    }
+
     fn layout_tab_titles(&mut self, scale: f64) {
         let typeface = self.state.borrow().font_manager.get();
         if let Some(typeface) = typeface {
             if let Some(font) = get_font(&typeface.font_name, &typeface.font_style.to_string()) {
-                let size = DEFAULT_TEXT_SIZE * scale as f32;
+                let base_size = typeface.font_size.unwrap_or(DEFAULT_TEXT_SIZE);
+                let size = base_size * scale as f32;
                 for tab in self.tabs.iter_mut() {
                     if tab.cached_title.is_none() {
                         let text = font.layout_text(&tab.title, size, TextOptions::new());
@@ -141,6 +149,11 @@ impl View for TabView {
             }
             "font" => self.set_font(value),
             "font_style" => self.set_font_style(value),
+            "font_size" => {
+                if let Ok(size) = value.parse::<f32>() {
+                    self.set_font_size(size);
+                }
+            }
             _ => {}
         }
     }
@@ -318,6 +331,14 @@ impl View for TabView {
 
     fn set_margin(&self, top: i32, left: i32, right: i32, bottom: i32) {
         self.base_set_margin(top, left, right, bottom);
+    }
+
+    fn get_gravity(&self) -> Gravity {
+        self.base_get_gravity()
+    }
+
+    fn set_gravity(&self, gravity: Gravity) {
+        self.base_set_gravity(gravity);
     }
 
     fn get_bounds(&self) -> (Dimension, Dimension) {

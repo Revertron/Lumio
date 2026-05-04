@@ -10,7 +10,7 @@ use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode}
 use crate::assets::get_font;
 use crate::events::EventType;
 use crate::common::{delete_char, delete_range, insert_str};
-use crate::views::Borders;
+use crate::views::{Borders, Gravity};
 use crate::views::popupmenu::PopupMenu;
 use crate::styles::selector::FontSelector;
 use crate::themes::{Theme, Typeface, ViewState};
@@ -225,6 +225,13 @@ impl Edit {
         self.state.borrow_mut().main.font_manager.set_font_style(style);
     }
 
+    fn set_font_size(&self, size: f32) {
+        let mut state = self.state.borrow_mut();
+        state.main.font_manager.set_font_size(size);
+        state.cached_text = None;
+        state.line_height = 0f32;
+    }
+
     #[allow(unused_variables)]
     fn layout_text(&self, width: i32, scale: f64) {
         if self.state.borrow().text.is_empty() {
@@ -235,7 +242,10 @@ impl Edit {
         if let Some(typeface) = typeface {
             if let Some(font) = get_font(&typeface.font_name, &typeface.font_style.to_string()) {
                 let options = TextOptions::new();
-                let text = font.layout_text(&self.state.borrow().text, self.state.borrow().text_size, options);
+                let base_size = typeface.font_size
+                    .map(|dip| dip * scale as f32)
+                    .unwrap_or(self.state.borrow().text_size);
+                let text = font.layout_text(&self.state.borrow().text, base_size, options);
                 self.state.borrow_mut().cached_text = Some(text);
             }
         }
@@ -251,7 +261,11 @@ impl Edit {
         if let Some(typeface) = typeface {
             if let Some(font) = get_font(&typeface.font_name, &typeface.font_style.to_string()) {
                 let options = TextOptions::new();
-                return Some(font.layout_text(&placeholder, self.state.borrow().text_size, options));
+                let scale = self.state.borrow().main.scale;
+                let base_size = typeface.font_size
+                    .map(|dip| dip * scale as f32)
+                    .unwrap_or(self.state.borrow().text_size);
+                return Some(font.layout_text(&placeholder, base_size, options));
             }
         }
         None
@@ -351,7 +365,11 @@ impl Edit {
         if let Some(typeface) = typeface {
             if let Some(font) = get_font(&typeface.font_name, &typeface.font_style.to_string()) {
                 let options = TextOptions::new();
-                let text = font.layout_text("W", self.state.borrow().text_size, options);
+                let scale = self.state.borrow().main.scale;
+                let base_size = typeface.font_size
+                    .map(|dip| dip * scale as f32)
+                    .unwrap_or(self.state.borrow().text_size);
+                let text = font.layout_text("W", base_size, options);
                 self.state.borrow_mut().line_height = text.height();
             }
         }
@@ -682,6 +700,11 @@ impl View for Edit {
             "text" => { self.set_text(value) }
             "font" => { self.set_font(value) }
             "font_style" => { self.set_font_style(value) }
+            "font_size" => {
+                if let Ok(size) = value.parse::<f32>() {
+                    self.set_font_size(size);
+                }
+            }
             "placeholder" => { self.set_placeholder(value) }
             "readonly" => { self.set_read_only(value == "true") }
             "single_line" => { self.state.borrow_mut().single_line = value.parse().unwrap_or(true) }
@@ -849,6 +872,14 @@ impl View for Edit {
         self.base_set_margin(top, left, right, bottom);
     }
 
+    fn get_gravity(&self) -> Gravity {
+        self.base_get_gravity()
+    }
+
+    fn set_gravity(&self, gravity: Gravity) {
+        self.base_set_gravity(gravity);
+    }
+
     fn get_bounds(&self) -> (Dimension, Dimension) {
         self.base_get_bounds()
     }
@@ -903,6 +934,19 @@ impl View for Edit {
     fn get_id(&self) -> String {
         self.base_get_id()
     }
+    fn is_enabled(&self) -> bool {
+        self.base_is_enabled()
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.base_set_enabled(enabled);
+    }
+
+    fn get_visibility(&self) -> Visibility {
+        self.base_get_visibility()
+    }
+    fn set_visibility(&mut self, visibility: Visibility) {
+        self.base_set_visibility(visibility);
+    }
     fn get_tooltip(&self) -> Option<String> {
         self.base_get_tooltip()
     }
@@ -921,19 +965,6 @@ impl View for Edit {
     }
     fn set_border_color(&mut self, color: Option<u32>) {
         self.base_set_border_color(color);
-    }
-
-    fn is_enabled(&self) -> bool {
-        self.base_is_enabled()
-    }
-    fn set_enabled(&mut self, enabled: bool) {
-        self.base_set_enabled(enabled);
-    }
-    fn get_visibility(&self) -> Visibility {
-        self.base_get_visibility()
-    }
-    fn set_visibility(&mut self, visibility: Visibility) {
-        self.base_set_visibility(visibility);
     }
 
     fn on_event(&mut self, event: EventType, func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {

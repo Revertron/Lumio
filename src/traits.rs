@@ -8,7 +8,7 @@ use super::ui::UI;
 use super::themes::{Theme, ViewState};
 use super::types::{Rect, Point};
 use super::themes::Typeface;
-use super::views::{Borders, Dimension, Visibility};
+use super::views::{Borders, Dimension, Gravity, Visibility};
 
 pub type Element = Rc<RefCell<dyn View>>;
 pub type WeakElement = Weak<RefCell<dyn View>>;
@@ -41,6 +41,9 @@ pub trait View: Downcast {
     fn set_padding(&self, top: i32, left: i32, right: i32, bottom: i32);
     fn get_margin(&self, scale: f64) -> Borders { Borders::default().scaled(scale) }
     fn set_margin(&self, top: i32, left: i32, right: i32, bottom: i32);
+    fn get_gravity(&self) -> Gravity { Gravity::default() }
+    #[allow(unused_variables)]
+    fn set_gravity(&self, gravity: Gravity) {}
     fn get_x(&self) -> i32 { self.get_rect().min.x }
     fn get_y(&self) -> i32 { self.get_rect().min.y }
     fn get_rect_width(&self) -> i32 { self.get_rect().width() }

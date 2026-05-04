@@ -8,7 +8,7 @@ use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::UI;
-use crate::views::{Borders, Dimension, FieldsMain, Visibility};
+use crate::views::{Borders, Dimension, FieldsMain, Gravity, Visibility};
 use crate::view_base::{HasMainFields, ViewBasics, FontManager};
 
 const DEFAULT_HEIGHT: u32 = 22;
@@ -99,6 +99,11 @@ impl StatusBar {
         self.font_manager.set_font_style(style);
     }
 
+    fn set_font_size(&mut self, size: f32) {
+        self.font_manager.set_font_size(size);
+        self.invalidate_cache();
+    }
+
     fn invalidate_cache(&mut self) {
         for section in &mut self.sections {
             section.cached_text = None;
@@ -115,6 +120,11 @@ impl View for StatusBar {
         match name {
             "font" => self.set_font(value),
             "font_style" => self.set_font_style(value),
+            "font_size" => {
+                if let Ok(size) = value.parse::<f32>() {
+                    self.set_font_size(size);
+                }
+            }
             _ => {}
         }
     }
@@ -131,14 +141,12 @@ impl View for StatusBar {
         self.base_set_scale(scale);
         let (new_width, new_height) = self.calculate_size(width, height, scale);
 
-        let typeface = match self.font_manager.get() {
-            None => typeface.clone(),
-            Some(t) => t,
-        };
+        let typeface = self.font_manager.get_typeface(typeface);
 
         // Cache text for all sections
         let font = get_font(&typeface.font_name, &typeface.font_style.to_string());
-        let text_size = (14.0 * scale as f32).round();
+        let base_size = typeface.font_size.unwrap_or(14.0);
+        let text_size = (base_size * scale as f32).round();
         for section in &mut self.sections {
             if let Some(ref f) = font {
                 let text = f.layout_text(&section.text, text_size, TextOptions::new());
@@ -301,13 +309,33 @@ impl View for StatusBar {
         self.base_set_margin(top, left, right, bottom);
     }
 
+    fn get_gravity(&self) -> Gravity {
+        self.base_get_gravity()
+    }
+
+    fn set_gravity(&self, gravity: Gravity) {
+        self.base_set_gravity(gravity);
+    }
+
     fn get_bounds(&self) -> (Dimension, Dimension) {
         self.base_get_bounds()
     }
 
     fn get_content_size(&self) -> (i32, i32) {
-        let scale = self.state.borrow().scale;
+        let state = self.state.borrow();
+        let scale = state.scale;
         let pad_h = (SECTION_PADDING_H as f64 * scale).round() as i32;
+
+        let configured_w = match state.width {
+            Dimension::Dip(d) => Some((d as f64 * scale).round() as i32),
+            _ => None,
+        };
+        let configured_h = match state.height {
+            Dimension::Dip(d) => Some((d as f64 * scale).round() as i32),
+            _ => None,
+        };
+        drop(state);
+
         let mut total_width = 0i32;
         let mut max_height = 0i32;
         for (i, section) in self.sections.iter().enumerate() {
@@ -321,7 +349,12 @@ impl View for StatusBar {
                 max_height = text_h;
             }
         }
-        (total_width, max_height)
+
+        let width = configured_w.unwrap_or(total_width);
+        let height = configured_h.unwrap_or_else(|| {
+            if max_height > 0 { max_height } else { (DEFAULT_HEIGHT as f64 * self.state.borrow().scale).round() as i32 }
+        });
+        (width, height)
     }
 
     fn is_break(&self) -> bool {
