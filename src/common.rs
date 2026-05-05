@@ -16,7 +16,7 @@ pub fn random_string(length: usize) -> String {
     let mut rng = rand::thread_rng();
     let mut result = String::with_capacity(length);
     for _ in 0..length {
-        let position: usize = rng.gen::<usize>() % chars.len();
+        let position: usize = rng.r#gen::<usize>() % chars.len();
         let c: char = *chars.get(position).unwrap();
         result.push(c);
     }

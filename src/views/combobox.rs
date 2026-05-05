@@ -643,7 +643,7 @@ impl View for ComboDropdown {
                 NORMAL_TEXT_COLOR
             };
 
-            if let Some(Some(ref text)) = cached.get(i) {
+            if let Some(Some(text)) = cached.get(i) {
                 let text_x = content_x + pad_left;
                 let text_y = y + (item_h as f32 - text.height()) as i32 / 2;
                 theme.draw_text(text_x as f32, text_y as f32, text_color, text);

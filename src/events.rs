@@ -8,6 +8,8 @@ pub enum EventType {
     MouseUp,
     SelectionChanged,
     TextChanged,
+    LeftIconClick,
+    RightIconClick,
 }
 
 #[allow(dead_code)]

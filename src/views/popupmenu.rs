@@ -273,7 +273,7 @@ impl View for PopupMenu {
             };
 
             // Draw icon
-            if let Some(Some(ref bytes)) = icon_bytes.get(i) {
+            if let Some(Some(bytes)) = icon_bytes.get(i) {
                 let icon_y = y + (item_h - icon_size) / 2;
                 let icon_rect = rect(
                     (content_x + pad_left, icon_y),
@@ -283,7 +283,7 @@ impl View for PopupMenu {
             }
 
             // Draw text
-            if let Some(Some(ref text)) = cached.get(i) {
+            if let Some(Some(text)) = cached.get(i) {
                 let text_x = content_x + pad_left + icon_size + gap;
                 let text_y = y + (item_h as f32 - text.height()) as i32 / 2;
                 theme.draw_text(text_x as f32, text_y as f32, text_color, text);

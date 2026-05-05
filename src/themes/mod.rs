@@ -59,6 +59,18 @@ pub trait Theme {
     /// the same buffer on subsequent frames.
     fn draw_raw_image(&mut self, _rect: Rect<i32>, _rgba: &[u8], _size: (u32, u32), _cache_key: u64) {}
 
+    /// Draw an image from raw file bytes, multiplied by an ARGB tint colour.
+    /// `0xFFFFFFFF` means "no change". `0x80FFFFFF` halves opacity. `0xFFFF0000`
+    /// recolours the image to red full-alpha. Default falls back to plain `draw_image`.
+    fn draw_image_tinted(&mut self, rect: Rect<i32>, image_bytes: &[u8], _tint_argb: u32) {
+        self.draw_image(rect, image_bytes);
+    }
+
+    /// Tinted variant of `draw_raw_image`. See `draw_image_tinted` for tint semantics.
+    fn draw_raw_image_tinted(&mut self, rect: Rect<i32>, rgba: &[u8], size: (u32, u32), cache_key: u64, _tint_argb: u32) {
+        self.draw_raw_image(rect, rgba, size, cache_key);
+    }
+
     // Progress bar drawing methods
     fn draw_progressbar_track(&mut self, rect: Rect<i32>);
     fn draw_progressbar_fill(&mut self, rect: Rect<i32>);

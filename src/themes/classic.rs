@@ -627,6 +627,14 @@ impl<'h> Theme for Classic<'h> {
     }
 
     fn draw_image(&mut self, rect: Rect<i32>, image_bytes: &[u8]) {
+        self.draw_image_tinted(rect, image_bytes, 0xFFFFFFFF);
+    }
+
+    fn draw_raw_image(&mut self, rect: Rect<i32>, rgba: &[u8], size: (u32, u32), cache_key: u64) {
+        self.draw_raw_image_tinted(rect, rgba, size, cache_key, 0xFFFFFFFF);
+    }
+
+    fn draw_image_tinted(&mut self, rect: Rect<i32>, image_bytes: &[u8], tint_argb: u32) {
         let cache_key = image_bytes.as_ptr() as usize;
         if !self.image_cache.contains_key(&cache_key) {
             let cursor = Cursor::new(image_bytes);
@@ -645,12 +653,16 @@ impl<'h> Theme for Classic<'h> {
                 (rect.min.x as f32, rect.min.y as f32),
                 (rect.max.x as f32, rect.max.y as f32),
             );
-            let tint = Color::from_rgba(1.0, 1.0, 1.0, self.current_opacity());
+            let a = ((tint_argb >> 24) & 0xFF) as f32 / 255.0;
+            let r = ((tint_argb >> 16) & 0xFF) as f32 / 255.0;
+            let g = ((tint_argb >> 8) & 0xFF) as f32 / 255.0;
+            let b = (tint_argb & 0xFF) as f32 / 255.0;
+            let tint = Color::from_rgba(r, g, b, a * self.current_opacity());
             self.graphics.draw_rectangle_image_tinted(speedy_rect, tint, handle);
         }
     }
 
-    fn draw_raw_image(&mut self, rect: Rect<i32>, rgba: &[u8], size: (u32, u32), cache_key: u64) {
+    fn draw_raw_image_tinted(&mut self, rect: Rect<i32>, rgba: &[u8], size: (u32, u32), cache_key: u64, tint_argb: u32) {
         let key = cache_key as usize;
         if !self.image_cache.contains_key(&key) {
             match self.graphics.create_image_from_raw_pixels(
@@ -673,7 +685,11 @@ impl<'h> Theme for Classic<'h> {
                 (rect.min.x as f32, rect.min.y as f32),
                 (rect.max.x as f32, rect.max.y as f32),
             );
-            let tint = Color::from_rgba(1.0, 1.0, 1.0, self.current_opacity());
+            let a = ((tint_argb >> 24) & 0xFF) as f32 / 255.0;
+            let r = ((tint_argb >> 16) & 0xFF) as f32 / 255.0;
+            let g = ((tint_argb >> 8) & 0xFF) as f32 / 255.0;
+            let b = (tint_argb & 0xFF) as f32 / 255.0;
+            let tint = Color::from_rgba(r, g, b, a * self.current_opacity());
             self.graphics.draw_rectangle_image_tinted(speedy_rect, tint, handle);
         }
     }

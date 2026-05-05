@@ -7,9 +7,12 @@ use speedy2d::dimen::Vector2;
 use speedy2d::font::{TextLayout, TextOptions};
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
 
-use crate::assets::get_font_family;
+use std::hash::{Hash, Hasher};
+
+use crate::assets::{get_asset, get_font_family};
 use crate::events::EventType;
 use crate::common::{delete_char, delete_range, insert_str};
+use crate::svg;
 use crate::views::{Borders, Gravity};
 use crate::views::popupmenu::PopupMenu;
 use crate::styles::selector::FontSelector;
@@ -17,12 +20,15 @@ use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::{PopupDirection, PopupMode, UI};
-use crate::view_base::{HasMainFields, ViewBasics};
+use crate::view_base::{HasMainFields, ViewBasics, parse_hex_color};
 use super::{BUTTON_MIN_HEIGHT, BUTTON_MIN_WIDTH, Dimension, FieldsMain, FieldsTexted, Visibility};
 
 const SELECTION_COLOR: u32 = 0xff0078d7;
 const PLACEHOLDER_COLOR: u32 = 0xff808080;
 const DOUBLE_CLICK_MS: u128 = 400;
+const ICON_GAP_DIP: i32 = 2;
+const DEFAULT_ICON_TINT: u32 = 0xFFFFFFFF;
+const DEFAULT_ERROR_COLOR: u32 = 0xFFD83A3A;
 
 pub struct Edit {
     state: RefCell<FieldsTexted>,
@@ -46,6 +52,22 @@ pub struct Edit {
     held_ctrl: RefCell<bool>,
     key_repeat_time: RefCell<Instant>,
     key_repeat_started: RefCell<bool>,
+    // Leading/trailing icons + tint
+    icon_left_path: RefCell<String>,
+    icon_left_bytes: RefCell<Option<Vec<u8>>>,
+    icon_left_is_svg: RefCell<bool>,
+    icon_left_rasterized: RefCell<Option<(u32, u32, Vec<u8>)>>,
+    icon_right_path: RefCell<String>,
+    icon_right_bytes: RefCell<Option<Vec<u8>>>,
+    icon_right_is_svg: RefCell<bool>,
+    icon_right_rasterized: RefCell<Option<(u32, u32, Vec<u8>)>>,
+    icon_tint: RefCell<u32>,
+    // Track which icon (if any) absorbed the most recent mouse-down — used to
+    // route the click on mouse-up only if release happens over the same icon.
+    pressed_icon: RefCell<Option<bool>>, // Some(true)=left, Some(false)=right
+    // Error state + colour
+    error: RefCell<bool>,
+    error_color: RefCell<u32>,
 }
 
 impl HasMainFields for Edit {
@@ -88,6 +110,147 @@ impl Edit {
             held_ctrl: RefCell::new(false),
             key_repeat_time: RefCell::new(Instant::now()),
             key_repeat_started: RefCell::new(false),
+            icon_left_path: RefCell::new(String::new()),
+            icon_left_bytes: RefCell::new(None),
+            icon_left_is_svg: RefCell::new(false),
+            icon_left_rasterized: RefCell::new(None),
+            icon_right_path: RefCell::new(String::new()),
+            icon_right_bytes: RefCell::new(None),
+            icon_right_is_svg: RefCell::new(false),
+            icon_right_rasterized: RefCell::new(None),
+            icon_tint: RefCell::new(DEFAULT_ICON_TINT),
+            pressed_icon: RefCell::new(None),
+            error: RefCell::new(false),
+            error_color: RefCell::new(DEFAULT_ERROR_COLOR),
+        }
+    }
+
+    pub fn set_error(&self, error: bool) {
+        *self.error.borrow_mut() = error;
+    }
+
+    pub fn is_error(&self) -> bool {
+        *self.error.borrow()
+    }
+
+    fn load_icon(path: &RefCell<String>, bytes: &RefCell<Option<Vec<u8>>>, is_svg: &RefCell<bool>) {
+        if bytes.borrow().is_some() {
+            return;
+        }
+        let p = path.borrow().clone();
+        if p.is_empty() {
+            return;
+        }
+        if let Some(data) = get_asset(&p) {
+            let svg_flag = p.to_ascii_lowercase().ends_with(".svg") || svg::looks_like_svg(&data);
+            *is_svg.borrow_mut() = svg_flag;
+            *bytes.borrow_mut() = Some(data);
+        } else {
+            println!("Edit: icon asset not found: {}", p);
+        }
+    }
+
+    fn load_icons(&self) {
+        Self::load_icon(&self.icon_left_path, &self.icon_left_bytes, &self.icon_left_is_svg);
+        Self::load_icon(&self.icon_right_path, &self.icon_right_bytes, &self.icon_right_is_svg);
+    }
+
+    /// Width in pixels reserved by an icon side. Returns 0 when no icon is set.
+    /// `inner_height` is the field's content height (after padding).
+    fn icon_side_width(&self, has_icon: bool, inner_height: i32, scale: f64) -> i32 {
+        if !has_icon || inner_height <= 0 {
+            return 0;
+        }
+        inner_height + (ICON_GAP_DIP as f64 * scale).round() as i32
+    }
+
+    /// Returns (left_inset, right_inset) in pixels for icon reservations.
+    /// Used by paint, click hit-testing, scroll bounds, caret rect.
+    fn icon_insets(&self, inner_height: i32, scale: f64) -> (i32, i32) {
+        let has_left = !self.icon_left_path.borrow().is_empty();
+        let has_right = !self.icon_right_path.borrow().is_empty();
+        (
+            self.icon_side_width(has_left, inner_height, scale),
+            self.icon_side_width(has_right, inner_height, scale),
+        )
+    }
+
+    /// Returns (left_icon_rect, right_icon_rect) in absolute view coords (no
+    /// origin offset; same coord system as `state.main.rect`). `None` for a
+    /// side without an icon.
+    fn icon_hit_rects(&self) -> (Option<Rect<i32>>, Option<Rect<i32>>) {
+        let scale = self.state.borrow().main.scale;
+        let padding = self.get_padding(scale);
+        let my_rect = self.state.borrow().main.rect;
+        let inner_h = my_rect.height() - padding.top - padding.bottom;
+        if inner_h <= 0 {
+            return (None, None);
+        }
+        let icon_size = inner_h;
+        let inner_top = my_rect.min.y + padding.top;
+        let has_left = !self.icon_left_path.borrow().is_empty();
+        let has_right = !self.icon_right_path.borrow().is_empty();
+        let left = if has_left {
+            let x = my_rect.min.x + padding.left;
+            Some(crate::types::rect((x, inner_top), (x + icon_size, inner_top + icon_size)))
+        } else {
+            None
+        };
+        let right = if has_right {
+            let x = my_rect.max.x - padding.right - icon_size;
+            Some(crate::types::rect((x, inner_top), (x + icon_size, inner_top + icon_size)))
+        } else {
+            None
+        };
+        (left, right)
+    }
+
+    fn fire_icon_event(&self, ui: &mut UI, event: EventType) {
+        // Bind first so the borrow_mut temporary drops before the handler runs;
+        // otherwise the handler can't touch self.state without panicking.
+        let handler = self.state.borrow_mut().listeners.remove(&event);
+        if let Some(mut handler) = handler {
+            handler(ui, self as &dyn View);
+            self.state.borrow_mut().listeners.insert(event, handler);
+        }
+    }
+
+    fn draw_icon(&self, theme: &mut dyn Theme, icon_rect: Rect<i32>, is_left: bool, tint: u32) {
+        let (path_cell, bytes_cell, is_svg_cell, raster_cell) = if is_left {
+            (&self.icon_left_path, &self.icon_left_bytes, &self.icon_left_is_svg, &self.icon_left_rasterized)
+        } else {
+            (&self.icon_right_path, &self.icon_right_bytes, &self.icon_right_is_svg, &self.icon_right_rasterized)
+        };
+        if bytes_cell.borrow().is_none() {
+            return;
+        }
+        let w = icon_rect.width().max(0) as u32;
+        let h = icon_rect.height().max(0) as u32;
+        if w == 0 || h == 0 {
+            return;
+        }
+        if *is_svg_cell.borrow() {
+            let needs_render = match &*raster_cell.borrow() {
+                Some((cw, ch, _)) => *cw != w || *ch != h,
+                None => true,
+            };
+            if needs_render {
+                if let Some(ref src) = *bytes_cell.borrow() {
+                    if let Some(rgba) = svg::rasterize(src, w, h) {
+                        *raster_cell.borrow_mut() = Some((w, h, rgba));
+                    }
+                }
+            }
+            if let Some((cw, ch, rgba)) = &*raster_cell.borrow() {
+                let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                path_cell.borrow().hash(&mut hasher);
+                cw.hash(&mut hasher);
+                ch.hash(&mut hasher);
+                let key = hasher.finish();
+                theme.draw_raw_image_tinted(icon_rect, rgba, (*cw, *ch), key, tint);
+            }
+        } else if let Some(ref bytes) = *bytes_cell.borrow() {
+            theme.draw_image_tinted(icon_rect, bytes, tint);
         }
     }
 
@@ -316,12 +479,14 @@ impl Edit {
         let mut rect = *self.caret_rect.borrow();
         let caret_pos = *self.caret_pos.borrow();
         let my_rect = self.state.borrow().main.rect;
+        let inner_h = my_rect.height() - padding.top - padding.bottom;
+        let (left_inset, _) = self.icon_insets(inner_h, scale);
 
         rect.min.y = my_rect.min.y + padding.top + 2;
         rect.max.y = my_rect.max.y - padding.bottom - 2;
 
         let x_offset = self.x_of_char_pos(caret_pos);
-        rect.min.x = my_rect.min.x + padding.left + x_offset;
+        rect.min.x = my_rect.min.x + padding.left + left_inset + x_offset;
         rect.max.x = rect.min.x + (1f64 * scale) as i32;
 
         *self.caret_rect.borrow_mut() = rect;
@@ -343,9 +508,11 @@ impl Edit {
         let my_rect = self.state.borrow().main.rect;
         let caret_rect = self.get_caret_rect(scale);
         let padding = self.get_padding(scale);
+        let inner_h = my_rect.height() - padding.top - padding.bottom;
+        let (left_inset, right_inset) = self.icon_insets(inner_h, scale);
         let cur_scroll_x = *self.scroll_x.borrow();
-        let view_left = my_rect.min.x + padding.left;
-        let view_right = my_rect.max.x - padding.right;
+        let view_left = my_rect.min.x + padding.left + left_inset;
+        let view_right = my_rect.max.x - padding.right - right_inset;
 
         if caret_rect.max.x + cur_scroll_x > view_right {
             // Caret is past the right edge — scroll so caret is at the right edge
@@ -537,7 +704,8 @@ impl Edit {
     }
 
     fn fire_text_changed(&self, ui: &mut UI) {
-        if let Some(mut handler) = self.state.borrow_mut().listeners.remove(&EventType::TextChanged) {
+        let handler = self.state.borrow_mut().listeners.remove(&EventType::TextChanged);
+        if let Some(mut handler) = handler {
             handler(ui, self as &dyn View);
             self.state.borrow_mut().listeners.insert(EventType::TextChanged, handler);
         }
@@ -713,6 +881,31 @@ impl View for Edit {
                     self.set_max_length(Some(n));
                 }
             }
+            "icon_left" => {
+                *self.icon_left_path.borrow_mut() = value.to_owned();
+                *self.icon_left_bytes.borrow_mut() = None;
+                *self.icon_left_is_svg.borrow_mut() = false;
+                *self.icon_left_rasterized.borrow_mut() = None;
+            }
+            "icon_right" => {
+                *self.icon_right_path.borrow_mut() = value.to_owned();
+                *self.icon_right_bytes.borrow_mut() = None;
+                *self.icon_right_is_svg.borrow_mut() = false;
+                *self.icon_right_rasterized.borrow_mut() = None;
+            }
+            "icon_tint" => {
+                if let Some(c) = parse_hex_color(value) {
+                    *self.icon_tint.borrow_mut() = c;
+                }
+            }
+            "error" => {
+                self.set_error(value == "true");
+            }
+            "error_color" => {
+                if let Some(c) = parse_hex_color(value) {
+                    *self.error_color.borrow_mut() = c;
+                }
+            }
             &_ => {}
         }
     }
@@ -764,6 +957,8 @@ impl View for Edit {
     }
 
     fn paint(&self, origin: Point<i32>, theme: &mut dyn Theme) {
+        // Lazy load icon assets on first paint
+        self.load_icons();
         self.update_scroll();
         let state = self.state.borrow();
         let scroll_x = *self.scroll_x.borrow();
@@ -780,6 +975,12 @@ impl View for Edit {
         let padding = state.main.padding.scaled(state.main.scale);
         let mut text_rect = rect;
         text_rect.shrink_by(padding.top, padding.left, padding.right, padding.bottom);
+        let inner_h = text_rect.height();
+        let scale = state.main.scale;
+        let (left_inset, right_inset) = self.icon_insets(inner_h, scale);
+        // Reserve icon space inside the text rect
+        text_rect.min.x += left_inset;
+        text_rect.max.x -= right_inset;
         theme.push_clip();
         theme.clip_rect(text_rect);
 
@@ -826,6 +1027,37 @@ impl View for Edit {
         }
         theme.pop_clip();
 
+        // Step 2.5: Draw leading/trailing icons (between text and borders).
+        // Icons are square, sized to the field's inner (padded) height, vertically centred.
+        let tint = *self.icon_tint.borrow();
+        let icon_size = inner_h;
+        if icon_size > 0 {
+            let inner_top = rect.min.y + padding.top;
+            // Padded content rect is the visual bounds for clipping icons
+            let mut content_rect = rect;
+            content_rect.shrink_by(padding.top, padding.left, padding.right, padding.bottom);
+            theme.push_clip();
+            theme.clip_rect(content_rect);
+
+            if left_inset > 0 {
+                let icon_x = rect.min.x + padding.left;
+                let icon_rect = crate::types::rect(
+                    (icon_x, inner_top),
+                    (icon_x + icon_size, inner_top + icon_size),
+                );
+                self.draw_icon(theme, icon_rect, true, tint);
+            }
+            if right_inset > 0 {
+                let icon_x = rect.max.x - padding.right - icon_size;
+                let icon_rect = crate::types::rect(
+                    (icon_x, inner_top),
+                    (icon_x + icon_size, inner_top + icon_size),
+                );
+                self.draw_icon(theme, icon_rect, false, tint);
+            }
+            theme.pop_clip();
+        }
+
         // Step 3: Draw borders (after text)
         let state = self.state.borrow();
         let mut rect = state.main.rect;
@@ -834,6 +1066,20 @@ impl View for Edit {
         theme.clip_rect(rect);
         theme.draw_component("edit_field_classic_body", rect, state.main.state);
         theme.pop_clip();
+
+        // Step 3.5: Error underline. Draw a 2-dip line just above the existing
+        // bottom inset highlights — it visually underlines the field without
+        // disturbing the outer 1-pixel highlight at max.y - 1.
+        if *self.error.borrow() {
+            let line_h = ((2.0 * scale).round() as i32).max(1);
+            let inset = ((2.0 * scale).round() as i32).max(2);
+            let bottom_offset = (2.0 * scale).round() as i32;
+            let underline = crate::types::rect(
+                (rect.min.x + inset, rect.max.y - bottom_offset - line_h),
+                (rect.max.x - inset, rect.max.y - bottom_offset),
+            );
+            theme.draw_rect(underline, *self.error_color.borrow());
+        }
 
         // Step 4: Draw caret (on top of everything, only when no selection or always)
         if state.main.state.focused && *self.caret_visible.borrow() {
@@ -973,7 +1219,8 @@ impl View for Edit {
 
     fn click(&self, ui: &mut UI) -> bool {
         if !self.base_is_enabled() { return false; }
-        if let Some(mut click) = self.state.borrow_mut().listeners.remove(&EventType::Click) {
+        let handler = self.state.borrow_mut().listeners.remove(&EventType::Click);
+        if let Some(mut click) = handler {
             let result = click(ui, self as &dyn View);
             self.state.borrow_mut().listeners.insert(EventType::Click, click);
             return result;
@@ -1038,6 +1285,22 @@ impl View for Edit {
             return true;
         }
 
+        // Left-click on an icon? Capture press; the click fires on mouse-up if
+        // the release lands on the same icon.
+        let (left_rect, right_rect) = self.icon_hit_rects();
+        if let Some(r) = left_rect {
+            if r.hit((position.x, position.y)) {
+                *self.pressed_icon.borrow_mut() = Some(true);
+                return true;
+            }
+        }
+        if let Some(r) = right_rect {
+            if r.hit((position.x, position.y)) {
+                *self.pressed_icon.borrow_mut() = Some(false);
+                return true;
+            }
+        }
+
         self.state.borrow_mut().main.state.pressed = true;
         self.state.borrow_mut().main.state.focused = true;
 
@@ -1046,7 +1309,9 @@ impl View for Edit {
         let padding = self.get_padding(scale);
         let my_rect = self.state.borrow().main.rect;
         let scroll_x = *self.scroll_x.borrow();
-        let click_x = position.x - my_rect.min.x - padding.left - scroll_x;
+        let inner_h = my_rect.height() - padding.top - padding.bottom;
+        let (left_inset, _) = self.icon_insets(inner_h, scale);
+        let click_x = position.x - my_rect.min.x - padding.left - left_inset - scroll_x;
         let char_pos = self.char_pos_from_x(click_x);
 
         // Multi-click detection
@@ -1084,9 +1349,25 @@ impl View for Edit {
         true
     }
 
-    fn on_mouse_button_up(&self, _ui: &mut UI, _position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_up(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
-        if matches!(button, MouseButton::Left) && self.state.borrow().main.state.pressed {
+        if !matches!(button, MouseButton::Left) {
+            return false;
+        }
+        // If a press started on an icon, treat the up over the same icon as a click.
+        let pressed_icon = self.pressed_icon.borrow_mut().take();
+        if let Some(was_left) = pressed_icon {
+            let (left_rect, right_rect) = self.icon_hit_rects();
+            let target = if was_left { left_rect } else { right_rect };
+            if let Some(r) = target {
+                if r.hit((position.x, position.y)) {
+                    let event = if was_left { EventType::LeftIconClick } else { EventType::RightIconClick };
+                    self.fire_icon_event(ui, event);
+                }
+            }
+            return true;
+        }
+        if self.state.borrow().main.state.pressed {
             self.state.borrow_mut().main.state.pressed = false;
             return true;
         }

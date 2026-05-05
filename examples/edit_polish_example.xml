@@ -1,0 +1,30 @@
+<Frame id="root" width="max" height="max" direction="vertical" padding="16">
+    <Label text="Edit polish — leading/trailing icons + error state" font_size="18" margin_bottom="12"/>
+
+    <Label text="Plain edit (no icons):" margin_top="8"/>
+    <Edit id="edit_plain" text="Hello, world" width="320" margin_top="4"/>
+
+    <Label text="icon_left (lock-outline.svg):" margin_top="12"/>
+    <Edit id="edit_left" text="username" icon_left="icons/lock-outline.svg" width="320" margin_top="4"/>
+
+    <Label text="icon_right click (magnify.svg → clears text):" margin_top="12"/>
+    <Edit id="edit_right" placeholder="Search..." text="search me" icon_right="icons/magnify.svg" width="320" margin_top="4"/>
+
+    <Label text="Both icons + tinted red:" margin_top="12"/>
+    <Edit id="edit_both" text="tinted" icon_left="icons/lock-outline.svg" icon_right="icons/alert-circle-outline.svg" icon_tint="#FFD83A3A" width="320" margin_top="4"/>
+
+    <Label text="Half-opacity tint (#80000000):" margin_top="12"/>
+    <Edit id="edit_dim" text="dim icon" icon_left="icons/lock-outline.svg" icon_tint="#80000000" width="320" margin_top="4"/>
+
+    <Label text="Error state — toggleable:" margin_top="12"/>
+    <Frame direction="horizontal" width="min" height="min" margin_top="4">
+        <Edit id="edit_error" text="invalid.domain" error="true" icon_left="icons/alert-circle-outline.svg" icon_tint="#FFD83A3A" width="320"/>
+        <Button id="btn_toggle" text="Toggle error" margin_left="8"/>
+    </Frame>
+
+    <Label text="Custom error_color (#FFE8A33D — amber):" margin_top="12"/>
+    <Edit id="edit_amber" text="warn" error="true" error_color="#FFE8A33D" width="320" margin_top="4"/>
+
+    <Label text="Read-only — left lock icon copies value to clipboard:" margin_top="12"/>
+    <Edit id="edit_ro" text="read-only-public-key" readonly="true" icon_left="icons/lock-outline.svg" width="320" margin_top="4"/>
+</Frame>
