@@ -17,6 +17,7 @@ arboard = "3"
 resvg = { version = "0.47.0", default-features = false }
 usvg = { version = "0.47.0", default-features = false }
 tiny-skia = "0.12.0"
+font-kit = "0.14"
 
 [dev-dependencies]
 include_dir = "0.7"

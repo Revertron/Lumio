@@ -30,7 +30,7 @@ impl FontManager {
                 let font_size = t.font_size.or(parent_typeface.font_size);
                 Typeface {
                     font_name,
-                    font_style: t.font_style.clone(),
+                    font_style: t.font_style,
                     font_size
                 }
             }
@@ -396,7 +396,7 @@ fn uniform_color_selector(color: u32) -> MainSelector {
 }
 
 /// Parse a hex color string like `#RRGGBB` or `#AARRGGBB` into a u32.
-fn parse_hex_color(s: &str) -> Option<u32> {
+pub(crate) fn parse_hex_color(s: &str) -> Option<u32> {
     let hex = s.strip_prefix('#')?;
     match hex.len() {
         6 => u32::from_str_radix(hex, 16).ok().map(|c| 0xFF000000 | c),

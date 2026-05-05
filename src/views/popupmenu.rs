@@ -5,7 +5,7 @@ use speedy2d::dimen::Vector2;
 use speedy2d::font::{TextLayout, TextOptions};
 use speedy2d::window::MouseButton;
 
-use crate::assets::{get_asset, get_font};
+use crate::assets::{get_asset, get_font_family};
 use crate::common::DEFAULT_TEXT_SIZE;
 use crate::events::EventType;
 use crate::themes::{Theme, Typeface, ViewState};
@@ -119,7 +119,7 @@ impl PopupMenu {
         let mut cached = self.cached_texts.borrow_mut();
         let base_size = typeface.font_size.unwrap_or(DEFAULT_TEXT_SIZE);
         let text_size = base_size * scale as f32;
-        if let Some(font) = get_font(&typeface.font_name, &typeface.font_style.to_string()) {
+        if let Some(font) = get_font_family(&typeface.font_name, typeface.font_style) {
             for (i, item) in items.iter().enumerate() {
                 if cached[i].is_none() {
                     let options = TextOptions::new();

@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 use speedy2d::font::{TextAlignment, TextLayout, TextOptions};
-use crate::assets::get_font;
+use crate::assets::get_font_family;
 use crate::events::EventType;
 
 use crate::themes::{Theme, Typeface, ViewState};
@@ -48,7 +48,7 @@ impl Label {
     fn rebuild_text(&self) {
         let state = self.state.borrow();
         let typeface = state.main.font_manager.get_typeface(&Typeface::default());
-        let font = match get_font(&typeface.font_name, &typeface.font_style.to_string()) {
+        let font = match get_font_family(&typeface.font_name, typeface.font_style) {
             Some(f) => f,
             None => return,
         };
@@ -163,7 +163,7 @@ impl View for Label {
         let (new_width, new_height) = self.calculate_size(width - horizontal, height - vertical, scale);
         let typeface = self.get_typeface(typeface);
         self.state.borrow_mut().main.font_manager.set(Some(typeface.clone()));
-        if let Some(font) = get_font(&typeface.font_name, &typeface.font_style.to_string()) {
+        if let Some(font) = get_font_family(&typeface.font_name, typeface.font_style) {
             let single_line = self.state.borrow().single_line;
             let options = match single_line {
                 true => TextOptions::new(),

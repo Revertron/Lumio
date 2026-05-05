@@ -7,7 +7,7 @@ use speedy2d::dimen::Vector2;
 use speedy2d::font::{TextAlignment, TextLayout, TextOptions};
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
 
-use crate::assets::get_font;
+use crate::assets::get_font_family;
 use crate::events::EventType;
 use crate::common::{delete_char, delete_range, insert_str};
 use crate::views::{Borders, Gravity};
@@ -257,7 +257,7 @@ impl Memo {
         let state = self.state.borrow();
         let typeface = state.main.font_manager.get();
         if let Some(typeface) = typeface {
-            if let Some(font) = get_font(&typeface.font_name, &typeface.font_style.to_string()) {
+            if let Some(font) = get_font_family(&typeface.font_name, typeface.font_style) {
                 let padding = state.main.padding.scaled(state.main.scale);
                 let available_width = (width - padding.left - padding.right).max(1) as f32;
                 let options = TextOptions::new().with_wrap_to_width(available_width, TextAlignment::Left);
@@ -312,7 +312,7 @@ impl Memo {
         let state = self.state.borrow();
         let typeface = state.main.font_manager.get();
         if let Some(typeface) = typeface {
-            if let Some(font) = get_font(&typeface.font_name, &typeface.font_style.to_string()) {
+            if let Some(font) = get_font_family(&typeface.font_name, typeface.font_style) {
                 let padding = state.main.padding.scaled(state.main.scale);
                 let available_width = (state.main.rect.width() - padding.left - padding.right).max(1) as f32;
                 let options = TextOptions::new().with_wrap_to_width(available_width, TextAlignment::Left);
@@ -332,7 +332,7 @@ impl Memo {
 
         let typeface = self.state.borrow().main.font_manager.get();
         if let Some(typeface) = typeface {
-            if let Some(font) = get_font(&typeface.font_name, &typeface.font_style.to_string()) {
+            if let Some(font) = get_font_family(&typeface.font_name, typeface.font_style) {
                 let options = TextOptions::new();
                 let scale = self.state.borrow().main.scale;
                 let base_size = typeface.font_size

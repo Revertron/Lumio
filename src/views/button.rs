@@ -6,7 +6,7 @@ use speedy2d::dimen::Vector2;
 use speedy2d::font::{TextAlignment, TextLayout, TextOptions};
 use speedy2d::window::MouseButton;
 
-use crate::assets::get_font;
+use crate::assets::get_font_family;
 use crate::events::EventType;
 use crate::common::DEFAULT_TEXT_SIZE;
 use crate::themes::{Theme, Typeface, ViewState};
@@ -95,7 +95,7 @@ impl Button {
         }
         let typeface = self.state.borrow().main.font_manager.get();
         if let Some(typeface) = typeface {
-            if let Some(font) = get_font(&typeface.font_name, &typeface.font_style.to_string()) {
+            if let Some(font) = get_font_family(&typeface.font_name, typeface.font_style) {
                 let options = match single_line {
                     true => TextOptions::new(),
                     false => TextOptions::new().with_wrap_to_width(max_width as f32, TextAlignment::Left)

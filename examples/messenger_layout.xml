@@ -1,4 +1,4 @@
-<SplitPanel id="root" width="max" height="max" direction="horizontal" split_pos="360" font="Noto Sans" font_style="Regular">
+<SplitPanel id="root" width="max" height="max" direction="horizontal" split_pos="360" font="Segoe UI" font_style="Regular">
     <!-- Left panel: contact list -->
     <Frame id="contacts_panel" width="max" height="max" direction="vertical" padding="0">
         <Frame id="contacts_header" width="max" height="min" direction="horizontal" padding="8" background="#F0F0F0">

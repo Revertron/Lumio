@@ -537,6 +537,23 @@ impl RecyclerView {
         self.notify_item_range_changed(position, 1);
     }
 
+    /// Rebind the item at `position` without invalidating the layout. Use this
+    /// when the row's content changes but its measured size is guaranteed to
+    /// stay the same — e.g. swapping a fixed-size icon. Does nothing if no
+    /// holder is currently attached at that position.
+    pub fn rebind_item(&self, position: usize) {
+        let holder = self.attached_holders.borrow()
+            .iter()
+            .find(|h| h.get_position() == position)
+            .cloned();
+        if let Some(holder) = holder {
+            let adapter_ref = self.adapter.borrow();
+            if let Some(adapter) = adapter_ref.as_ref() {
+                adapter.bind_view_holder(&holder, position);
+            }
+        }
+    }
+
     /// Notify that `count` items starting at `position` have changed.
     /// Visible items in the range are rebound and remeasured.
     pub fn notify_item_range_changed(&self, position: usize, count: usize) {

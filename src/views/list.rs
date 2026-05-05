@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use speedy2d::dimen::Vector2;
 use speedy2d::font::{FormattedTextBlock, TextLayout, TextOptions};
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
-use super::super::assets::get_font;
+use super::super::assets::get_font_family;
 use super::super::common::DEFAULT_TEXT_SIZE;
 use super::super::events::EventType;
 use super::super::themes::{Theme, Typeface, ViewState};
@@ -48,7 +48,7 @@ impl List {
         let scale = self.state.borrow().scale as f32;
         let base_size = typeface.font_size.unwrap_or(self.text_size);
         for i in self.items.borrow().iter() {
-            if let Some(font) = get_font(&typeface.font_name, &typeface.font_style.to_string()) {
+            if let Some(font) = get_font_family(&typeface.font_name, typeface.font_style) {
                 let options = TextOptions::new();
                 let text = font.layout_text(&i, base_size * scale, options);
                 self.texts.borrow_mut().push(Some(text));

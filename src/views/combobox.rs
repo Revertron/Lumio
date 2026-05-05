@@ -7,7 +7,7 @@ use speedy2d::dimen::Vector2;
 use speedy2d::font::{FormattedTextBlock, TextLayout, TextOptions};
 use speedy2d::window::MouseButton;
 
-use crate::assets::get_font;
+use crate::assets::get_font_family;
 use crate::common::DEFAULT_TEXT_SIZE;
 use crate::events::EventType;
 use crate::themes::{Theme, Typeface, ViewState};
@@ -137,7 +137,7 @@ impl ComboBox {
         }
         let typeface = self.state.borrow().main.font_manager.get();
         if let Some(typeface) = typeface {
-            if let Some(font) = get_font(&typeface.font_name, &typeface.font_style.to_string()) {
+            if let Some(font) = get_font_family(&typeface.font_name, typeface.font_style) {
                 let scale_i = scale.round() as i32;
                 let arrow_w = ARROW_AREA_WIDTH * scale_i;
                 let width = max_width - arrow_w;
@@ -539,7 +539,7 @@ impl ComboDropdown {
         };
         let base_size = typeface.font_size.unwrap_or(DEFAULT_TEXT_SIZE);
         let text_size = base_size * scale as f32;
-        if let Some(font) = get_font(&typeface.font_name, &typeface.font_style.to_string()) {
+        if let Some(font) = get_font_family(&typeface.font_name, typeface.font_style) {
             let mut cached = self.cached_texts.borrow_mut();
             for (i, item) in self.items.iter().enumerate() {
                 if cached[i].is_none() {

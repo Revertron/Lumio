@@ -27,15 +27,39 @@ pub struct ImageView {
     natural_size: RefCell<(u32, u32)>,
     image_is_svg: RefCell<bool>,
     rasterized: RefCell<Option<(u32, u32, Vec<u8>)>>,
+    /// Optional ARGB tint applied to SVG icons. Replaces the rasterized
+    /// pixel's RGB with the tint's RGB and multiplies the pixel's alpha by
+    /// the tint's alpha — designed for monochrome icons whose shape lives
+    /// in the alpha channel.
+    tint: RefCell<Option<u32>>,
     listeners: RefCell<HashMap<EventType, Box<dyn FnMut(&mut UI, &dyn View) -> bool>>>,
 }
 
-fn path_size_key(path: &str, w: u32, h: u32) -> u64 {
+fn path_size_key(path: &str, w: u32, h: u32, tint: Option<u32>) -> u64 {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     path.hash(&mut hasher);
     w.hash(&mut hasher);
     h.hash(&mut hasher);
+    tint.hash(&mut hasher);
     hasher.finish()
+}
+
+/// Applies the tint to a premultiplied-alpha RGBA buffer in place. For each
+/// pixel, the alpha is multiplied by the tint's alpha and the RGB channels
+/// are replaced with the tint's RGB (premultiplied by the new alpha).
+fn apply_tint(rgba: &mut [u8], tint: u32) {
+    let ta = ((tint >> 24) & 0xFF) as u32;
+    let tr = ((tint >> 16) & 0xFF) as u32;
+    let tg = ((tint >> 8) & 0xFF) as u32;
+    let tb = (tint & 0xFF) as u32;
+    for chunk in rgba.chunks_exact_mut(4) {
+        let a = chunk[3] as u32;
+        let new_a = a * ta / 255;
+        chunk[0] = (tr * new_a / 255) as u8;
+        chunk[1] = (tg * new_a / 255) as u8;
+        chunk[2] = (tb * new_a / 255) as u8;
+        chunk[3] = new_a as u8;
+    }
 }
 
 impl HasMainFields for ImageView {
@@ -47,6 +71,24 @@ impl HasMainFields for ImageView {
 impl ViewBasics for ImageView {}
 
 impl ImageView {
+    /// Change the image source. Loads the asset eagerly so callers can swap
+    /// the image without waiting for the next layout pass — useful when the
+    /// image dimensions are fixed and only the source bytes need to change.
+    pub fn set_image(&mut self, path: &str) {
+        *self.image_path.borrow_mut() = path.to_owned();
+        *self.image_bytes.borrow_mut() = None;
+        *self.image_is_svg.borrow_mut() = false;
+        *self.rasterized.borrow_mut() = None;
+        self.load_image();
+    }
+
+    /// Set or clear an ARGB tint applied to SVG icons. Pass `None` to render
+    /// the SVG with its original colors. Invalidates the rasterized cache.
+    pub fn set_tint(&mut self, color: Option<u32>) {
+        *self.tint.borrow_mut() = color;
+        *self.rasterized.borrow_mut() = None;
+    }
+
     fn load_image(&self) {
         if self.image_bytes.borrow().is_some() {
             return;
@@ -93,6 +135,10 @@ impl View for ImageView {
                 *self.image_path.borrow_mut() = value.to_owned();
                 *self.image_bytes.borrow_mut() = None;
                 *self.image_is_svg.borrow_mut() = false;
+                *self.rasterized.borrow_mut() = None;
+            }
+            "tint" => {
+                *self.tint.borrow_mut() = crate::view_base::parse_hex_color(value);
                 *self.rasterized.borrow_mut() = None;
             }
             _ => {}
@@ -158,13 +204,16 @@ impl View for ImageView {
                 };
                 if needs_render {
                     if let Some(ref src) = *self.image_bytes.borrow() {
-                        if let Some(rgba) = svg::rasterize(src, w, h) {
+                        if let Some(mut rgba) = svg::rasterize(src, w, h) {
+                            if let Some(tint) = *self.tint.borrow() {
+                                apply_tint(&mut rgba, tint);
+                            }
                             *self.rasterized.borrow_mut() = Some((w, h, rgba));
                         }
                     }
                 }
                 if let Some((cw, ch, rgba)) = &*self.rasterized.borrow() {
-                    let key = path_size_key(&self.image_path.borrow(), *cw, *ch);
+                    let key = path_size_key(&self.image_path.borrow(), *cw, *ch, *self.tint.borrow());
                     theme.draw_raw_image(img_rect, rgba, (*cw, *ch), key);
                 }
             } else if let Some(ref bytes) = *self.image_bytes.borrow() {
@@ -397,6 +446,7 @@ impl Default for ImageView {
             natural_size: RefCell::new((0, 0)),
             image_is_svg: RefCell::new(false),
             rasterized: RefCell::new(None),
+            tint: RefCell::new(None),
             listeners: RefCell::new(HashMap::new()),
         }
     }

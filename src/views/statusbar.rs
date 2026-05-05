@@ -2,7 +2,7 @@ use std::cell::RefCell;
 
 use speedy2d::font::{TextLayout, TextOptions};
 
-use crate::assets::get_font;
+use crate::assets::get_font_family;
 use crate::events::EventType;
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
@@ -144,7 +144,7 @@ impl View for StatusBar {
         let typeface = self.font_manager.get_typeface(typeface);
 
         // Cache text for all sections
-        let font = get_font(&typeface.font_name, &typeface.font_style.to_string());
+        let font = get_font_family(&typeface.font_name, typeface.font_style);
         let base_size = typeface.font_size.unwrap_or(14.0);
         let text_size = (base_size * scale as f32).round();
         for section in &mut self.sections {
