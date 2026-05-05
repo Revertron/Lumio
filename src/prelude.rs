@@ -5,7 +5,7 @@ pub use crate::events::EventType;
 pub use crate::assets::{AssetsProvider, set_provider, set_font_fallbacks};
 pub use crate::themes::{Theme, Classic, Typeface, FontStyle};
 pub use crate::containers::Frame;
-pub use crate::views::{Label, Button, Edit, CheckBox, RadioButton, ComboBox, ScrollView, ProgressBar, TabView, List, ImageButton, ImageView, Separator, SplitPanel, StatusBar, Memo};
+pub use crate::views::{Label, Button, Edit, CheckBox, RadioButton, ComboBox, ScrollView, ProgressBar, TabView, List, ImageButton, ImageView, Separator, SplitPanel, StatusBar, Memo, NotificationStack};
 pub use crate::views::{RecyclerView, RecyclerAdapter, ViewHolder};
 pub use crate::views::{PopupMenu, MenuItem};
 pub use crate::views::{Dialog, DialogButton, ButtonSide};

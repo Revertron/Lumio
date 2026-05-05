@@ -1,0 +1,20 @@
+<Frame id="root" width="max" height="max" direction="vertical" padding="16" font="Akkurat" font_style="Regular">
+    <Label id="title" text="Notification stack demo" font_size="22" margin_bottom="8"/>
+    <Label id="hint" text="Click any button to push a notification. Click the X on a notification to dismiss it. Notifications above the dismissed one will fall down. Notifications outside their boxes are click-through — try clicking the buttons under them." width="max" margin_bottom="12"/>
+
+    <Frame id="row1" width="max" height="min" direction="horizontal" padding="0" margin_bottom="8">
+        <Button id="btn_info" text="Info toast" width="160" height="32" margin_right="8"/>
+        <Button id="btn_warn" text="Warning toast" width="160" height="32" margin_right="8"/>
+        <Button id="btn_error" text="Error toast" width="160" height="32" margin_right="8"/>
+        <Button id="btn_success" text="Success toast" width="160" height="32"/>
+    </Frame>
+
+    <Frame id="row2" width="max" height="min" direction="horizontal" padding="0" margin_bottom="16">
+        <Button id="btn_persist" text="No-timeout toast" width="200" height="32" margin_right="8"/>
+        <Button id="btn_burst" text="Burst 5 toasts" width="160" height="32" margin_right="8"/>
+        <Button id="btn_clear" text="Dismiss all" width="160" height="32"/>
+    </Frame>
+
+    <Label id="count" text="Background button click count: 0" margin_bottom="8"/>
+    <Button id="btn_bg" text="Background button — clicking through notifications should still hit me" width="600" height="40"/>
+</Frame>

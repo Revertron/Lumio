@@ -15,8 +15,9 @@ use super::traits::{Element, View};
 use super::types::Point;
 use super::themes::Typeface;
 
-use super::views::{Button, Edit, Label, CheckBox, RadioButton, ComboBox, ScrollView, ProgressBar, TabView, List, RecyclerView, ImageButton, ImageView, PopupMenu, Dialog, Separator, SplitPanel, StatusBar, Memo};
+use super::views::{Button, Edit, Label, CheckBox, RadioButton, ComboBox, ScrollView, ProgressBar, TabView, List, RecyclerView, ImageButton, ImageView, PopupMenu, Dialog, Separator, SplitPanel, StatusBar, Memo, NotificationStack};
 use super::views::Dimension;
+use std::time::Duration;
 
 /// Controls how a popup interacts with the rest of the UI.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -25,6 +26,8 @@ pub enum PopupMode {
     Popup,
     /// Blocks all input to the root tree until closed.
     Modal,
+    /// Lets unhandled input fall through to overlays/root below. Never auto-dismissed.
+    Transparent,
 }
 
 /// Controls which direction the popup expands from the anchor point (x, y).
@@ -73,6 +76,7 @@ pub struct UI {
     tooltip_showing: bool,
     tooltip_popup: Option<TooltipPopup>,
     needs_relayout: bool,
+    notification_stack: Option<Element>,
 }
 
 #[allow(dead_code)]
@@ -82,6 +86,7 @@ impl UI {
             width, height, typeface, scale, root: None, types: HashMap::new(),
             on_start: None, overlays: Vec::new(), mouse_pos: Vector2::new(0, 0),
             tooltip_view_id: None, tooltip_hover_start: None, tooltip_showing: false, tooltip_popup: None, needs_relayout: false,
+            notification_stack: None,
         };
         ui.register::<Label>("Label");
         ui.register::<Button>("Button");
@@ -103,6 +108,7 @@ impl UI {
         ui.register::<StatusBar>("StatusBar");
         ui.register::<Memo>("Memo");
         ui.register::<Frame>("Frame");
+        ui.register::<NotificationStack>("NotificationStack");
         ui
     }
 
@@ -191,6 +197,17 @@ impl UI {
         if let Some(root) = root {
             root.borrow_mut().layout_content(0, 0, width as i32, height as i32, &self.typeface.clone(), scale);
         }
+        // Transparent overlays (e.g. notification stack) cover the whole window —
+        // resize them with the window so newly-added items lay out into the right slot.
+        let typeface = self.typeface.clone();
+        let entries: Vec<(Element, PopupMode)> = self.overlays.iter()
+            .map(|e| (Rc::clone(&e.element), e.mode))
+            .collect();
+        for (el, mode) in entries {
+            if mode == PopupMode::Transparent {
+                el.borrow_mut().layout_content(0, 0, width as i32, height as i32, &typeface, scale);
+            }
+        }
     }
 
     pub fn relayout(&mut self) {
@@ -250,14 +267,103 @@ impl UI {
         self.overlays.retain(|entry| entry.element.borrow().get_id() != id);
     }
 
-    /// Closes all non-modal popups.
+    /// Closes all `Popup`-mode overlays. `Modal` and `Transparent` overlays are preserved.
     pub fn close_all_popups(&mut self) {
-        self.overlays.retain(|entry| entry.mode == PopupMode::Modal);
+        self.overlays.retain(|entry| entry.mode != PopupMode::Popup);
     }
 
     /// Returns true if there are any active popups/overlays.
     pub fn has_popups(&self) -> bool {
         !self.overlays.is_empty()
+    }
+
+    /// Lazily ensures the notification stack overlay exists, returning a clone of its Element.
+    fn ensure_notification_stack(&mut self) -> Element {
+        if let Some(el) = &self.notification_stack {
+            return Rc::clone(el);
+        }
+        let stack: Element = Rc::new(RefCell::new(NotificationStack::new()));
+        // Lay out at full window size so it can place items at absolute coords.
+        let typeface = self.typeface.clone();
+        stack.borrow_mut().layout_content(0, 0, self.width as i32, self.height as i32, &typeface, self.scale);
+        self.overlays.push(PopupEntry {
+            element: Rc::clone(&stack),
+            x: 0,
+            y: 0,
+            mode: PopupMode::Transparent,
+        });
+        self.notification_stack = Some(Rc::clone(&stack));
+        stack
+    }
+
+    /// Push a notification view onto the stack with the given id and optional auto-dismiss timeout.
+    /// If `id` already exists it is replaced. Clicking a child of `element` that calls
+    /// `dismiss_notification(id)` (or `dismiss_notification_for(view)`) removes it.
+    pub fn show_notification(&mut self, element: Element, id: &str, timeout: Option<Duration>) {
+        let stack = self.ensure_notification_stack();
+        let typeface = self.typeface.clone();
+        let scale = self.scale;
+        let s = stack.borrow();
+        if let Some(stack_ref) = s.as_any().downcast_ref::<NotificationStack>() {
+            stack_ref.push_item(id, element, timeout, &typeface, scale);
+        }
+    }
+
+    /// Animate an item out and remove it.
+    pub fn dismiss_notification(&mut self, id: &str) {
+        if let Some(stack) = &self.notification_stack {
+            if let Some(s) = stack.borrow().as_any().downcast_ref::<NotificationStack>() {
+                s.dismiss(id);
+            }
+        }
+    }
+
+    /// Remove an item without animation.
+    pub fn dismiss_notification_immediate(&mut self, id: &str) {
+        if let Some(stack) = &self.notification_stack {
+            if let Some(s) = stack.borrow().as_any().downcast_ref::<NotificationStack>() {
+                s.dismiss_immediate(id);
+            }
+        }
+    }
+
+    /// Animate every active notification out of the stack.
+    pub fn dismiss_all_notifications(&mut self) {
+        if let Some(stack) = &self.notification_stack {
+            if let Some(s) = stack.borrow().as_any().downcast_ref::<NotificationStack>() {
+                s.dismiss_all();
+            }
+        }
+    }
+
+    pub fn has_notification(&self, id: &str) -> bool {
+        match &self.notification_stack {
+            Some(stack) => stack.borrow()
+                .as_any()
+                .downcast_ref::<NotificationStack>()
+                .map(|s| s.has(id))
+                .unwrap_or(false),
+            None => false,
+        }
+    }
+
+    /// Walks `view`'s parent chain looking for an id that matches a current
+    /// notification, then dismisses it. Convenient inside close-button callbacks
+    /// so the caller doesn't need to capture the id by closure.
+    pub fn dismiss_notification_for(&mut self, view: &dyn View) -> bool {
+        let id = match &self.notification_stack {
+            Some(stack) => match stack.borrow().as_any().downcast_ref::<NotificationStack>() {
+                Some(s) => s.id_for_descendant(view),
+                None => None,
+            },
+            None => None,
+        };
+        if let Some(id) = id {
+            self.dismiss_notification(&id);
+            true
+        } else {
+            false
+        }
     }
 
     pub fn start(&mut self) {
@@ -460,8 +566,9 @@ impl UI {
     }
 
     fn update_tooltip(&mut self) -> bool {
-        // Don't show tooltips when popups are open
-        if !self.overlays.is_empty() {
+        // Don't show tooltips when blocking popups are open. Transparent overlays
+        // (e.g. notification stack) let tooltips on the underlying UI keep working.
+        if self.overlays.iter().any(|e| e.mode != PopupMode::Transparent) {
             return self.dismiss_tooltip();
         }
 
@@ -593,8 +700,9 @@ impl UI {
                 return true;
             }
         }
-        // Click missed all overlays — dismiss Popup-mode overlays
-        if !self.overlays.is_empty() {
+        // Click missed all overlays — dismiss Popup-mode overlays only.
+        // Transparent overlays (e.g. notification stack) let the click fall through.
+        if self.overlays.iter().any(|e| e.mode == PopupMode::Popup) {
             self.close_all_popups();
             return true;
         }

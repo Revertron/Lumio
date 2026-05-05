@@ -645,7 +645,8 @@ impl<'h> Theme for Classic<'h> {
                 (rect.min.x as f32, rect.min.y as f32),
                 (rect.max.x as f32, rect.max.y as f32),
             );
-            self.graphics.draw_rectangle_image(speedy_rect, handle);
+            let tint = Color::from_rgba(1.0, 1.0, 1.0, self.current_opacity());
+            self.graphics.draw_rectangle_image_tinted(speedy_rect, tint, handle);
         }
     }
 
@@ -672,7 +673,8 @@ impl<'h> Theme for Classic<'h> {
                 (rect.min.x as f32, rect.min.y as f32),
                 (rect.max.x as f32, rect.max.y as f32),
             );
-            self.graphics.draw_rectangle_image(speedy_rect, handle);
+            let tint = Color::from_rgba(1.0, 1.0, 1.0, self.current_opacity());
+            self.graphics.draw_rectangle_image_tinted(speedy_rect, tint, handle);
         }
     }
 }
