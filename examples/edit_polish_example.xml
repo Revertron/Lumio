@@ -27,4 +27,8 @@
 
     <Label text="Read-only — left lock icon copies value to clipboard:" margin_top="12"/>
     <Edit id="edit_ro" text="read-only-public-key" readonly="true" icon_left="icons/lock-outline.svg" width="320" margin_top="4"/>
+
+    <Label text="Hyperlink Label (click me):" margin_top="12"/>
+    <Label id="link1" text="Open the help page" link="true" margin_top="4"/>
+    <Label id="link_status" text="(not clicked yet)" margin_top="4"/>
 </Frame>

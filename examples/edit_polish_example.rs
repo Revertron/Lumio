@@ -49,6 +49,17 @@ fn main() {
         }));
     }
 
+    if let Some(l) = ui.get_view("link1") {
+        l.borrow_mut().on_event(EventType::Click, Box::new(|ui, _view| {
+            if let Some(status) = ui.get_view("link_status") {
+                if let Some(label) = status.borrow_mut().downcast_mut::<Label>() {
+                    label.set_text("Link clicked!");
+                }
+            }
+            true
+        }));
+    }
+
     // Left-icon click on the read-only field copies its content to clipboard.
     if let Some(e) = ui.get_view("edit_ro") {
         e.borrow_mut().on_event(EventType::LeftIconClick, Box::new(|_ui, view| {
