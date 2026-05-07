@@ -77,6 +77,10 @@ pub struct UI {
     tooltip_popup: Option<TooltipPopup>,
     needs_relayout: bool,
     notification_stack: Option<Element>,
+    /// Ids queued for removal during event dispatch. Processed at the next
+    /// `update()` tick so removal can be requested from inside handlers
+    /// without invalidating the iterator the dispatcher is walking.
+    pending_removals: Vec<String>,
 }
 
 #[allow(dead_code)]
@@ -87,6 +91,7 @@ impl UI {
             on_start: None, overlays: Vec::new(), mouse_pos: Vector2::new(0, 0),
             tooltip_view_id: None, tooltip_hover_start: None, tooltip_showing: false, tooltip_popup: None, needs_relayout: false,
             notification_stack: None,
+            pending_removals: Vec::new(),
         };
         ui.register::<Label>("Label");
         ui.register::<Button>("Button");
@@ -122,6 +127,60 @@ impl UI {
                 root.as_container_mut().unwrap().add_view(view);
             }
         }
+    }
+
+    /// Queue a view for removal from its parent. Safe to call from inside an
+    /// event handler — the actual tree mutation happens at the next `update()`
+    /// tick, after the dispatcher has released its borrow on the firing view.
+    /// Returns silently if no view with this id exists at flush time.
+    pub fn remove_view(&mut self, id: &str) {
+        self.pending_removals.push(id.to_owned());
+    }
+
+    fn process_pending_removals(&mut self) -> bool {
+        if self.pending_removals.is_empty() {
+            return false;
+        }
+        let ids: Vec<String> = std::mem::take(&mut self.pending_removals);
+        let mut any_removed = false;
+        for id in ids {
+            if self.do_remove_view(&id) {
+                any_removed = true;
+            }
+        }
+        if any_removed {
+            self.needs_relayout = true;
+        }
+        any_removed
+    }
+
+    fn do_remove_view(&mut self, id: &str) -> bool {
+        // Try overlays first; an overlay element could itself match by id, in
+        // which case we drop the whole overlay entry. Otherwise recurse into
+        // the overlay's container children.
+        if let Some(pos) = self.overlays.iter().position(|e| e.element.borrow().get_id() == id) {
+            self.overlays.remove(pos);
+            return true;
+        }
+        for entry in &self.overlays {
+            if let Some(container) = entry.element.borrow_mut().as_container_mut() {
+                if container.remove_view(id) {
+                    return true;
+                }
+            }
+        }
+        if let Some(root) = &self.root {
+            if root.borrow().get_id() == id {
+                self.root = None;
+                return true;
+            }
+            if let Some(container) = root.borrow_mut().as_container_mut() {
+                if container.remove_view(id) {
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     pub fn get_view(&self, id: &str) -> Option<Element> {
@@ -374,6 +433,10 @@ impl UI {
 
     pub fn update(&mut self) -> bool {
         let mut redraw = false;
+        // Process queued removals first; they may flip needs_relayout.
+        if self.process_pending_removals() {
+            redraw = true;
+        }
         // Perform deferred relayout if requested
         if self.needs_relayout {
             self.needs_relayout = false;

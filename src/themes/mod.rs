@@ -39,6 +39,13 @@ pub trait Theme {
     fn draw_text(&mut self, x: f32, y: f32, color: u32, text: &FormattedTextBlock);
     fn draw_rect(&mut self, rect: Rect<i32>, color: u32);
 
+    /// Filled rectangle with rounded corners. `radius` is in physical pixels —
+    /// callers are expected to pre-multiply by scale. Default falls back to a
+    /// square `draw_rect` for themes that don't implement rounding.
+    fn draw_rounded_rect(&mut self, rect: Rect<i32>, color: u32, _radius: i32) {
+        self.draw_rect(rect, color);
+    }
+
     // New drawable-based methods
     /// Draw a drawable at the specified rectangle
     fn draw_drawable(&mut self, drawable: &Drawable, rect: Rect<i32>);

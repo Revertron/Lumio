@@ -164,4 +164,10 @@ pub trait Container: View {
     fn get_view(&self, id: &str) -> Option<Element>;
     fn get_view_count(&self) -> usize;
     fn get_views(&self) -> Vec<Element> { Vec::new() }
+
+    /// Remove the view with the given id from this container's subtree.
+    /// Returns true if a view was removed. Default impl does nothing —
+    /// containers that own children should override.
+    #[allow(unused_variables)]
+    fn remove_view(&mut self, id: &str) -> bool { false }
 }

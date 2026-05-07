@@ -437,6 +437,24 @@ impl Container for Frame {
     fn get_views(&self) -> Vec<Element> {
         self.views.clone()
     }
+
+    fn remove_view(&mut self, id: &str) -> bool {
+        if let Some(pos) = self.views.iter().position(|v| v.borrow().get_id() == id) {
+            self.views.remove(pos);
+            return true;
+        }
+        for v in &self.views {
+            let removed = if let Some(container) = v.borrow_mut().as_container_mut() {
+                container.remove_view(id)
+            } else {
+                false
+            };
+            if removed {
+                return true;
+            }
+        }
+        false
+    }
 }
 
 impl View for Frame {

@@ -364,6 +364,33 @@ impl<'h> Theme for Classic<'h> {
         self.graphics.draw_rectangle(Rectangle::new(top_left, bottom_right), color);
     }
 
+    fn draw_rounded_rect(&mut self, rect: Rect<i32>, color: u32, radius: i32) {
+        let w = rect.width();
+        let h = rect.height();
+        if w <= 0 || h <= 0 {
+            return;
+        }
+        let r = radius.min(w / 2).min(h / 2).max(0);
+        if r == 0 {
+            self.draw_rect(rect, color);
+            return;
+        }
+        let c = self.color_argb(color);
+        let (x0, y0, x1, y1) = (rect.min.x as f32, rect.min.y as f32, rect.max.x as f32, rect.max.y as f32);
+        let rf = r as f32;
+        // Top, bottom, and middle bands. Corners are filled by the four circles.
+        // Note: circles overlap the bands by a fraction of a pixel; for opaque
+        // colours this is invisible. With low alpha (e.g. inside a fading
+        // notification) the corners will appear slightly more saturated.
+        self.graphics.draw_rectangle(Rectangle::new(Vector2::new(x0 + rf, y0), Vector2::new(x1 - rf, y0 + rf)), c);
+        self.graphics.draw_rectangle(Rectangle::new(Vector2::new(x0 + rf, y1 - rf), Vector2::new(x1 - rf, y1)), c);
+        self.graphics.draw_rectangle(Rectangle::new(Vector2::new(x0, y0 + rf), Vector2::new(x1, y1 - rf)), c);
+        self.graphics.draw_circle((x0 + rf, y0 + rf), rf, c);
+        self.graphics.draw_circle((x1 - rf, y0 + rf), rf, c);
+        self.graphics.draw_circle((x0 + rf, y1 - rf), rf, c);
+        self.graphics.draw_circle((x1 - rf, y1 - rf), rf, c);
+    }
+
     // New drawable-based methods implementation
     fn draw_drawable(&mut self, drawable: &Drawable, rect: Rect<i32>) {
         let mut engine = DrawingEngine::new(self.graphics, self.scale);
