@@ -130,6 +130,7 @@ impl Grid {
             self.row_offsets.borrow_mut().push(0);
             return;
         }
+        let padding = self.get_padding(scale);
         let cells = self.cells.borrow();
         let col_offs = self.column_offsets.borrow();
 
@@ -174,8 +175,8 @@ impl Grid {
             let row = idx / n_cols;
             let col = idx % n_cols;
             if row >= row_heights.len() { break; }
-            let cell_x = col_offs[col];
-            let cell_y = row_offsets[row];
+            let cell_x = padding.left + col_offs[col];
+            let cell_y = padding.top + row_offsets[row];
             let cell_w = col_offs[col + 1] - col_offs[col];
             let cell_h = measured_heights[idx];
             cell.borrow_mut().set_rect(rect((cell_x, cell_y), (cell_x + cell_w, cell_y + cell_h)));
@@ -226,22 +227,28 @@ impl View for Grid {
         self.state.borrow_mut().font_manager.set(Some(effective.clone()));
         self.base_set_scale(scale);
 
+        let padding = self.get_padding(scale);
+        let h_pad = padding.left + padding.right;
+        let v_pad = padding.top + padding.bottom;
+
         let (mut new_w, mut new_h) = self.calculate_size(width, height, scale);
         // Min dimensions: derive from content after columns/rows are resolved.
-        // First do a column-resolve at the available width to know cell widths.
+        // First do a column-resolve at the available width (minus padding) to
+        // know cell widths.
         let avail_w = if matches!(self.state.borrow().width, Dimension::Min) {
             width.max(0)
         } else {
             new_w.max(0)
         };
-        self.relayout_columns(avail_w, scale);
+        self.relayout_columns((avail_w - h_pad).max(0), scale);
         self.layout_cells(scale, &effective);
 
-        // Compute content-derived size for Min sizing.
+        // Compute content-derived size for Min sizing. Cells live inside the
+        // padded content box, so the grid's own Min size includes padding.
         let content_w: i32 = self.column_offsets.borrow().last().copied().unwrap_or(0);
         let content_h: i32 = self.row_offsets.borrow().last().copied().unwrap_or(0);
-        if matches!(self.state.borrow().width, Dimension::Min) { new_w = content_w; }
-        if matches!(self.state.borrow().height, Dimension::Min) { new_h = content_h; }
+        if matches!(self.state.borrow().width, Dimension::Min) { new_w = content_w + h_pad; }
+        if matches!(self.state.borrow().height, Dimension::Min) { new_h = content_h + v_pad; }
 
         let r = rect((x, y), (x + new_w, y + new_h));
         self.set_rect(r);
@@ -283,8 +290,10 @@ impl View for Grid {
     fn set_gravity(&self, g: Gravity) { self.base_set_gravity(g); }
     fn get_bounds(&self) -> (Dimension, Dimension) { self.base_get_bounds() }
     fn get_content_size(&self) -> (i32, i32) {
-        let w = self.column_offsets.borrow().last().copied().unwrap_or(0);
-        let h = self.row_offsets.borrow().last().copied().unwrap_or(0);
+        let scale = self.state.borrow().scale;
+        let padding = self.get_padding(scale);
+        let w = self.column_offsets.borrow().last().copied().unwrap_or(0) + padding.left + padding.right;
+        let h = self.row_offsets.borrow().last().copied().unwrap_or(0) + padding.top + padding.bottom;
         (w, h)
     }
     fn is_focused(&self) -> bool { self.base_is_focused() }
@@ -325,9 +334,11 @@ impl View for Grid {
             let r = self.get_rect();
             let scale = self.state.borrow().scale;
             let typeface = self.state.borrow().font_manager.get().unwrap_or_default();
+            let padding = self.get_padding(scale);
+            let h_pad = padding.left + padding.right;
             // Refresh inner layout against the cached rect (safe — Min/Max
             // dimensions are evaluated only inside `layout_content`, not here).
-            self.relayout_columns(r.width().max(0), scale);
+            self.relayout_columns((r.width() - h_pad).max(0), scale);
             self.layout_cells(scale, &typeface);
             return true;
         }
@@ -437,6 +448,19 @@ mod tests {
         assert_eq!(offs[1], 100);
         assert_eq!(offs[2], 250);
         assert_eq!(offs[3], 300);
+    }
+
+    #[test]
+    fn content_size_includes_padding() {
+        let mut g = make_grid();
+        g.set_scale(1.0);
+        g.set_padding(4, 8, 8, 4); // top, left, right, bottom
+        // Seed resolved offsets directly (avoids needing a font for layout).
+        *g.column_offsets.borrow_mut() = vec![0, 100, 250];
+        *g.row_offsets.borrow_mut() = vec![0, 30, 60];
+        let (w, h) = g.get_content_size();
+        assert_eq!(w, 250 + 8 + 8); // content width + left + right
+        assert_eq!(h, 60 + 4 + 4);  // content height + top + bottom
     }
 
     #[test]
