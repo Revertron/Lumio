@@ -1,0 +1,37 @@
+<Frame id="root" direction="vertical" width="max" height="max" padding="8">
+    <Label id="title" text="Simple Grid demo — wrapped in a ScrollView, header cells styled manually" width="max" height="22" font_size="14" margin_bottom="4"/>
+
+    <ScrollView id="scroll" width="max" height="max" direction="vertical">
+        <Grid id="grid" width="max" height="min" widths="120,*,120,90" padding="8">
+            <Label text="Name"        font_style="Bold" font_size="14" padding="4" height="min"/>
+            <Label text="Description" font_style="Bold" font_size="14" padding="4" height="min"/>
+            <Label text="Status"      font_style="Bold" font_size="14" padding="4" height="min"/>
+            <Label text="Count"       font_style="Bold" font_size="14" padding="4" height="min"/>
+
+            <Label text="alpha"   padding="4" font_size="14"/>
+            <Label text="The first thing in the list of things to consider here."  padding="4" font_size="14"/>
+            <Label text="active" background_color="#22aa55" text_color="#FFFFFF" corner_radius="4" padding="4" font_size="14"/>
+            <Label text="42"      padding="4" font_size="14"/>
+
+            <Label text="beta"    padding="4" font_size="14"/>
+            <Label text="A second entry that demonstrates wrapping with more text in the description column." padding="4" font_size="14"/>
+            <Label text="pending" background_color="#cc8800" text_color="#FFFFFF" corner_radius="4" padding="4" font_size="14"/>
+            <Label text="7"       padding="4" font_size="14"/>
+
+            <Label text="gamma"   padding="4" font_size="14"/>
+            <Label text="Third."  padding="4" font_size="14"/>
+            <Label text="active" background_color="#22aa55" text_color="#FFFFFF" corner_radius="4" padding="4" font_size="14"/>
+            <Label text="123"     padding="4" font_size="14"/>
+
+            <Label text="delta"   padding="4" font_size="14"/>
+            <Label text="A long-running task with a multi-line description that should expand its row height accordingly when the column is narrow enough." padding="4" font_size="14"/>
+            <Label text="inactive" background_color="#888888" text_color="#FFFFFF" corner_radius="4" padding="4" font_size="14"/>
+            <Label text="0"       padding="4" font_size="14"/>
+
+            <Label text="epsilon" padding="4" font_size="14"/>
+            <Label text="Fifth row." padding="4" font_size="14"/>
+            <Label text="active" background_color="#22aa55" text_color="#FFFFFF" corner_radius="4" padding="4" font_size="14"/>
+            <Label text="9"       padding="4" font_size="14"/>
+        </Grid>
+    </ScrollView>
+</Frame>

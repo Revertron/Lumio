@@ -18,6 +18,8 @@ pub mod splitpanel;
 pub mod statusbar;
 pub mod memo;
 pub mod notification_stack;
+pub mod tableview;
+pub mod grid;
 
 use super::themes::{Typeface, ViewState};
 use super::traits::{View, WeakElement};
@@ -50,6 +52,8 @@ pub use self::splitpanel::SplitPanel;
 pub use self::statusbar::StatusBar;
 pub use self::memo::Memo;
 pub use self::notification_stack::NotificationStack;
+pub use self::tableview::{TableView, TableColumn, TableRow, ColumnDef, ColumnWidth, SortDirection};
+pub use self::grid::Grid;
 
 pub const BUTTON_MIN_WIDTH: i32 = 80;
 pub const BUTTON_MIN_HEIGHT: i32 = 24;

@@ -51,6 +51,11 @@ pub struct Label {
     /// Track which icon (if any) absorbed the most recent mouse-down, so the
     /// click only fires on mouse-up if the release lands over the same icon.
     pressed_icon: RefCell<Option<bool>>, // Some(true)=left, Some(false)=right
+    /// Width / height / scale params used the last time `layout_content` ran.
+    /// `layout_content` returns the cached rect when these match (skipping the
+    /// expensive font shaping); when they differ we re-layout. Resolves the
+    /// "Label doesn't reflow on parent resize" bug.
+    last_layout_params: std::cell::Cell<Option<(i32, i32, f64)>>,
 }
 
 impl HasMainFields for Label {
@@ -93,6 +98,7 @@ impl Label {
             right_icon_rasterized: RefCell::new(None),
             icon_tint: RefCell::new(DEFAULT_ICON_TINT),
             pressed_icon: RefCell::new(None),
+            last_layout_params: std::cell::Cell::new(None),
         }
     }
 
@@ -420,10 +426,17 @@ impl View for Label {
     }
 
     fn layout_content(&mut self, x: i32, y: i32, width: i32, height: i32, typeface: &Typeface, scale: f64) -> Rect<i32> {
-        if self.state.borrow().cached_text.is_some() {
-            // TODO check if area changed
+        // Skip the (expensive) font shaping if nothing relevant has changed.
+        // We re-layout when (width, height, scale) differ from the previous
+        // call OR when the text was invalidated (cached_text is None).
+        let params = (width, height, scale);
+        if self.state.borrow().cached_text.is_some()
+            && self.last_layout_params.get() == Some(params)
+        {
             return self.get_rect();
         }
+        self.last_layout_params.set(Some(params));
+        self.state.borrow_mut().cached_text = None;
 
         self.base_set_scale(scale);
         let padding = self.get_padding(scale);

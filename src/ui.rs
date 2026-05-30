@@ -15,7 +15,7 @@ use super::traits::{Element, View};
 use super::types::Point;
 use super::themes::Typeface;
 
-use super::views::{Button, Edit, Label, CheckBox, RadioButton, ComboBox, ScrollView, ProgressBar, TabView, List, RecyclerView, ImageButton, ImageView, PopupMenu, Dialog, Separator, SplitPanel, StatusBar, Memo, NotificationStack};
+use super::views::{Button, Edit, Label, CheckBox, RadioButton, ComboBox, ScrollView, ProgressBar, TabView, List, RecyclerView, ImageButton, ImageView, PopupMenu, Dialog, Separator, SplitPanel, StatusBar, Memo, NotificationStack, TableView, TableColumn, TableRow, Grid};
 use super::views::Dimension;
 use std::time::Duration;
 
@@ -114,6 +114,10 @@ impl UI {
         ui.register::<Memo>("Memo");
         ui.register::<Frame>("Frame");
         ui.register::<NotificationStack>("NotificationStack");
+        ui.register::<TableView>("TableView");
+        ui.register::<TableColumn>("TableColumn");
+        ui.register::<TableRow>("TableRow");
+        ui.register::<Grid>("Grid");
         ui
     }
 

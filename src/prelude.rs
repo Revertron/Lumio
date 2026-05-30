@@ -10,3 +10,4 @@ pub use crate::views::{RecyclerView, RecyclerAdapter, ViewHolder};
 pub use crate::views::{PopupMenu, MenuItem};
 pub use crate::views::{Dialog, DialogButton, ButtonSide};
 pub use crate::views::{Dimension, Direction, Borders, Gravity, HAlign, VAlign, Visibility};
+pub use crate::views::{TableView, ColumnDef, ColumnWidth, SortDirection, Grid};

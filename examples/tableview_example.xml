@@ -1,0 +1,37 @@
+<Frame id="root" direction="vertical" width="max" height="max" padding="8">
+    <Label id="title" text="TableView demo — text mode (top) and view mode (bottom)" width="max" height="22" font_size="14" margin_bottom="4"/>
+
+    <Label id="hint_top" text="Click a header to sort. Drag a header divider to resize. Mouse wheel to scroll." width="max" height="18" font_size="12" margin_bottom="2"/>
+    <TableView id="domains" width="max" height="35%" margin_bottom="8"
+          headers="Name,Status,Owner,Updated,Notes"
+          widths="200,120,140,160,*"
+          sortable="true" resizable="true"/>
+
+    <Label id="hint_bot" text="Below: view-mode table with mixed cell types (Label chips)." width="max" height="18" font_size="12" margin_bottom="2"/>
+    <TableView id="contacts" width="max" height="max"
+          sortable="true" resizable="true">
+        <TableColumn title="Name"   width="220" align="left"/>
+        <TableColumn title="Tag"    width="120" align="center" sortable="false"/>
+        <TableColumn title="Email"  width="*"   align="left"/>
+        <TableRow>
+            <Label text="Alice Anderson"/>
+            <Label text="active" background_color="#22aa55" text_color="#FFFFFF" corner_radius="6"/>
+            <Label text="alice@example.com"/>
+        </TableRow>
+        <TableRow>
+            <Label text="Bob Brown"/>
+            <Label text="pending" background_color="#cc8800" text_color="#FFFFFF" corner_radius="6"/>
+            <Label text="bob@example.com"/>
+        </TableRow>
+        <TableRow>
+            <Label text="Carol Chen"/>
+            <Label text="active" background_color="#22aa55" text_color="#FFFFFF" corner_radius="6"/>
+            <Label text="carol@example.com"/>
+        </TableRow>
+        <TableRow>
+            <Label text="Dan Davis"/>
+            <Label text="inactive" background_color="#888888" text_color="#FFFFFF" corner_radius="6"/>
+            <Label text="dan@example.com"/>
+        </TableRow>
+    </TableView>
+</Frame>

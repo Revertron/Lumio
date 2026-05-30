@@ -1,0 +1,27 @@
+<Frame id="root" width="max" height="max" direction="vertical" padding="16">
+    <Label text="Label polish — background, text_color, corner_radius, icons" font_size="18" margin_bottom="12"/>
+
+    <Label text="Plain Label (baseline):" margin_top="8"/>
+    <Label text="Hello, world" margin_top="4"/>
+
+    <Label text="Status badge — background_color + text_color + corner_radius:" margin_top="12"/>
+    <Label id="badge1" text="ONLINE" background_color="#FF2BB673" text_color="#FFFFFFFF" corner_radius="6" padding="6" margin_top="4"/>
+
+    <Label text="Chip with right-icon close (click X to remove):" margin_top="12"/>
+    <Frame id="chip_row" direction="horizontal" width="max" height="min" margin_top="4">
+        <Label id="chip1" text="rust" background_color="#FFE6E6E6" text_color="#FF333333" corner_radius="10" padding="6" right_icon="icons/close-circle-outline.svg" icon_tint="#FF555555" margin_right="6"/>
+        <Label id="chip2" text="async" background_color="#FFE6E6E6" text_color="#FF333333" corner_radius="10" padding="6" right_icon="icons/close-circle-outline.svg" icon_tint="#FF555555" margin_right="6"/>
+        <Label id="chip3" text="speedy2d" background_color="#FFE6E6E6" text_color="#FF333333" corner_radius="10" padding="6" right_icon="icons/close-circle-outline.svg" icon_tint="#FF555555" margin_right="6"/>
+    </Frame>
+
+    <Label text="Tag with leading icon (lock-outline):" margin_top="12"/>
+    <Label id="tag_locked" text="locked" background_color="#FFFEE2A0" text_color="#FF7A4F00" corner_radius="6" padding="6" left_icon="icons/lock-outline.svg" icon_tint="#FF7A4F00" margin_top="4"/>
+
+    <Label text="Hyperlink + text_color override (red link):" margin_top="12"/>
+    <Label id="link_red" text="Open the help page" link="true" text_color="#FFD83A3A" margin_top="4"/>
+
+    <Label text="Square corners (corner_radius=0):" margin_top="12"/>
+    <Label text="square" background_color="#FF3273DC" text_color="#FFFFFFFF" corner_radius="0" padding="6" margin_top="4"/>
+
+    <Label id="status" text="(click a chip's X to remove it; click red link too)" margin_top="16"/>
+</Frame>
