@@ -2,7 +2,7 @@
     <Label id="title" text="Simple Grid demo — wrapped in a ScrollView, header cells styled manually" width="max" height="22" font_size="14" margin_bottom="4"/>
 
     <ScrollView id="scroll" width="max" height="max" direction="vertical">
-        <Grid id="grid" width="max" height="min" widths="120,*,120,90" padding="8">
+        <Grid id="grid" width="max" height="min" widths="120,*,120,90" padding="4">
             <Label text="Name"        font_style="Bold" font_size="14" padding="4" height="min"/>
             <Label text="Description" font_style="Bold" font_size="14" padding="4" height="min"/>
             <Label text="Status"      font_style="Bold" font_size="14" padding="4" height="min"/>

@@ -133,6 +133,13 @@ pub trait View: Downcast {
     fn as_container(&self) -> Option<&dyn Container> { None }
     fn as_container_mut(&mut self) -> Option<&mut dyn Container> { None }
 
+    /// When `true`, the XML parser does not treat this view's child tags as
+    /// nested views. Instead it captures the literal inner markup of the
+    /// element (e.g. `Hello <b>world</b>`) and hands it to the view via
+    /// `set_any("html", ...)`. Used by `RichText` so inline tags become spans
+    /// rather than being instantiated as views. Default `false`.
+    fn wants_raw_content(&self) -> bool { false }
+
     // Events and listeners
     fn on_event(&mut self, event: EventType, func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>);
     fn click(&self, ui: &mut UI) -> bool;

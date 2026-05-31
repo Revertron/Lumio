@@ -15,7 +15,7 @@ use super::traits::{Element, View};
 use super::types::Point;
 use super::themes::Typeface;
 
-use super::views::{Button, Edit, Label, CheckBox, RadioButton, ComboBox, ScrollView, ProgressBar, TabView, List, RecyclerView, ImageButton, ImageView, PopupMenu, Dialog, Separator, SplitPanel, StatusBar, Memo, NotificationStack, TableView, TableColumn, TableRow, Grid};
+use super::views::{Button, Edit, Label, CheckBox, RadioButton, ComboBox, ScrollView, ProgressBar, TabView, List, RecyclerView, ImageButton, ImageView, PopupMenu, Dialog, Separator, SplitPanel, StatusBar, Memo, NotificationStack, TableView, TableColumn, TableRow, Grid, RichText};
 use super::views::Dimension;
 use std::time::Duration;
 
@@ -118,6 +118,7 @@ impl UI {
         ui.register::<TableColumn>("TableColumn");
         ui.register::<TableRow>("TableRow");
         ui.register::<Grid>("Grid");
+        ui.register::<RichText>("RichText");
         ui
     }
 
@@ -490,7 +491,27 @@ impl UI {
             match reader.read_event() {
                 Ok(Event::Start(ref e)) => {
                     let element = UI::parse_element(&mut ui, e);
-                    stack.push(element);
+                    if element.borrow().wants_raw_content() {
+                        // Capture the literal inner markup (incl. inline tags like
+                        // <b>…</b>) and hand it to the view instead of parsing the
+                        // children as nested views. `read_text` returns the inner
+                        // slice verbatim and consumes the matching end tag, so this
+                        // element gets no `Event::End` — attach it as a leaf here.
+                        let inner = reader.read_text(e.name()).map(|c| c.into_owned()).unwrap_or_default();
+                        element.borrow_mut().set_any("html", &inner);
+                        match stack.last() {
+                            Some(parent) => {
+                                element.borrow_mut().set_parent(Some(Rc::downgrade(parent)));
+                                let mut ref_mut = parent.borrow_mut();
+                                if let Some(container) = ref_mut.as_container_mut() {
+                                    container.add_view(element);
+                                }
+                            }
+                            None => ui.add_view(element),
+                        }
+                    } else {
+                        stack.push(element);
+                    }
                 },
                 Ok(Event::Empty(ref e)) => {
                     let tag_name = String::from_utf8(e.name().0.to_vec()).unwrap();
