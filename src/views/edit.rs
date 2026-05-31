@@ -5,7 +5,7 @@ use std::rc::Rc;
 use std::time::Instant;
 use speedy2d::dimen::Vector2;
 use speedy2d::font::{TextLayout, TextOptions};
-use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
+use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, VirtualKeyCode};
 
 use std::hash::{Hash, Hasher};
 
@@ -68,6 +68,9 @@ pub struct Edit {
     // Error state + colour
     error: RefCell<bool>,
     error_color: RefCell<u32>,
+    /// True while the left button is held after a press inside the text, so
+    /// mouse-move extends the selection (even when the pointer leaves the view).
+    dragging: RefCell<bool>,
 }
 
 impl HasMainFields for Edit {
@@ -122,6 +125,7 @@ impl Edit {
             pressed_icon: RefCell::new(None),
             error: RefCell::new(false),
             error_color: RefCell::new(DEFAULT_ERROR_COLOR),
+            dragging: RefCell::new(false),
         }
     }
 
@@ -1264,8 +1268,34 @@ impl View for Edit {
         redraw
     }
 
-    fn on_mouse_move(&self, _ui: &mut UI, position: Vector2<i32>) -> bool {
-        let hit = self.state.borrow().main.rect.hit((position.x, position.y));
+    fn on_mouse_move(&self, ui: &mut UI, position: Vector2<i32>) -> bool {
+        let scale = self.state.borrow().main.scale;
+        let padding = self.get_padding(scale);
+        let my_rect = self.state.borrow().main.rect;
+        let inner_h = my_rect.height() - padding.top - padding.bottom;
+        let (left_inset, right_inset) = self.icon_insets(inner_h, scale);
+
+        // Drag-selection: extend regardless of whether the pointer is still
+        // inside the view (the parent dispatches moves to every child).
+        if *self.dragging.borrow() {
+            let scroll_x = *self.scroll_x.borrow();
+            let move_x = position.x - my_rect.min.x - padding.left - left_inset - scroll_x;
+            let char_pos = self.char_pos_from_x(move_x);
+            *self.caret_pos.borrow_mut() = char_pos;
+            self.caret_rect.borrow_mut().clear();
+            self.update_scroll();
+            return true;
+        }
+
+        let hit = my_rect.hit((position.x, position.y));
+        // I-beam only over the text area, not the left/right icon regions.
+        if hit {
+            let text_left = my_rect.min.x + padding.left + left_inset;
+            let text_right = my_rect.max.x - padding.right - right_inset;
+            if position.x >= text_left && position.x < text_right {
+                ui.request_cursor(MouseCursorType::Text);
+            }
+        }
         let old_state = self.state.borrow().main.state;
         self.state.borrow_mut().main.state.hovered = hit;
         self.state.borrow().main.state != old_state
@@ -1342,9 +1372,21 @@ impl View for Edit {
             *self.last_click_time.borrow_mut() = Instant::now();
         }
 
-        // Single click: position caret, clear selection
-        *self.caret_pos.borrow_mut() = char_pos;
-        self.clear_selection();
+        // Single click: position caret and begin a drag-selection. Shift+click
+        // extends the selection from the existing anchor (or the current caret).
+        let shift = *self.held_shift.borrow();
+        if shift {
+            let has_anchor = self.selection_anchor.borrow().is_some();
+            if !has_anchor {
+                let old = *self.caret_pos.borrow();
+                *self.selection_anchor.borrow_mut() = Some(old);
+            }
+            *self.caret_pos.borrow_mut() = char_pos;
+        } else {
+            *self.caret_pos.borrow_mut() = char_pos;
+            *self.selection_anchor.borrow_mut() = Some(char_pos);
+        }
+        *self.dragging.borrow_mut() = true;
         self.caret_rect.borrow_mut().clear();
         true
     }
@@ -1353,6 +1395,13 @@ impl View for Edit {
         if !self.base_is_enabled() { return false; }
         if !matches!(button, MouseButton::Left) {
             return false;
+        }
+        // End any drag-selection; drop the zero-length anchor a plain click left.
+        if *self.dragging.borrow() {
+            *self.dragging.borrow_mut() = false;
+            if *self.selection_anchor.borrow() == Some(*self.caret_pos.borrow()) {
+                self.clear_selection();
+            }
         }
         // If a press started on an icon, treat the up over the same icon as a click.
         let pressed_icon = self.pressed_icon.borrow_mut().take();

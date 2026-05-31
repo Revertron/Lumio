@@ -5,7 +5,7 @@ use std::rc::Rc;
 use std::time::Instant;
 use speedy2d::dimen::Vector2;
 use speedy2d::font::{TextAlignment, TextLayout, TextOptions};
-use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
+use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, MouseScrollDistance, VirtualKeyCode};
 
 use crate::assets::get_font_family;
 use crate::events::EventType;
@@ -48,6 +48,9 @@ pub struct Memo {
     line_count: RefCell<u32>,
     /// Start char index of each visual line (rebuilt in layout_text)
     line_offsets: RefCell<Vec<usize>>,
+    /// True while the left button is held after a press inside the text, so
+    /// mouse-move extends the selection (even when the pointer leaves the view).
+    dragging: RefCell<bool>,
 }
 
 impl HasMainFields for Memo {
@@ -94,6 +97,7 @@ impl Memo {
             key_repeat_started: RefCell::new(false),
             line_count: RefCell::new(1),
             line_offsets: RefCell::new(vec![0]),
+            dragging: RefCell::new(false),
         }
     }
 
@@ -1288,8 +1292,27 @@ impl View for Memo {
         redraw
     }
 
-    fn on_mouse_move(&self, _ui: &mut UI, position: Vector2<i32>) -> bool {
+    fn on_mouse_move(&self, ui: &mut UI, position: Vector2<i32>) -> bool {
+        // Drag-selection: extend regardless of whether the pointer is still
+        // inside the view (the parent dispatches moves to every child).
+        if *self.dragging.borrow() {
+            let scale = self.state.borrow().main.scale;
+            let padding = self.get_padding(scale);
+            let my_rect = self.state.borrow().main.rect;
+            let scroll_y = *self.scroll_y.borrow();
+            let move_x = (position.x - my_rect.min.x - padding.left) as f32;
+            let move_y = (position.y - my_rect.min.y - padding.top - scroll_y) as f32;
+            let char_pos = self.pos_from_point(move_x, move_y);
+            *self.caret_pos.borrow_mut() = char_pos;
+            self.caret_rect.borrow_mut().clear();
+            self.update_scroll();
+            return true;
+        }
+
         let hit = self.state.borrow().main.rect.hit((position.x, position.y));
+        if hit {
+            ui.request_cursor(MouseCursorType::Text);
+        }
         let old_state = self.state.borrow().main.state;
         self.state.borrow_mut().main.state.hovered = hit;
         self.state.borrow().main.state != old_state
@@ -1346,15 +1369,33 @@ impl View for Memo {
             *self.last_click_time.borrow_mut() = Instant::now();
         }
 
-        *self.caret_pos.borrow_mut() = char_pos;
+        // Single click: position caret and begin a drag-selection. Shift+click
+        // extends the selection from the existing anchor (or the current caret).
+        let shift = *self.held_shift.borrow();
+        if shift {
+            let has_anchor = self.selection_anchor.borrow().is_some();
+            if !has_anchor {
+                let old = *self.caret_pos.borrow();
+                *self.selection_anchor.borrow_mut() = Some(old);
+            }
+            *self.caret_pos.borrow_mut() = char_pos;
+        } else {
+            *self.caret_pos.borrow_mut() = char_pos;
+            *self.selection_anchor.borrow_mut() = Some(char_pos);
+        }
         *self.preferred_x.borrow_mut() = None;
-        self.clear_selection();
+        *self.dragging.borrow_mut() = true;
         self.caret_rect.borrow_mut().clear();
         true
     }
 
     fn on_mouse_button_up(&self, _ui: &mut UI, _position: Vector2<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
+        // End any drag-selection; collapse a zero-length anchor from a plain click.
+        if *self.dragging.borrow() {
+            *self.dragging.borrow_mut() = false;
+            self.collapse_if_empty();
+        }
         if matches!(button, MouseButton::Left) && self.state.borrow().main.state.pressed {
             self.state.borrow_mut().main.state.pressed = false;
             return true;
