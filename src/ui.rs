@@ -7,7 +7,7 @@ use std::time::Instant;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::Reader;
 use speedy2d::dimen::Vector2;
-use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
+use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, MouseScrollDistance, VirtualKeyCode};
 
 use super::containers::Frame;
 use super::themes::Theme;
@@ -81,6 +81,10 @@ pub struct UI {
     /// `update()` tick so removal can be requested from inside handlers
     /// without invalidating the iterator the dispatcher is walking.
     pending_removals: Vec<String>,
+    /// The cursor shape requested by the view under the pointer during the
+    /// current `on_mouse_move` dispatch. Reset each move; resolved via
+    /// [`UI::current_cursor`] and applied by the window handler.
+    requested_cursor: Option<MouseCursorType>,
 }
 
 #[allow(dead_code)]
@@ -92,6 +96,7 @@ impl UI {
             tooltip_view_id: None, tooltip_hover_start: None, tooltip_showing: false, tooltip_popup: None, needs_relayout: false,
             notification_stack: None,
             pending_removals: Vec::new(),
+            requested_cursor: None,
         };
         ui.register::<Label>("Label");
         ui.register::<Button>("Button");
@@ -756,6 +761,9 @@ impl UI {
 
     pub fn on_mouse_move(&mut self, position: Vector2<i32>) -> bool {
         self.mouse_pos = position;
+        // Re-evaluate the cursor from scratch each move: views over a link
+        // re-request `Pointer` during dispatch; anything left is the default.
+        self.requested_cursor = None;
         // Dispatch to overlays first (reverse order = topmost first)
         let entries: Vec<(Element, i32, i32)> = self.overlays.iter().rev()
             .map(|e| (Rc::clone(&e.element), e.x, e.y))
@@ -774,6 +782,23 @@ impl UI {
             None => false,
             Some(root) => root.borrow().on_mouse_move(self, position),
         }
+    }
+
+    /// Requests a cursor shape for the current `on_mouse_move` dispatch. Called
+    /// by a view (e.g. a hovered link) from its `on_mouse_move`. First write
+    /// wins, so the topmost view under the pointer decides the cursor (dispatch
+    /// visits views topmost-first).
+    pub fn request_cursor(&mut self, cursor: MouseCursorType) {
+        if self.requested_cursor.is_none() {
+            self.requested_cursor = Some(cursor);
+        }
+    }
+
+    /// The cursor shape resolved by the last `on_mouse_move`, falling back to
+    /// the default arrow when no view requested one. Read by the window handler
+    /// to drive the OS cursor.
+    pub fn current_cursor(&self) -> MouseCursorType {
+        self.requested_cursor.unwrap_or(MouseCursorType::Default)
     }
 
     pub fn on_mouse_button_down(&mut self, position: Vector2<i32>, button: MouseButton) -> bool {

@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use speedy2d::dimen::Vector2;
 use speedy2d::font::{FormattedTextBlock, TextLayout, TextOptions};
-use speedy2d::window::MouseButton;
+use speedy2d::window::{MouseButton, MouseCursorType};
 
 use crate::assets::get_font_family;
 use crate::events::EventType;
@@ -1071,11 +1071,12 @@ impl View for RichText {
         self.fire_click(ui)
     }
 
-    fn on_mouse_move(&self, _ui: &mut UI, position: Vector2<i32>) -> bool {
+    fn on_mouse_move(&self, ui: &mut UI, position: Vector2<i32>) -> bool {
         if !self.has_link.get() {
             return false;
         }
         let hit = self.link_at(position).is_some();
+        if hit { ui.request_cursor(MouseCursorType::Pointer); }
         let old = self.state.borrow().main.state.hovered;
         self.state.borrow_mut().main.state.hovered = hit;
         old != hit

@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::time::Duration;
 use speedy2d::dimen::Vector2;
 use speedy2d::Graphics2D;
-use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, UserEventSender, VirtualKeyCode, WindowHandler, WindowHelper, WindowStartupInfo};
+use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, MouseScrollDistance, UserEventSender, VirtualKeyCode, WindowHandler, WindowHelper, WindowStartupInfo};
 use crate::drawing::DrawableRegistry;
 use super::ui::UI;
 use super::themes::*;
@@ -17,6 +17,9 @@ pub struct Win<T> {
     mouse_pos: Vector2<i32>,
     mod_state: ModifiersState,
     sender: UserEventSender<WinEvent>,
+    /// Last cursor shape pushed to the OS, so we only call `set_cursor` on a
+    /// real transition (avoids per-move churn).
+    last_cursor: Option<MouseCursorType>,
     t: PhantomData<T>
 }
 
@@ -31,6 +34,7 @@ impl<T> Win<T> {
             mouse_pos: Vector2::new(-1, -1),
             mod_state: ModifiersState::default(),
             sender,
+            last_cursor: None,
             t: PhantomData::default()
         }
     }
@@ -85,7 +89,14 @@ impl<T> WindowHandler<T> for Win<T> {
         //println!("Position: {} x {}", position.x, position.y);
         let position = Vector2::new(position.x.round() as i32, position.y.round() as i32);
         self.mouse_pos = position;
-        if self.ui.on_mouse_move(position) {
+        let redraw = self.ui.on_mouse_move(position);
+        // Apply the cursor regardless of the redraw flag, only on a transition.
+        let cursor = self.ui.current_cursor();
+        if self.last_cursor != Some(cursor) {
+            helper.set_cursor(cursor);
+            self.last_cursor = Some(cursor);
+        }
+        if redraw {
             helper.request_redraw();
         }
     }

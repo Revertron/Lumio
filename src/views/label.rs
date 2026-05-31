@@ -4,7 +4,7 @@ use std::hash::{Hash, Hasher};
 
 use speedy2d::dimen::Vector2;
 use speedy2d::font::{TextAlignment, TextLayout, TextOptions};
-use speedy2d::window::MouseButton;
+use speedy2d::window::{MouseButton, MouseCursorType};
 use crate::assets::{get_asset, get_font_family};
 use crate::events::EventType;
 use crate::svg;
@@ -697,9 +697,10 @@ impl View for Label {
         self.fire_click(ui)
     }
 
-    fn on_mouse_move(&self, _ui: &mut UI, position: Vector2<i32>) -> bool {
+    fn on_mouse_move(&self, ui: &mut UI, position: Vector2<i32>) -> bool {
         if !*self.link.borrow() { return false; }
         let hit = self.state.borrow().main.rect.hit((position.x, position.y));
+        if hit { ui.request_cursor(MouseCursorType::Pointer); }
         let old_state = self.state.borrow().main.state;
         self.state.borrow_mut().main.state.hovered = hit;
         self.state.borrow().main.state != old_state
