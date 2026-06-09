@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use std::rc::Rc;
 
 use speedy2d::dimen::Vector2;
 use speedy2d::font::{TextAlignment, TextLayout, TextOptions};
@@ -12,8 +13,9 @@ use crate::svg;
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
-use crate::ui::UI;
+use crate::ui::{PopupDirection, PopupMode, UI};
 use crate::views::{Borders, Dimension, Gravity, Visibility};
+use crate::views::popupmenu::PopupMenu;
 use crate::styles::selector::FontSelector;
 use crate::views::{FieldsMain, FieldsTexted};
 use crate::view_base::{HasMainFields, ViewBasics, parse_hex_color};
@@ -21,6 +23,8 @@ use crate::view_base::{HasMainFields, ViewBasics, parse_hex_color};
 const DEFAULT_LINK_COLOR: u32 = 0xFF3273DC;
 const DEFAULT_ICON_TINT: u32 = 0xFFFFFFFF;
 const ICON_GAP_DIP: i32 = 2;
+/// Highlight colour behind selected text (same blue as `Edit`/`Memo`).
+const SELECTION_COLOR: u32 = 0xff0078d7;
 
 pub struct Label {
     state: RefCell<FieldsTexted>,
@@ -56,6 +60,21 @@ pub struct Label {
     /// expensive font shaping); when they differ we re-layout. Resolves the
     /// "Label doesn't reflow on parent resize" bug.
     last_layout_params: std::cell::Cell<Option<(i32, i32, f64)>>,
+    /// When true, the text can be selected with the mouse (I-beam cursor,
+    /// click-drag highlight, right-click Copy / Select All). Read-only:
+    /// no editing, no keyboard, no focus changes. Default false.
+    selectable: RefCell<bool>,
+    /// Anchor (fixed end) of the current selection, as a char index into
+    /// `text`. `None` = no selection; equal to `caret_pos` = empty selection.
+    selection_anchor: RefCell<Option<usize>>,
+    /// Moving end of the selection drag, as a char index into `text`.
+    caret_pos: RefCell<usize>,
+    /// True while the left button is held after a press inside the text, so
+    /// mouse-move extends the selection (even when the pointer leaves the view).
+    dragging: RefCell<bool>,
+    /// Start char index of each visual (wrapped) line, rebuilt whenever the
+    /// text is laid out. Drives hit-testing and the selection highlight.
+    line_offsets: RefCell<Vec<usize>>,
 }
 
 impl HasMainFields for Label {
@@ -99,6 +118,11 @@ impl Label {
             icon_tint: RefCell::new(DEFAULT_ICON_TINT),
             pressed_icon: RefCell::new(None),
             last_layout_params: std::cell::Cell::new(None),
+            selectable: RefCell::new(false),
+            selection_anchor: RefCell::new(None),
+            caret_pos: RefCell::new(0),
+            dragging: RefCell::new(false),
+            line_offsets: RefCell::new(Vec::new()),
         }
     }
 
@@ -320,6 +344,7 @@ impl Label {
             false => TextOptions::new().with_wrap_to_width(available_width as f32, TextAlignment::Left),
         };
         let text = font.layout_text(&state.text, base_size, options);
+        *self.line_offsets.borrow_mut() = Self::build_line_offsets(&text, &state.text);
         // After layout, recompute icon reservation using actual text height so
         // the final rect snaps tight; insets used by paint/hit-test derive
         // from this same text height via `icon_insets`.
@@ -371,6 +396,197 @@ impl Label {
         state.main.font_manager.set_font_size(size);
         state.cached_text = None;
     }
+
+    pub fn set_selectable(&self, selectable: bool) {
+        *self.selectable.borrow_mut() = selectable;
+    }
+
+    pub fn is_selectable(&self) -> bool {
+        *self.selectable.borrow()
+    }
+
+    /// Build `line_offsets` (start char index per visual line) from a laid-out
+    /// block. Mirrors `Memo`: wrapped lines advance by glyph count, hard `\n`
+    /// breaks are skipped (they are not glyphs), and a trailing `\n` adds a
+    /// virtual empty line.
+    fn build_line_offsets(text: &speedy2d::font::FormattedTextBlock, full_text: &str) -> Vec<usize> {
+        let chars: Vec<char> = full_text.chars().collect();
+        let mut offsets = Vec::new();
+        let mut char_offset = 0usize;
+        for line in text.iter_lines() {
+            offsets.push(char_offset);
+            char_offset += line.iter_glyphs().count();
+            if char_offset < chars.len() && chars[char_offset] == '\n' {
+                char_offset += 1;
+            }
+        }
+        if !full_text.is_empty() && full_text.ends_with('\n') {
+            offsets.push(chars.len());
+        }
+        if offsets.is_empty() {
+            offsets.push(0);
+        }
+        offsets
+    }
+
+    fn has_selection(&self) -> bool {
+        match *self.selection_anchor.borrow() {
+            Some(anchor) => anchor != *self.caret_pos.borrow(),
+            None => false,
+        }
+    }
+
+    /// `(start, end)` char indices of the selection, or `None` when empty.
+    fn selection_range(&self) -> Option<(usize, usize)> {
+        let anchor = (*self.selection_anchor.borrow())?;
+        let caret = *self.caret_pos.borrow();
+        if anchor == caret {
+            return None;
+        }
+        Some((anchor.min(caret), anchor.max(caret)))
+    }
+
+    fn clear_selection(&self) {
+        *self.selection_anchor.borrow_mut() = None;
+    }
+
+    pub fn select_all(&self) {
+        let len = self.state.borrow().text.chars().count();
+        *self.selection_anchor.borrow_mut() = Some(0);
+        *self.caret_pos.borrow_mut() = len;
+    }
+
+    fn get_selected_text(&self) -> Option<String> {
+        let (start, end) = self.selection_range()?;
+        let text = &self.state.borrow().text;
+        Some(text.chars().skip(start).take(end - start).collect())
+    }
+
+    fn copy_to_clipboard(&self) {
+        if let Some(text) = self.get_selected_text()
+            && let Ok(mut clipboard) = arboard::Clipboard::new()
+        {
+            let _ = clipboard.set_text(text);
+        }
+    }
+
+    /// Vertical pixel of the laid-out text top, in `main.rect` coordinates
+    /// (matches the `text_y` used by `paint`, minus `origin`).
+    fn text_top(&self, text_height: f32) -> i32 {
+        let my_rect = self.state.borrow().main.rect;
+        let y = (my_rect.height() as f32 - text_height) / 2f32;
+        (my_rect.min.y as f32 + y).round() as i32
+    }
+
+    /// Per visual-line height (uniform — `Label` uses a single font/size).
+    fn per_line_height(&self, text_height: f32) -> f32 {
+        let lines = self.line_offsets.borrow().len().max(1);
+        text_height / lines as f32
+    }
+
+    /// Map a mouse point (in `main.rect` coordinates) to a char index.
+    fn pos_from_point(&self, x: i32, y: i32) -> usize {
+        let state = self.state.borrow();
+        let text = match &state.cached_text {
+            Some(t) => t,
+            None => return 0,
+        };
+        let scale = state.main.scale;
+        let padding = state.main.padding.scaled(scale);
+        let my_rect = state.main.rect;
+        let inner_h = my_rect.height() - padding.top - padding.bottom;
+        let (left_inset, _) = self.icon_insets(inner_h, scale);
+        let text_x = my_rect.min.x + padding.left + left_inset;
+        let text_top = self.text_top(text.height());
+        let per_line = self.per_line_height(text.height());
+
+        let offsets = self.line_offsets.borrow();
+        let line_count = offsets.len();
+        let target_line = if per_line > 0.0 {
+            (((y - text_top) as f32 / per_line).floor().max(0.0) as usize).min(line_count - 1)
+        } else {
+            0
+        };
+        let line_start = offsets[target_line];
+
+        let visual_line_count = text.iter_lines().count();
+        if target_line >= visual_line_count {
+            return line_start; // virtual empty line after a trailing '\n'
+        }
+        if let Some(line) = text.iter_lines().nth(target_line) {
+            let rel_x = (x - text_x) as f32;
+            for (i, glyph) in line.iter_glyphs().enumerate() {
+                let mid = glyph.position_x() + glyph.advance_width() / 2.0;
+                if rel_x < mid {
+                    return line_start + i;
+                }
+            }
+            return line_start + line.iter_glyphs().count();
+        }
+        line_start
+    }
+
+    /// Map a char index to `(visual_line, x_pixels_from_line_left)`.
+    fn pos_to_line_and_x(&self, pos: usize) -> (usize, f32) {
+        let offsets = self.line_offsets.borrow();
+        let mut line_idx = 0;
+        for i in (0..offsets.len()).rev() {
+            if offsets[i] <= pos {
+                line_idx = i;
+                break;
+            }
+        }
+        let pos_in_line = pos - offsets[line_idx];
+
+        let state = self.state.borrow();
+        if let Some(text) = &state.cached_text {
+            if line_idx >= text.iter_lines().count() {
+                return (line_idx, 0.0);
+            }
+            if let Some(line) = text.iter_lines().nth(line_idx) {
+                if pos_in_line == 0 {
+                    return (line_idx, 0.0);
+                }
+                for (i, glyph) in line.iter_glyphs().enumerate() {
+                    if i == pos_in_line - 1 {
+                        return (line_idx, glyph.position_x() + glyph.advance_width());
+                    }
+                }
+                let x = line.iter_glyphs().last()
+                    .map(|g| g.position_x() + g.advance_width())
+                    .unwrap_or(0.0);
+                return (line_idx, x);
+            }
+        }
+        (line_idx, 0.0)
+    }
+
+    fn open_context_menu(&self, ui: &mut UI, x: i32, y: i32) {
+        let mut menu = PopupMenu::new();
+        menu.add_item("copy", "", "Copy");
+        menu.add_item("select_all", "", "Select All");
+
+        let label_id = self.get_id();
+        menu.on_event(EventType::Click, Box::new(move |ui: &mut UI, view: &dyn View| {
+            let menu = view.as_any().downcast_ref::<PopupMenu>().unwrap();
+            if let Some(index) = menu.get_hovered_index()
+                && let Some(el) = ui.get_view(&label_id)
+            {
+                let b = el.borrow();
+                if let Some(label) = b.as_any().downcast_ref::<Label>() {
+                    match index {
+                        0 => label.copy_to_clipboard(),
+                        1 => label.select_all(),
+                        _ => {}
+                    }
+                }
+            }
+            true
+        }));
+
+        let element: Element = Rc::new(RefCell::new(menu));
+        ui.show_popup(element, x, y, PopupDirection::BottomRight, PopupMode::Popup);
+    }
 }
 
 impl View for Label {
@@ -413,6 +629,7 @@ impl View for Label {
                     self.set_icon_tint(c);
                 }
             }
+            "selectable" => { self.set_selectable(value == "true") }
             &_ => {}
         }
     }
@@ -462,6 +679,7 @@ impl View for Label {
                 false => TextOptions::new().with_wrap_to_width(wrap_w as f32, TextAlignment::Left),
             };
             let text = font.layout_text(&self.state.borrow().text, base_size, options);
+            *self.line_offsets.borrow_mut() = Self::build_line_offsets(&text, &self.state.borrow().text);
             self.state.borrow_mut().cached_text = Some(text);
         }
         let (content_width, content_height) = self.calculate_full_size(scale);
@@ -526,6 +744,24 @@ impl View for Label {
             let y = (self.get_rect_height() as f32 - text.height()) / 2f32;
             let text_x = (rect.min.x + padding.left + left_inset) as f32;
             let text_y = (rect.min.y as f32 + y).round();
+            // Selection highlight (drawn under the text).
+            if *self.selectable.borrow()
+                && let Some((sel_start, sel_end)) = self.selection_range()
+            {
+                let (start_line, start_x) = self.pos_to_line_and_x(sel_start);
+                let (end_line, end_x) = self.pos_to_line_and_x(sel_end);
+                let per_line = self.per_line_height(text.height());
+                let text_top = text_y as i32;
+                let text_left = text_x as i32;
+                let line_right = rect.max.x - padding.right - right_inset;
+                for line in start_line..=end_line {
+                    let y_top = text_top + (line as f32 * per_line).round() as i32;
+                    let y_bottom = text_top + ((line + 1) as f32 * per_line).round() as i32;
+                    let x_left = if line == start_line { text_left + start_x.round() as i32 } else { text_left };
+                    let x_right = if line == end_line { text_left + end_x.round() as i32 } else { line_right };
+                    theme.draw_rect(crate::types::rect((x_left, y_top), (x_right, y_bottom)), SELECTION_COLOR);
+                }
+            }
             theme.draw_text(text_x, text_y, color, text);
             // Underline: only when link mode is on AND there's no background
             // (a filled chip with an underlined word looks busy).
@@ -698,16 +934,39 @@ impl View for Label {
     }
 
     fn on_mouse_move(&self, ui: &mut UI, position: Vector2<i32>) -> bool {
-        if !*self.link.borrow() { return false; }
-        let hit = self.state.borrow().main.rect.hit((position.x, position.y));
-        if hit { ui.request_cursor(MouseCursorType::Pointer); }
-        let old_state = self.state.borrow().main.state;
-        self.state.borrow_mut().main.state.hovered = hit;
-        self.state.borrow().main.state != old_state
+        // Selection drag — continues even when the pointer leaves the view
+        // (the Frame dispatches moves to every child).
+        if *self.dragging.borrow() {
+            *self.caret_pos.borrow_mut() = self.pos_from_point(position.x, position.y);
+            return true;
+        }
+        if *self.link.borrow() {
+            let hit = self.state.borrow().main.rect.hit((position.x, position.y));
+            if hit { ui.request_cursor(MouseCursorType::Pointer); }
+            let old_state = self.state.borrow().main.state;
+            self.state.borrow_mut().main.state.hovered = hit;
+            return self.state.borrow().main.state != old_state;
+        }
+        if *self.selectable.borrow()
+            && self.state.borrow().main.rect.hit((position.x, position.y))
+        {
+            ui.request_cursor(MouseCursorType::Text);
+        }
+        false
     }
 
-    fn on_mouse_button_down(&self, _ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_down(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
+        // Right-click opens the Copy / Select All menu on selectable labels.
+        if matches!(button, MouseButton::Right) {
+            if *self.selectable.borrow()
+                && self.state.borrow().main.rect.hit((position.x, position.y))
+            {
+                self.open_context_menu(ui, position.x, position.y);
+                return true;
+            }
+            return false;
+        }
         if !matches!(button, MouseButton::Left) { return false; }
         // Icon clicks work even when the label isn't a link — capture the press
         // and route to LeftIconClick / RightIconClick on mouse-up.
@@ -724,10 +983,25 @@ impl View for Label {
                 return true;
             }
         }
-        if !*self.link.borrow() { return false; }
-        if self.state.borrow().main.rect.hit((position.x, position.y)) {
-            *self.pressed.borrow_mut() = true;
-            self.state.borrow_mut().main.state.pressed = true;
+        // A link label is a single clickable unit — link wins over selection.
+        if *self.link.borrow() {
+            if self.state.borrow().main.rect.hit((position.x, position.y)) {
+                *self.pressed.borrow_mut() = true;
+                self.state.borrow_mut().main.state.pressed = true;
+                return true;
+            }
+            return false;
+        }
+        // Start a selection drag (a fresh click clears any previous selection,
+        // here and in any other view that held one).
+        if *self.selectable.borrow()
+            && self.state.borrow().main.rect.hit((position.x, position.y))
+        {
+            ui.deselect_text();
+            let pos = self.pos_from_point(position.x, position.y);
+            *self.selection_anchor.borrow_mut() = Some(pos);
+            *self.caret_pos.borrow_mut() = pos;
+            *self.dragging.borrow_mut() = true;
             return true;
         }
         false
@@ -736,6 +1010,14 @@ impl View for Label {
     fn on_mouse_button_up(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
         if !matches!(button, MouseButton::Left) { return false; }
+        // Finish a selection drag; collapse a zero-length (plain-click) selection.
+        if *self.dragging.borrow() {
+            *self.dragging.borrow_mut() = false;
+            if *self.selection_anchor.borrow() == Some(*self.caret_pos.borrow()) {
+                self.clear_selection();
+            }
+            return true;
+        }
         let pressed_icon = self.pressed_icon.borrow_mut().take();
         if let Some(was_left) = pressed_icon {
             let (left_rect, right_rect) = self.icon_hit_rects();
@@ -757,6 +1039,10 @@ impl View for Label {
             return true;
         }
         false
+    }
+
+    fn deselect_text(&self) {
+        self.clear_selection();
     }
 
 }

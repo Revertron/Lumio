@@ -246,6 +246,30 @@ impl UI {
         }
     }
 
+    /// Clear the text selection in every view (overlays + root). Selectable
+    /// views (`Label`, `RichText`) drop their highlight; everything else is a
+    /// no-op. Called when a view starts a new selection so only one view holds
+    /// a selection at a time. Uses immutable borrows only, so it is safe to call
+    /// from inside a mouse handler mid-dispatch.
+    pub fn deselect_text(&self) {
+        for entry in &self.overlays {
+            Self::deselect_recursive(&entry.element);
+        }
+        if let Some(root) = &self.root {
+            Self::deselect_recursive(root);
+        }
+    }
+
+    fn deselect_recursive(element: &Element) {
+        let view = element.borrow();
+        view.deselect_text();
+        if let Some(container) = view.as_container() {
+            for child in container.get_views() {
+                Self::deselect_recursive(&child);
+            }
+        }
+    }
+
     pub fn register<T: Default + View + 'static>(&mut self, name: &str) {
         self.types.insert(name.to_owned(), || Rc::new(RefCell::from(T::default())));
     }

@@ -12,9 +12,10 @@ use crate::events::EventType;
 use crate::themes::{FontStyle, Theme, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
-use crate::ui::UI;
+use crate::ui::{PopupDirection, PopupMode, UI};
 use crate::views::{Borders, Dimension, Gravity, Visibility};
 use crate::views::{FieldsMain, FieldsTexted};
+use crate::views::popupmenu::PopupMenu;
 use crate::styles::selector::FontSelector;
 use crate::view_base::{HasMainFields, ViewBasics, parse_hex_color};
 
@@ -22,6 +23,8 @@ const DEFAULT_LINK_COLOR: u32 = 0xFF3273DC; // Bulma link blue (same as Label)
 const DEFAULT_MARK_COLOR: u32 = 0xFFFFF59D; // soft yellow highlight for <mark>
 const BIG_FACTOR: f32 = 1.25;
 const SMALL_FACTOR: f32 = 0.8;
+/// Highlight colour behind selected text (same blue as `Edit`/`Memo`).
+const SELECTION_COLOR: u32 = 0xff0078d7;
 
 /// The resolved style of a contiguous run of characters. Cheap to clone — the
 /// only heap field is the (shared) link target. Produced by the HTML parser and
@@ -117,11 +120,14 @@ impl RichContent {
 }
 
 /// A single laid-out word: a speedy2d text block placed at `(x, top)` (relative
-/// to the content origin).
+/// to the content origin). `byte_start` + `text` map its glyphs back to byte
+/// offsets in `RichContent::text` for selection / copy.
 struct PlacedWord {
     x: i32,
     top: i32,
     block: FormattedTextBlock,
+    byte_start: usize,
+    text: String,
 }
 
 /// A maximal run of words sharing one `SpanStyle` on a single line. Drawn with
@@ -164,6 +170,18 @@ pub struct RichText {
     /// `(wrap_width, scale)` of the last layout — lets `paint` re-lay-out at the
     /// correct width when content changed since the last `layout_content`.
     last_wrap: Cell<Option<(i32, f64)>>,
+    /// When true, the text can be selected with the mouse (I-beam cursor,
+    /// click-drag highlight, right-click Copy / Select All). Read-only:
+    /// no editing, no keyboard, no focus changes. Default false.
+    selectable: RefCell<bool>,
+    /// Anchor (fixed end) of the selection, as a byte offset into
+    /// `content.text`. `None` = no selection; equal to `caret_pos` = empty.
+    selection_anchor: RefCell<Option<usize>>,
+    /// Moving end of the selection drag, as a byte offset into `content.text`.
+    caret_pos: RefCell<usize>,
+    /// True while the left button is held after a press, so mouse-move extends
+    /// the selection (even when the pointer leaves the view).
+    dragging: RefCell<bool>,
 }
 
 impl HasMainFields for RichText {
@@ -200,6 +218,10 @@ impl RichText {
             pressed_href: RefCell::new(None),
             clicked_href: RefCell::new(None),
             last_wrap: Cell::new(None),
+            selectable: RefCell::new(false),
+            selection_anchor: RefCell::new(None),
+            caret_pos: RefCell::new(0),
+            dragging: RefCell::new(false),
         }
     }
 
@@ -214,6 +236,7 @@ impl RichText {
         self.base_set_focusable(has_link);
         *self.content.borrow_mut() = content;
         self.invalidate();
+        self.reset_selection();
     }
 
     /// Append a styled run programmatically. `\n` inside `text` is a hard break.
@@ -224,6 +247,7 @@ impl RichText {
         }
         self.content.borrow_mut().push(text, style);
         self.invalidate();
+        self.reset_selection();
     }
 
     /// Append a clickable link run.
@@ -242,6 +266,7 @@ impl RichText {
         *self.content.borrow_mut() = RichContent::default();
         self.has_link.set(false);
         self.invalidate();
+        self.reset_selection();
     }
 
     /// The href of the most recent link click — read this from a `Click` handler.
@@ -315,7 +340,7 @@ impl RichText {
                         pending_space = Some(sw);
                     }
                 }
-                Tok::Word(text, style) => {
+                Tok::Word(text, byte_start, style) => {
                     let laid = layout_run_block(&font_name, base_style, base_px, scale_f, &text, &style, true);
                     let (block, w, asc, desc) = match laid {
                         Some(v) => v,
@@ -325,11 +350,11 @@ impl RichText {
                     if !cur.is_empty() && wrap > 0.0 && x + space_w + w > wrap {
                         // Wrap: finish this line, start the word at the next line's left.
                         lines_words.push(std::mem::take(&mut cur));
-                        cur.push(WordBox { x: 0, width: w.ceil() as i32, asc, desc, block, style });
+                        cur.push(WordBox { x: 0, width: w.ceil() as i32, asc, desc, block, style, byte_start, text });
                         x = w;
                     } else {
                         let wx = x + space_w;
-                        cur.push(WordBox { x: wx.round() as i32, width: w.ceil() as i32, asc, desc, block, style });
+                        cur.push(WordBox { x: wx.round() as i32, width: w.ceil() as i32, asc, desc, block, style, byte_start, text });
                         x = wx + w;
                     }
                     pending_space = None;
@@ -388,6 +413,163 @@ impl RichText {
         }
         false
     }
+
+    pub fn set_selectable(&self, selectable: bool) {
+        *self.selectable.borrow_mut() = selectable;
+    }
+
+    pub fn is_selectable(&self) -> bool {
+        *self.selectable.borrow()
+    }
+
+    fn reset_selection(&self) {
+        *self.selection_anchor.borrow_mut() = None;
+        *self.caret_pos.borrow_mut() = 0;
+    }
+
+    fn has_selection(&self) -> bool {
+        match *self.selection_anchor.borrow() {
+            Some(anchor) => anchor != *self.caret_pos.borrow(),
+            None => false,
+        }
+    }
+
+    /// `(start, end)` byte offsets of the selection, or `None` when empty.
+    fn selection_range(&self) -> Option<(usize, usize)> {
+        let anchor = (*self.selection_anchor.borrow())?;
+        let caret = *self.caret_pos.borrow();
+        if anchor == caret {
+            return None;
+        }
+        Some((anchor.min(caret), anchor.max(caret)))
+    }
+
+    fn clear_selection(&self) {
+        *self.selection_anchor.borrow_mut() = None;
+    }
+
+    pub fn select_all(&self) {
+        let len = self.content.borrow().text.len();
+        *self.selection_anchor.borrow_mut() = Some(0);
+        *self.caret_pos.borrow_mut() = len;
+    }
+
+    fn get_selected_text(&self) -> Option<String> {
+        let (start, end) = self.selection_range()?;
+        let content = self.content.borrow();
+        content.text.get(start..end).map(|s| s.to_string())
+    }
+
+    fn copy_to_clipboard(&self) {
+        if let Some(text) = self.get_selected_text()
+            && let Ok(mut clipboard) = arboard::Clipboard::new()
+        {
+            let _ = clipboard.set_text(text);
+        }
+    }
+
+    /// Byte offset of the `g`-th glyph (= char) within a placed word.
+    /// Non-ASCII safe: maps the char index back to a byte index in the word.
+    fn word_byte_at(word: &PlacedWord, g: usize) -> usize {
+        word.byte_start
+            + word.text.char_indices().nth(g).map(|(b, _)| b).unwrap_or(word.text.len())
+    }
+
+    /// Map a mouse point (in `main.rect` coordinates) to a byte offset into
+    /// `content.text`. Mirrors `link_at`'s coordinate convention.
+    fn byte_pos_from_point(&self, x: i32, y: i32) -> usize {
+        let laid = self.laid.borrow();
+        let laid = match laid.as_ref() {
+            Some(l) => l,
+            None => return 0,
+        };
+        if laid.lines.is_empty() {
+            return 0;
+        }
+        let state = self.state.borrow();
+        let scale = state.main.scale;
+        let padding = state.main.padding.scaled(scale);
+        let r = state.main.rect;
+        let ox = r.min.x + padding.left;
+        let oy = r.min.y + padding.top;
+
+        // Pick the line by y (clamp to first / last).
+        let mut line_idx = laid.lines.len() - 1;
+        for (i, line) in laid.lines.iter().enumerate() {
+            if y < oy + line.top + line.height {
+                line_idx = i;
+                break;
+            }
+        }
+        let line = &laid.lines[line_idx];
+
+        // Words on this line, in document order (runs are left-to-right).
+        let words: Vec<&PlacedWord> = line.runs.iter().flat_map(|run| run.words.iter()).collect();
+        if let Some(first) = words.first() {
+            if x < ox + first.x {
+                return first.byte_start;
+            }
+            for w in &words {
+                let wx = ox + w.x;
+                let wright = wx + w.block.width().ceil() as i32;
+                if x <= wright {
+                    let local = (x - wx) as f32;
+                    if let Some(block_line) = w.block.iter_lines().next() {
+                        for (g, glyph) in block_line.iter_glyphs().enumerate() {
+                            let mid = glyph.position_x() + glyph.advance_width() / 2.0;
+                            if local < mid {
+                                return Self::word_byte_at(w, g);
+                            }
+                        }
+                    }
+                    return w.byte_start + w.text.len();
+                }
+            }
+            let last = words[words.len() - 1];
+            return last.byte_start + last.text.len();
+        }
+
+        // Empty line (e.g. a blank line between hard breaks): snap to the start
+        // of the next non-empty line, else the end of a previous one, else 0.
+        for line in laid.lines[line_idx..].iter() {
+            if let Some(w) = line.runs.iter().flat_map(|r| r.words.iter()).next() {
+                return w.byte_start;
+            }
+        }
+        for line in laid.lines[..line_idx].iter().rev() {
+            if let Some(w) = line.runs.iter().flat_map(|r| r.words.iter()).last() {
+                return w.byte_start + w.text.len();
+            }
+        }
+        0
+    }
+
+    fn open_context_menu(&self, ui: &mut UI, x: i32, y: i32) {
+        let mut menu = PopupMenu::new();
+        menu.add_item("copy", "", "Copy");
+        menu.add_item("select_all", "", "Select All");
+
+        let rt_id = self.get_id();
+        menu.on_event(EventType::Click, Box::new(move |ui: &mut UI, view: &dyn View| {
+            let menu = view.as_any().downcast_ref::<PopupMenu>().unwrap();
+            if let Some(index) = menu.get_hovered_index()
+                && let Some(el) = ui.get_view(&rt_id)
+            {
+                let b = el.borrow();
+                if let Some(rt) = b.as_any().downcast_ref::<RichText>() {
+                    match index {
+                        0 => rt.copy_to_clipboard(),
+                        1 => rt.select_all(),
+                        _ => {}
+                    }
+                }
+            }
+            true
+        }));
+
+        let element: Element = Rc::new(RefCell::new(menu));
+        ui.show_popup(element, x, y, PopupDirection::BottomRight, PopupMode::Popup);
+    }
 }
 
 /// A measured word ready to be placed on a line. `x` is line-relative.
@@ -398,10 +580,13 @@ struct WordBox {
     desc: f32, // negative
     block: FormattedTextBlock,
     style: SpanStyle,
+    byte_start: usize,
+    text: String,
 }
 
 enum Tok {
-    Word(String, SpanStyle),
+    /// Word text, its byte offset in `RichContent::text`, and its style.
+    Word(String, usize, SpanStyle),
     Space(SpanStyle),
     Break,
 }
@@ -412,25 +597,30 @@ fn tokenize(content: &RichContent) -> Vec<Tok> {
     let mut toks = Vec::new();
     for section in &content.sections {
         let style = &section.style;
+        let base = section.range.start;
         let text = &content.text[section.range.clone()];
         let mut word = String::new();
-        for ch in text.chars() {
+        let mut word_start = base;
+        for (i, ch) in text.char_indices() {
             if ch == '\n' {
                 if !word.is_empty() {
-                    toks.push(Tok::Word(std::mem::take(&mut word), style.clone()));
+                    toks.push(Tok::Word(std::mem::take(&mut word), word_start, style.clone()));
                 }
                 toks.push(Tok::Break);
             } else if ch.is_whitespace() {
                 if !word.is_empty() {
-                    toks.push(Tok::Word(std::mem::take(&mut word), style.clone()));
+                    toks.push(Tok::Word(std::mem::take(&mut word), word_start, style.clone()));
                 }
                 toks.push(Tok::Space(style.clone()));
             } else {
+                if word.is_empty() {
+                    word_start = base + i;
+                }
                 word.push(ch);
             }
         }
         if !word.is_empty() {
-            toks.push(Tok::Word(word, style.clone()));
+            toks.push(Tok::Word(word, word_start, style.clone()));
         }
     }
     toks
@@ -453,7 +643,7 @@ fn finalize_line(words: Vec<WordBox>, top: i32, base_ascent: f32, base_descmag: 
     while let Some(w) = iter.next() {
         let block_top = (baseline as f32 - w.asc).round() as i32;
         let mut run = PlacedRun {
-            words: vec![PlacedWord { x: w.x, top: block_top, block: w.block }],
+            words: vec![PlacedWord { x: w.x, top: block_top, block: w.block, byte_start: w.byte_start, text: w.text }],
             x: w.x,
             width: w.width,
             style: w.style.clone(),
@@ -463,7 +653,7 @@ fn finalize_line(words: Vec<WordBox>, top: i32, base_ascent: f32, base_descmag: 
             if n.style == run.style {
                 let n = iter.next().unwrap();
                 let nt = (baseline as f32 - n.asc).round() as i32;
-                run.words.push(PlacedWord { x: n.x, top: nt, block: n.block });
+                run.words.push(PlacedWord { x: n.x, top: nt, block: n.block, byte_start: n.byte_start, text: n.text });
                 last_right = n.x + n.width;
             } else {
                 break;
@@ -822,6 +1012,7 @@ impl View for RichText {
                     *self.link_color.borrow_mut() = c;
                 }
             }
+            "selectable" => { self.set_selectable(value == "true") }
             &_ => {}
         }
     }
@@ -898,6 +1089,37 @@ impl View for RichText {
 
         let laid = self.laid.borrow();
         if let Some(laid) = &*laid {
+            // 0. Selection highlight (under everything else). One rect per line
+            // spanning the min/max x of the selected glyphs, so a contiguous
+            // selection reads as one continuous band (gaps auto-filled).
+            if *self.selectable.borrow()
+                && let Some((sel_start, sel_end)) = self.selection_range()
+            {
+                for line in &laid.lines {
+                    let mut min_x: Option<i32> = None;
+                    let mut max_x: Option<i32> = None;
+                    for run in &line.runs {
+                        for w in &run.words {
+                            if let Some(bl) = w.block.iter_lines().next() {
+                                for (g, glyph) in bl.iter_glyphs().enumerate() {
+                                    let b = Self::word_byte_at(w, g);
+                                    if b >= sel_start && b < sel_end {
+                                        let gl = ox + w.x + glyph.position_x().round() as i32;
+                                        let gr = ox + w.x
+                                            + (glyph.position_x() + glyph.advance_width()).round() as i32;
+                                        min_x = Some(min_x.map_or(gl, |m| m.min(gl)));
+                                        max_x = Some(max_x.map_or(gr, |m| m.max(gr)));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if let (Some(l), Some(rr)) = (min_x, max_x) {
+                        let sel = rect((l, oy + line.top), (rr, oy + line.top + line.height));
+                        theme.draw_rect(sel, SELECTION_COLOR);
+                    }
+                }
+            }
             for line in &laid.lines {
                 // 1. Backgrounds (highlight) under the whole run.
                 for run in &line.runs {
@@ -1072,34 +1294,82 @@ impl View for RichText {
     }
 
     fn on_mouse_move(&self, ui: &mut UI, position: Vector2<i32>) -> bool {
-        if !self.has_link.get() {
-            return false;
+        // Selection drag — continues even when the pointer leaves the view.
+        if *self.dragging.borrow() {
+            *self.caret_pos.borrow_mut() = self.byte_pos_from_point(position.x, position.y);
+            return true;
         }
-        let hit = self.link_at(position).is_some();
-        if hit { ui.request_cursor(MouseCursorType::Pointer); }
+        let link_hit = self.has_link.get() && self.link_at(position).is_some();
+        if link_hit {
+            ui.request_cursor(MouseCursorType::Pointer);
+        } else if *self.selectable.borrow()
+            && self.state.borrow().main.rect.hit((position.x, position.y))
+        {
+            ui.request_cursor(MouseCursorType::Text);
+        }
         let old = self.state.borrow().main.state.hovered;
-        self.state.borrow_mut().main.state.hovered = hit;
-        old != hit
+        self.state.borrow_mut().main.state.hovered = link_hit;
+        old != link_hit
     }
 
-    fn on_mouse_button_down(&self, _ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
-        if !self.base_is_enabled() || !matches!(button, MouseButton::Left) {
+    fn on_mouse_button_down(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+        if !self.base_is_enabled() {
             return false;
         }
+        // Right-click opens the Copy / Select All menu on selectable text.
+        if matches!(button, MouseButton::Right) {
+            if *self.selectable.borrow()
+                && self.state.borrow().main.rect.hit((position.x, position.y))
+            {
+                self.open_context_menu(ui, position.x, position.y);
+                return true;
+            }
+            return false;
+        }
+        if !matches!(button, MouseButton::Left) {
+            return false;
+        }
+        // Capture a link press — the click fires on mouse-up only if no
+        // drag-selection happened (a plain click still opens the link).
         if let Some(href) = self.link_at(position) {
             *self.pressed_href.borrow_mut() = Some(href);
             self.state.borrow_mut().main.state.pressed = true;
+        }
+        // Start a selection drag (a fresh click clears any previous selection).
+        if *self.selectable.borrow()
+            && self.state.borrow().main.rect.hit((position.x, position.y))
+        {
+            // Starting a new selection clears any selection in other views.
+            ui.deselect_text();
+            let pos = self.byte_pos_from_point(position.x, position.y);
+            *self.selection_anchor.borrow_mut() = Some(pos);
+            *self.caret_pos.borrow_mut() = pos;
+            *self.dragging.borrow_mut() = true;
             return true;
         }
-        false
+        // Non-selectable: still consume the event if a link press was captured.
+        self.pressed_href.borrow().is_some()
     }
 
     fn on_mouse_button_up(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
         if !matches!(button, MouseButton::Left) {
             return false;
         }
+        let was_dragging = *self.dragging.borrow();
+        *self.dragging.borrow_mut() = false;
         let pressed = self.pressed_href.borrow_mut().take();
         self.state.borrow_mut().main.state.pressed = false;
+        // Only the view that was dragging acts on the release: a drag that
+        // produced a selection suppresses the link click; a zero-length drag
+        // (plain click) collapses. A view merely *holding* a stale selection
+        // must NOT consume the event, or the clicked view never gets its
+        // mouse-up and its drag flag sticks.
+        if was_dragging {
+            if self.has_selection() {
+                return true;
+            }
+            self.clear_selection();
+        }
         if let Some(href) = pressed
             && let Some(over) = self.link_at(position)
             && over == href
@@ -1108,7 +1378,11 @@ impl View for RichText {
             self.fire_click(ui);
             return true;
         }
-        false
+        was_dragging
+    }
+
+    fn deselect_text(&self) {
+        self.clear_selection();
     }
 }
 

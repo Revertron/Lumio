@@ -1,11 +1,11 @@
 <Frame id="root" direction="vertical" width="max" height="max" padding="12">
-    <Label id="title" text="RichText — spannable text demo" width="max" height="24" font_size="16" margin_bottom="10"/>
+    <Label id="title" text="RichText — spannable, selectable text demo" width="max" height="24" font_size="16" margin_bottom="10" selectable="true"/>
 
-    <RichText id="rt1" width="max" height="min" font_size="18" margin_bottom="12">This is <b>bold</b>, <i>italic</i>, <b><i>bold-italic</i></b>, <u>underlined</u> and <s>struck-through</s> text, with a <mark>highlighted</mark> phrase and some <font color="#cc3333">red</font> words. Entities work too: A &amp; B, 1 &lt; 2.</RichText>
+    <RichText id="rt1" width="max" height="min" font_size="18" margin_bottom="12" selectable="true">This is <b>bold</b>, <i>italic</i>, <b><i>bold-italic</i></b>, <u>underlined</u> and <s>struck-through</s> text, with a <mark>highlighted</mark> phrase and some <font color="#cc3333">red</font> words. Entities work too: A &amp; B, 1 &lt; 2.</RichText>
 
-    <RichText id="rt2" width="max" height="min" font_size="16" margin_bottom="12">A longer paragraph to show word wrapping across several lines: the quick brown fox jumps over the lazy dog, and it keeps going so that the text must wrap when the window is narrow. Resize the window to watch it reflow. Visit the <a href="https://example.org/help">help page</a> for details, or read the <a href="https://example.org/faq">FAQ</a>.</RichText>
+    <RichText id="rt2" width="max" height="min" font_size="16" margin_bottom="12" selectable="true">A longer paragraph to show word wrapping across several lines: the quick brown fox jumps over the lazy dog, and it keeps going so that the text must wrap when the window is narrow. Resize the window to watch it reflow. Visit the <a href="https://example.org/help">help page</a> for details, or read the <a href="https://example.org/faq">FAQ</a>.</RichText>
 
-    <RichText id="rt3" width="max" height="min" font_size="16">Mixed sizes share one baseline: <small>small</small> normal <font size="30">THIRTY</font> <big>big</big> normal.<br/>This sentence is on a second line after an explicit &lt;br/&gt;.</RichText>
+    <RichText id="rt3" width="max" height="min" font_size="16" selectable="true">Mixed sizes share one baseline: <small>small</small> normal <font size="30">THIRTY</font> <big>big</big> normal.<br/>This sentence is on a second line after an explicit &lt;br/&gt;.</RichText>
 
-    <Label id="status" text="Click a link…" width="max" height="22" font_size="14" margin_top="12" text_color="#3273dc"/>
+    <Label id="status" text="Click a link, or drag to select text…" width="max" height="22" font_size="14" margin_top="12" text_color="#3273dc"/>
 </Frame>

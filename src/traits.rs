@@ -55,6 +55,10 @@ pub trait View: Downcast {
     fn is_break(&self) -> bool { false }
     #[allow(unused_variables)]
     fn set_focused(&self, focused: bool) {}
+    /// Clear any text selection this view holds. Default no-op; selectable
+    /// views (`Label`, `RichText`) override it so a new selection elsewhere can
+    /// drop their highlight. Called via [`UI::deselect_text`].
+    fn deselect_text(&self) {}
     fn set_focusable(&self, focusable: bool);
     fn calculate_full_size(&self, scale: f64) -> (i32, i32) {
         let (width, height) = self.get_content_size();
