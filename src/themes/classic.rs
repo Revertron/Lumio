@@ -357,6 +357,15 @@ impl<'h> Theme for Classic<'h> {
         self.graphics.draw_text((x, y), color, text);
     }
 
+    fn draw_text_cropped(&mut self, x: f32, y: f32, crop: Rect<i32>, color: u32, text: &FormattedTextBlock) {
+        let crop = Rectangle::from_tuples(
+            (crop.min.x as f32, crop.min.y as f32),
+            (crop.max.x as f32, crop.max.y as f32),
+        );
+        let color = self.color_argb(color);
+        self.graphics.draw_text_cropped((x, y), crop, color, text);
+    }
+
     fn draw_rect(&mut self, rect: Rect<i32>, color: u32) {
         let top_left = Vector2::new(rect.min.x as f32, rect.min.y as f32);
         let bottom_right = Vector2::new(rect.max.x as f32, rect.max.y as f32);

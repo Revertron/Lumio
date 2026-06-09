@@ -23,7 +23,7 @@ use crate::ui::{PopupDirection, PopupMode, UI};
 use crate::view_base::{HasMainFields, ViewBasics, parse_hex_color};
 use super::{BUTTON_MIN_HEIGHT, BUTTON_MIN_WIDTH, Dimension, FieldsMain, FieldsTexted, Visibility};
 
-const SELECTION_COLOR: u32 = 0xff0078d7;
+const SELECTION_COLOR: u32 = 0xff000080;
 const PLACEHOLDER_COLOR: u32 = 0xff808080;
 const DOUBLE_CLICK_MS: u128 = 400;
 const ICON_GAP_DIP: i32 = 2;
@@ -994,6 +994,7 @@ impl View for Edit {
             let text_y = (text_rect.min.y as f32 + y).round();
 
             // Draw selection highlight if any
+            let mut sel_rect = None;
             if let Some(anchor) = *self.selection_anchor.borrow() {
                 let caret = *self.caret_pos.borrow();
                 if anchor != caret {
@@ -1001,17 +1002,23 @@ impl View for Edit {
                     let sel_end = max(anchor, caret);
                     let x1 = self.x_of_char_pos(sel_start);
                     let x2 = self.x_of_char_pos(sel_end);
-                    let sel_rect = crate::types::rect(
+                    let rect = crate::types::rect(
                         (text_rect.min.x + x1 + scroll_x, text_rect.min.y),
                         (text_rect.min.x + x2 + scroll_x, text_rect.max.y),
                     );
-                    theme.draw_rect(sel_rect, SELECTION_COLOR);
+                    theme.draw_rect(rect, SELECTION_COLOR);
+                    sel_rect = Some(rect);
                 }
             }
 
             // Draw text
             let color = theme.get_text_color(state.main.state, state.main.foreground.as_ref());
             theme.draw_text(text_x, text_y, color, text);
+            // Redraw the selected part in a contrasting color over the highlight
+            if let Some(sel_rect) = sel_rect {
+                let sel_color = crate::themes::selection_text_color(color);
+                theme.draw_text_cropped(text_x, text_y, sel_rect, sel_color, text);
+            }
         } else if !self.placeholder.borrow().is_empty() {
             // Draw placeholder text when empty
             drop(state); // Release borrow before layout_placeholder_text

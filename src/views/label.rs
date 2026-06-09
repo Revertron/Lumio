@@ -24,7 +24,7 @@ const DEFAULT_LINK_COLOR: u32 = 0xFF3273DC;
 const DEFAULT_ICON_TINT: u32 = 0xFFFFFFFF;
 const ICON_GAP_DIP: i32 = 2;
 /// Highlight colour behind selected text (same blue as `Edit`/`Memo`).
-const SELECTION_COLOR: u32 = 0xff0078d7;
+const SELECTION_COLOR: u32 = 0xff000080;
 
 pub struct Label {
     state: RefCell<FieldsTexted>,
@@ -745,6 +745,7 @@ impl View for Label {
             let text_x = (rect.min.x + padding.left + left_inset) as f32;
             let text_y = (rect.min.y as f32 + y).round();
             // Selection highlight (drawn under the text).
+            let mut sel_rects = Vec::new();
             if *self.selectable.borrow()
                 && let Some((sel_start, sel_end)) = self.selection_range()
             {
@@ -759,10 +760,19 @@ impl View for Label {
                     let y_bottom = text_top + ((line + 1) as f32 * per_line).round() as i32;
                     let x_left = if line == start_line { text_left + start_x.round() as i32 } else { text_left };
                     let x_right = if line == end_line { text_left + end_x.round() as i32 } else { line_right };
-                    theme.draw_rect(crate::types::rect((x_left, y_top), (x_right, y_bottom)), SELECTION_COLOR);
+                    let sel_rect = crate::types::rect((x_left, y_top), (x_right, y_bottom));
+                    theme.draw_rect(sel_rect, SELECTION_COLOR);
+                    sel_rects.push(sel_rect);
                 }
             }
             theme.draw_text(text_x, text_y, color, text);
+            // Redraw the selected part in a contrasting color over the highlight
+            if !sel_rects.is_empty() {
+                let sel_color = crate::themes::selection_text_color(color);
+                for sel_rect in sel_rects {
+                    theme.draw_text_cropped(text_x, text_y, sel_rect, sel_color, text);
+                }
+            }
             // Underline: only when link mode is on AND there's no background
             // (a filled chip with an underlined word looks busy).
             if is_link && !has_bg {

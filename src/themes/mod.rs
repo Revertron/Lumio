@@ -37,6 +37,15 @@ pub trait Theme {
     fn draw_panel_back(&mut self, rect: Rect<i32>, state: ViewState);
     fn draw_panel_body(&mut self, rect: Rect<i32>, state: ViewState);
     fn draw_text(&mut self, x: f32, y: f32, color: u32, text: &FormattedTextBlock);
+
+    /// Like `draw_text`, but only glyphs inside `crop` are drawn (partial glyphs cropped).
+    fn draw_text_cropped(&mut self, x: f32, y: f32, crop: Rect<i32>, color: u32, text: &FormattedTextBlock) {
+        self.push_clip();
+        self.clip_rect(crop);
+        self.draw_text(x, y, color, text);
+        self.pop_clip();
+    }
+
     fn draw_rect(&mut self, rect: Rect<i32>, color: u32);
 
     /// Filled rectangle with rounded corners. `radius` is in physical pixels —
@@ -98,6 +107,16 @@ pub trait Theme {
     // Opacity stack for disabled views
     fn push_opacity(&mut self, _opacity: f32) {}
     fn pop_opacity(&mut self) {}
+}
+
+/// Contrast color for text drawn over a selection highlight:
+/// white for dark text, black for light text (by perceived luminance).
+pub fn selection_text_color(text_color: u32) -> u32 {
+    let r = (text_color >> 16) & 0xff;
+    let g = (text_color >> 8) & 0xff;
+    let b = text_color & 0xff;
+    let lum = (299 * r + 587 * g + 114 * b) / 1000;
+    if lum >= 128 { 0xff000000 } else { 0xffffffff }
 }
 
 #[allow(unused)]

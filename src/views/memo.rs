@@ -20,7 +20,7 @@ use crate::ui::{PopupDirection, PopupMode, UI};
 use crate::view_base::{HasMainFields, ViewBasics};
 use super::{BUTTON_MIN_HEIGHT, BUTTON_MIN_WIDTH, Dimension, FieldsMain, FieldsTexted, Visibility};
 
-const SELECTION_COLOR: u32 = 0xff0078d7;
+const SELECTION_COLOR: u32 = 0xff000080;
 const PLACEHOLDER_COLOR: u32 = 0xff808080;
 const DOUBLE_CLICK_MS: u128 = 400;
 
@@ -922,12 +922,14 @@ impl Memo {
         ui.show_popup(element, x, y, PopupDirection::BottomRight, PopupMode::Popup);
     }
 
-    /// Paint selection highlight across multiple lines
-    fn paint_selection(&self, theme: &mut dyn Theme, text_rect: Rect<i32>, scroll_y: i32) {
+    /// Paint selection highlight across multiple lines.
+    /// Returns the rectangles that were filled, for the contrast text overlay.
+    fn paint_selection(&self, theme: &mut dyn Theme, text_rect: Rect<i32>, scroll_y: i32) -> Vec<Rect<i32>> {
+        let mut rects = Vec::new();
         if let Some(anchor) = *self.selection_anchor.borrow() {
             let caret = *self.caret_pos.borrow();
             if anchor == caret {
-                return;
+                return rects;
             }
             let sel_start = min(anchor, caret);
             let sel_end = max(anchor, caret);
@@ -958,9 +960,11 @@ impl Memo {
                         (x_right, y_bottom.min(text_rect.max.y)),
                     );
                     theme.draw_rect(sel_rect, SELECTION_COLOR);
+                    rects.push(sel_rect);
                 }
             }
         }
+        rects
     }
 }
 
@@ -1078,13 +1082,20 @@ impl View for Memo {
             let text_y = text_rect.min.y as f32 + scroll_y as f32;
 
             // Draw selection
-            self.paint_selection(theme, text_rect, scroll_y);
+            let sel_rects = self.paint_selection(theme, text_rect, scroll_y);
 
             // Draw text
             let state = self.state.borrow();
             if let Some(text) = &state.cached_text {
                 let color = theme.get_text_color(state.main.state, state.main.foreground.as_ref());
                 theme.draw_text(text_x, text_y, color, text);
+                // Redraw the selected part in a contrasting color over the highlight
+                if !sel_rects.is_empty() {
+                    let sel_color = crate::themes::selection_text_color(color);
+                    for sel_rect in sel_rects {
+                        theme.draw_text_cropped(text_x, text_y, sel_rect, sel_color, text);
+                    }
+                }
             }
         } else if !self.placeholder.borrow().is_empty() {
             if let Some(placeholder_text) = self.layout_placeholder_text() {

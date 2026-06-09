@@ -24,7 +24,7 @@ const DEFAULT_MARK_COLOR: u32 = 0xFFFFF59D; // soft yellow highlight for <mark>
 const BIG_FACTOR: f32 = 1.25;
 const SMALL_FACTOR: f32 = 0.8;
 /// Highlight colour behind selected text (same blue as `Edit`/`Memo`).
-const SELECTION_COLOR: u32 = 0xff0078d7;
+const SELECTION_COLOR: u32 = 0xff000080;
 
 /// The resolved style of a contiguous run of characters. Cheap to clone — the
 /// only heap field is the (shared) link target. Produced by the HTML parser and
@@ -1089,9 +1089,12 @@ impl View for RichText {
 
         let laid = self.laid.borrow();
         if let Some(laid) = &*laid {
-            // 0. Selection highlight (under everything else). One rect per line
-            // spanning the min/max x of the selected glyphs, so a contiguous
-            // selection reads as one continuous band (gaps auto-filled).
+            // 0. Selection rects, one per line spanning the min/max x of the
+            // selected glyphs, so a contiguous selection reads as one
+            // continuous band (gaps auto-filled). Computed here, drawn in the
+            // per-line loop below — over run backgrounds (mark highlights),
+            // under the text.
+            let mut sel_line_rects: Vec<Option<Rect<i32>>> = Vec::new();
             if *self.selectable.borrow()
                 && let Some((sel_start, sel_end)) = self.selection_range()
             {
@@ -1116,11 +1119,13 @@ impl View for RichText {
                     }
                     if let (Some(l), Some(rr)) = (min_x, max_x) {
                         let sel = rect((l, oy + line.top), (rr, oy + line.top + line.height));
-                        theme.draw_rect(sel, SELECTION_COLOR);
+                        sel_line_rects.push(Some(sel));
+                    } else {
+                        sel_line_rects.push(None);
                     }
                 }
             }
-            for line in &laid.lines {
+            for (li, line) in laid.lines.iter().enumerate() {
                 // 1. Backgrounds (highlight) under the whole run.
                 for run in &line.runs {
                     if let Some(bg) = run.style.background {
@@ -1131,11 +1136,22 @@ impl View for RichText {
                         theme.draw_rect(rr, bg);
                     }
                 }
-                // 2. Text, word by word.
+                // 1b. Selection band over any highlight backgrounds.
+                let line_sel = sel_line_rects.get(li).copied().flatten();
+                if let Some(sel) = line_sel {
+                    theme.draw_rect(sel, SELECTION_COLOR);
+                }
+                // 2. Text, word by word. Words under the selection band get a
+                // second, cropped draw in a contrasting color; the crop rect
+                // spans exactly the selected glyphs, so no byte checks needed.
                 for run in &line.runs {
                     let color = resolve_color(&run.style, link_color, default_color);
                     for w in &run.words {
                         theme.draw_text((ox + w.x) as f32, (oy + w.top) as f32, color, &w.block);
+                        if let Some(sel) = line_sel {
+                            let sel_color = crate::themes::selection_text_color(color);
+                            theme.draw_text_cropped((ox + w.x) as f32, (oy + w.top) as f32, sel, sel_color, &w.block);
+                        }
                     }
                 }
                 // 3. Underline / strikethrough across the run extent.
