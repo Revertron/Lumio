@@ -45,7 +45,7 @@ impl Palette {
             ("border_light".to_string(), 0xFF2B2B2B),
             ("border_dark".to_string(), 0xFF161616),
             ("text".to_string(), 0xFFE0E0E0),
-            ("text_hint".to_string(), 0xFF808080),
+            ("text_hint".to_string(), 0xFF6A6A6A),
             ("selection".to_string(), 0xFF264F78),
             ("item_highlight".to_string(), 0xFF3060A8),
             ("item_highlight_text".to_string(), 0xFFFFFFFF),

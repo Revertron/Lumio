@@ -402,16 +402,24 @@ impl View for RadioButton {
     fn click(&self, ui: &mut UI) -> bool {
         if !self.base_is_enabled() { return false; }
         // RadioButton always sets checked to true (no toggle off)
+        let was_checked = self.state.borrow().main.state.checked;
         self.state.borrow_mut().main.state.checked = true;
         // Uncheck siblings in the same group
         self.uncheck_siblings_in_group();
+        let mut result = false;
+        if !was_checked {
+            let listener = self.state.borrow_mut().listeners.remove(&EventType::CheckedChanged);
+            if let Some(mut changed) = listener {
+                result |= changed(ui, self as &dyn View);
+                self.state.borrow_mut().listeners.insert(EventType::CheckedChanged, changed);
+            }
+        }
         let listener = self.state.borrow_mut().listeners.remove(&EventType::Click);
         if let Some(mut click) = listener {
-            let result = click(ui, self as &dyn View);
+            result |= click(ui, self as &dyn View);
             self.state.borrow_mut().listeners.insert(EventType::Click, click);
-            return result;
         }
-        false
+        result
     }
 
     fn on_mouse_move(&self, _ui: &mut UI, position: Vector2<i32>) -> bool {

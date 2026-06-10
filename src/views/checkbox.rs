@@ -350,13 +350,18 @@ impl View for CheckBox {
         if !self.base_is_enabled() { return false; }
         let checked = self.state.borrow().main.state.checked;
         self.state.borrow_mut().main.state.checked = !checked;
+        let mut result = false;
+        let listener = self.state.borrow_mut().listeners.remove(&EventType::CheckedChanged);
+        if let Some(mut changed) = listener {
+            result |= changed(ui, self as &dyn View);
+            self.state.borrow_mut().listeners.insert(EventType::CheckedChanged, changed);
+        }
         let listener = self.state.borrow_mut().listeners.remove(&EventType::Click);
         if let Some(mut click) = listener {
-            let result = click(ui, self as &dyn View);
+            result |= click(ui, self as &dyn View);
             self.state.borrow_mut().listeners.insert(EventType::Click, click);
-            return result;
         }
-        false
+        result
     }
 
     fn on_mouse_move(&self, _ui: &mut UI, position: Vector2<i32>) -> bool {
