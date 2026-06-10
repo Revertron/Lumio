@@ -1,8 +1,9 @@
-use std::cell::RefCell;
+use std::cell::{RefCell, RefMut};
 use std::rc::Rc;
 
 use speedy2d::dimen::Vector2;
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
+use super::background::{self, BackgroundImage};
 use super::events::EventType;
 use super::views::Borders;
 
@@ -17,7 +18,8 @@ pub struct Frame {
     state: RefCell<FieldsMain>,
     direction: Direction,
     views: Vec<Element>,
-    breaking: bool
+    breaking: bool,
+    background_image: RefCell<Option<BackgroundImage>>
 }
 
 /// Returns how far to shift a child along its parent's cross axis based on gravity.
@@ -117,8 +119,23 @@ impl Frame {
             state: RefCell::new(main),
             direction: Direction::default(),
             views: Vec::new(),
-            breaking: false
+            breaking: false,
+            background_image: RefCell::new(None)
         }
+    }
+
+    /// Sets the background image asset path, or clears the background image with `None`.
+    pub fn set_background_image(&mut self, path: Option<&str>) {
+        match path {
+            Some(p) => self.background_image_mut().set_path(p),
+            None => *self.background_image.borrow_mut() = None,
+        }
+    }
+
+    /// Access to the background image config (created with defaults if not set yet).
+    /// Style fields (`opacity`, `repeat`, `position`, `size`, `origin`) are public.
+    pub fn background_image_mut(&mut self) -> RefMut<'_, BackgroundImage> {
+        RefMut::map(self.background_image.borrow_mut(), |o| o.get_or_insert_with(BackgroundImage::default))
     }
 
     fn set_font(&mut self, font_name: &str) {
@@ -473,6 +490,16 @@ impl View for Frame {
                 }
             }
             "breaking" => { self.breaking = value.parse().unwrap_or(false) }
+            "background_image" => { self.background_image_mut().set_path(value) }
+            "background_image_opacity" => {
+                if let Ok(o) = value.parse::<f32>() {
+                    self.background_image_mut().opacity = o.clamp(0.0, 1.0);
+                }
+            }
+            "background_repeat" => { self.background_image_mut().repeat = background::parse_repeat(value) }
+            "background_position" => { self.background_image_mut().position = background::parse_position(value) }
+            "background_size" => { self.background_image_mut().size = background::parse_size(value) }
+            "background_origin" => { self.background_image_mut().origin = background::parse_origin(value) }
             &_ => {}
         }
     }
@@ -543,6 +570,9 @@ impl View for Frame {
             }
         } else {
             theme.draw_panel_back(rect, state.state);
+        }
+        if let Some(bg) = self.background_image.borrow_mut().as_mut() {
+            bg.paint(theme, rect, &state.padding.scaled(state.scale), state.scale);
         }
         if let Some(border_color) = state.border_color {
             let r = rect;

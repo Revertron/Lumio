@@ -1,0 +1,41 @@
+﻿<Frame id="main" direction="vertical" width="max" height="max" padding="8">
+    <Frame direction="horizontal" width="max" height="min">
+        <Frame width="200" height="140" margin="5" background="#334455"
+               background_image="wallpaper.jpg" background_size="cover">
+            <Label text="1: cover" text_color="#ffffff" background_color="#80000000" padding="4"/>
+        </Frame>
+        <Frame width="200" height="140" margin="5" background="#334455"
+               background_image="wallpaper.jpg" background_size="contain" background_position="center">
+            <Label text="2: contain" text_color="#ffffff" background_color="#80000000" padding="4"/>
+        </Frame>
+        <Frame width="200" height="140" margin="5" background="#334455"
+               background_image="avatar.png" background_repeat="both" background_size="40 40">
+            <Label text="3: tile both 40" text_color="#ffffff" background_color="#80000000" padding="4"/>
+        </Frame>
+    </Frame>
+    <Frame direction="horizontal" width="max" height="min">
+        <Frame width="200" height="140" margin="5" background="#334455"
+               background_image="avatar.png" background_repeat="x" background_position="left bottom+10" background_size="0.5x 0.5x">
+            <Label text="4: tile x, bottom+10" text_color="#ffffff" background_color="#80000000" padding="4"/>
+        </Frame>
+        <Frame width="200" height="140" margin="5" background="#334455"
+               background_image="wallpaper.jpg" background_size="cover" background_image_opacity="0.35">
+            <Label text="5: opacity 0.35" text_color="#ffffff" background_color="#80000000" padding="4"/>
+        </Frame>
+        <Frame width="200" height="140" margin="5" background="#334455" padding="20" border_color="#ff0000"
+               background_image="icons/magnify.svg" background_size="50% 50%" background_origin="content" background_position="left top">
+            <Label text="6: svg, content" text_color="#ffffff" background_color="#80000000" padding="4"/>
+        </Frame>
+    </Frame>
+    <Frame direction="horizontal" width="max" height="min">
+        <Frame width="200" height="60" margin="5" background="#334455"
+               background_image="missing.png">
+            <Label text="7: missing asset" text_color="#ffffff" background_color="#80000000" padding="4"/>
+        </Frame>
+        <Frame width="200" height="60" margin="5" background="#334455"
+               background_image="wallpaper.jpg" background_size="60 auto" background_position="right+10 center">
+            <Label text="8: 60 auto, right+10" text_color="#ffffff" background_color="#80000000" padding="4"/>
+        </Frame>
+    </Frame>
+</Frame>
+
