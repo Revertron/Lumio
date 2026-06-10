@@ -46,7 +46,8 @@ pub fn create_layout(name: &str) -> Option<Box<dyn Layout>> {
 
 /// The default layout: children flow one after another along `direction`.
 /// With `breaking` enabled (horizontal only), children wrap to the next row
-/// when they run out of width.
+/// when they run out of width. `Max` children share the space left over by
+/// fixed-size siblings proportionally to their `weight` (default 1).
 #[derive(Default)]
 pub struct LinearLayout {
     pub direction: Direction,
@@ -153,11 +154,14 @@ impl LinearLayout {
         let mut fixed_consumed: i32 = 0;
         let mut max_count: i32 = 0;
         let mut child_is_max: Vec<bool> = Vec::with_capacity(children.len());
+        // Main-axis weight per child; non-zero only for Max children.
+        let mut child_weights: Vec<f32> = Vec::with_capacity(children.len());
 
         for v in children.iter() {
             let mut v = v.try_borrow_mut().unwrap();
             if v.get_visibility() == Visibility::Gone {
                 child_is_max.push(false);
+                child_weights.push(0.0);
                 continue;
             }
             let margins = v.get_margin(scale);
@@ -177,9 +181,11 @@ impl LinearLayout {
 
             if is_max {
                 max_count += 1;
+                child_weights.push(v.get_layout_params().weight.max(0.0));
                 // Reserve space for margins only; the child's content space is computed later
                 fixed_consumed += margin_before + margin_after;
             } else {
+                child_weights.push(0.0);
                 // Layout at temporary position to measure size. Subtract the
                 // child's own margins from the available area so wrapping
                 // content (e.g. Labels) sizes itself within its content box,
@@ -203,10 +209,31 @@ impl LinearLayout {
             child_is_max.push(is_max);
         }
 
-        // Compute space for Max children (per_max excludes Max children's margins)
+        // Compute space for Max children (slots exclude Max children's margins).
+        // Each Max child gets a share of the leftover proportional to its
+        // weight; with the default weight of 1 everywhere this reduces to the
+        // old equal split, including how the remainder pixels are handed out.
         let remaining = (total_available - fixed_consumed).max(0);
-        let per_max = if max_count > 0 { remaining / max_count } else { 0 };
-        let mut extra = if max_count > 0 { remaining % max_count } else { 0 };
+        let total_weight: f32 = child_weights.iter().sum();
+        let mut slots: Vec<i32> = if total_weight > 0.0 {
+            child_weights.iter()
+                .map(|w| if *w > 0.0 { (remaining as f64 * *w as f64 / total_weight as f64).floor() as i32 } else { 0 })
+                .collect()
+        } else {
+            vec![0; children.len()]
+        };
+        if total_weight > 0.0 {
+            let mut extra = remaining - slots.iter().sum::<i32>();
+            for (i, slot) in slots.iter_mut().enumerate() {
+                if extra <= 0 {
+                    break;
+                }
+                if child_weights[i] > 0.0 {
+                    *slot += 1;
+                    extra -= 1;
+                }
+            }
+        }
 
         // When the parent shrinks to its content on the cross axis (Min), gravity
         // should align children inside the resolved content width — not the full
@@ -283,15 +310,10 @@ impl LinearLayout {
             };
 
             if is_max {
-                // per_max is the content space (margins already reserved in fixed_consumed).
+                // slots[i] is the content space (margins already reserved in fixed_consumed).
                 // layout_content's width/height param is "available space" — calculate_size
-                // for Max subtracts margins internally, so pass per_max + margins.
-                let mut slot = per_max;
-                if extra > 0 {
-                    slot += 1;
-                    extra -= 1;
-                }
-                let avail = slot + margin_before + margin_after;
+                // for Max subtracts margins internally, so pass slot + margins.
+                let avail = slots[i] + margin_before + margin_after;
 
                 if is_vertical {
                     v.layout_content(
@@ -523,6 +545,20 @@ mod tests {
         arrange(&OverlayLayout, &children);
         assert_eq!(children[0].borrow().get_rect(), rect((150, 125), (250, 175)));
         assert_eq!(children[1].borrow().get_rect(), rect((290, 240), (390, 290)));
+    }
+
+    #[test]
+    fn linear_weights_distribution() {
+        let children = vec![
+            frame(Dimension::Max, Dimension::Max, &[]),
+            frame(Dimension::Max, Dimension::Max, &[("weight", "2")]),
+            frame(Dimension::Max, Dimension::Max, &[]),
+        ];
+        let layout = LinearLayout { direction: Direction::Horizontal, breaking: false };
+        arrange(&layout, &children);
+        assert_eq!(children[0].borrow().get_rect(), rect((0, 0), (100, 300)));
+        assert_eq!(children[1].borrow().get_rect(), rect((100, 0), (300, 300)));
+        assert_eq!(children[2].borrow().get_rect(), rect((300, 0), (400, 300)));
     }
 
     #[test]

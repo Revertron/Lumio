@@ -2,8 +2,16 @@
     <Frame dock="top" width="max" height="48" background="#2d6da3" padding="8">
         <Label text="Toolbar (dock=top)" text_color="#ffffff"/>
     </Frame>
-    <Frame dock="bottom" width="max" height="32" background="#3a3f47" padding="6">
-        <Label text="Status bar (dock=bottom)" text_color="#cccccc"/>
+    <Frame dock="bottom" width="max" height="36" background="#3a3f47">
+        <Frame width="max" height="max" weight="1" background="#3a3f47" padding="6">
+            <Label text="weight=1" text_color="#cccccc"/>
+        </Frame>
+        <Frame width="max" height="max" weight="2" background="#2b2f36" padding="6">
+            <Label text="weight=2" text_color="#cccccc"/>
+        </Frame>
+        <Frame width="max" height="max" weight="1" background="#3a3f47" padding="6">
+            <Label text="weight=1" text_color="#cccccc"/>
+        </Frame>
     </Frame>
     <Frame dock="left" width="200" height="max" direction="vertical" background="#444a54" padding="8">
         <Label text="Sidebar (dock=left)" text_color="#ffffff"/>
