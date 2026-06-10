@@ -60,6 +60,14 @@ pub enum DrawCommand {
         stroke: Option<Stroke>,
     },
 
+    /// Filled triangle
+    Triangle {
+        p1: (Expr, Expr),
+        p2: (Expr, Expr),
+        p3: (Expr, Expr),
+        fill: Option<Paint>,
+    },
+
     /// SVG-style path
     Path {
         commands: Vec<PathCommand>,

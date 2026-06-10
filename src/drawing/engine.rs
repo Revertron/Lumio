@@ -12,6 +12,13 @@ pub struct DrawContext {
     pub scale: f64,
 }
 
+/// Which bounds dimension `Expr::Percent` refers to: X = width, Y = height.
+#[derive(Clone, Copy)]
+enum Axis {
+    X,
+    Y,
+}
+
 /// Drawing engine that renders drawables to speedy2d Graphics2D
 pub struct DrawingEngine<'a> {
     graphics: &'a mut Graphics2D,
@@ -35,10 +42,10 @@ impl<'a> DrawingEngine<'a> {
     fn draw_command(&mut self, cmd: &DrawCommand, bounds: Rect<i32>) {
         match cmd {
             DrawCommand::Rect { x, y, width, height, fill, stroke } => {
-                let x = self.eval_expr(x, bounds);
-                let y = self.eval_expr(y, bounds);
-                let w = self.eval_expr(width, bounds);
-                let h = self.eval_expr(height, bounds);
+                let x = self.eval_expr(x, bounds, Axis::X);
+                let y = self.eval_expr(y, bounds, Axis::Y);
+                let w = self.eval_expr(width, bounds, Axis::X);
+                let h = self.eval_expr(height, bounds, Axis::Y);
 
                 let rect = Rectangle::new(
                     Vector2::new(x, y),
@@ -60,14 +67,14 @@ impl<'a> DrawingEngine<'a> {
 
             DrawCommand::Line { x1, y1, x2, y2, stroke } => {
                 // Evaluate positions to integer pixels
-                let mut x1 = self.eval_expr(x1, bounds).round();
-                let mut y1 = self.eval_expr(y1, bounds).round();
-                let mut x2 = self.eval_expr(x2, bounds).round();
-                let mut y2 = self.eval_expr(y2, bounds).round();
+                let mut x1 = self.eval_expr(x1, bounds, Axis::X).round();
+                let mut y1 = self.eval_expr(y1, bounds, Axis::Y).round();
+                let mut x2 = self.eval_expr(x2, bounds, Axis::X).round();
+                let mut y2 = self.eval_expr(y2, bounds, Axis::Y).round();
 
                 if let Some(stroke_style) = stroke {
                     // Round width to integer for crisp rendering (already scaled)
-                    let width = self.eval_expr(&stroke_style.width, bounds).round();
+                    let width = self.eval_expr(&stroke_style.width, bounds, Axis::X).round();
 
                     // Add half-pixel offset for pixel-perfect line centering, scaled by DPI
                     // At 100% scale: 0.5, at 200% scale: 1.0, etc.
@@ -97,10 +104,10 @@ impl<'a> DrawingEngine<'a> {
                 }
             }
 
-            DrawCommand::Circle { cx, cy, radius, fill, stroke: _ } => {
-                let cx = self.eval_expr(cx, bounds);
-                let cy = self.eval_expr(cy, bounds);
-                let r = self.eval_expr(radius, bounds);
+            DrawCommand::Circle { cx, cy, radius, fill, stroke } => {
+                let cx = self.eval_expr(cx, bounds, Axis::X);
+                let cy = self.eval_expr(cy, bounds, Axis::Y);
+                let r = self.eval_expr(radius, bounds, Axis::X);
 
                 // Draw fill
                 if let Some(paint) = fill {
@@ -109,7 +116,33 @@ impl<'a> DrawingEngine<'a> {
                     }
                 }
 
-                // TODO: stroke for circle (not directly supported by speedy2d)
+                // Outline as 32 line segments (speedy2d has no circle stroke)
+                if let Some(stroke_style) = stroke {
+                    let width = self.eval_expr(&stroke_style.width, bounds, Axis::X);
+                    if let Some(color) = self.eval_paint(&stroke_style.paint) {
+                        let segments = 32;
+                        for i in 0..segments {
+                            let angle1 = 2.0 * std::f32::consts::PI * i as f32 / segments as f32;
+                            let angle2 = 2.0 * std::f32::consts::PI * (i + 1) as f32 / segments as f32;
+                            let p1 = (cx + r * angle1.cos(), cy + r * angle1.sin());
+                            let p2 = (cx + r * angle2.cos(), cy + r * angle2.sin());
+                            self.graphics.draw_line(p1, p2, width, color);
+                        }
+                    }
+                }
+            }
+
+            DrawCommand::Triangle { p1, p2, p3, fill } => {
+                if let Some(paint) = fill {
+                    if let Some(color) = self.eval_paint(paint) {
+                        let points = [
+                            Vector2::new(self.eval_expr(&p1.0, bounds, Axis::X), self.eval_expr(&p1.1, bounds, Axis::Y)),
+                            Vector2::new(self.eval_expr(&p2.0, bounds, Axis::X), self.eval_expr(&p2.1, bounds, Axis::Y)),
+                            Vector2::new(self.eval_expr(&p3.0, bounds, Axis::X), self.eval_expr(&p3.1, bounds, Axis::Y)),
+                        ];
+                        self.graphics.draw_triangle_three_color(points, [color, color, color]);
+                    }
+                }
             }
 
             DrawCommand::Path { commands: _, fill: _, stroke: _ } => {
@@ -129,14 +162,17 @@ impl<'a> DrawingEngine<'a> {
         }
     }
 
-    /// Evaluate an expression to a concrete float value
-    fn eval_expr(&self, expr: &Expr, bounds: Rect<i32>) -> f32 {
+    /// Evaluate an expression to a concrete float value. `axis` selects which
+    /// bounds dimension `Percent` refers to.
+    fn eval_expr(&self, expr: &Expr, bounds: Rect<i32>, axis: Axis) -> f32 {
         match expr {
             Expr::Literal(v) => *v * self.scale as f32,
             Expr::Percent(p) => {
-                // Percentage is context-dependent, but for simplicity use width
-                // In real implementation, we'd need context to know if this is X or Y
-                bounds.width() as f32 * p / 100.0
+                let dimension = match axis {
+                    Axis::X => bounds.width(),
+                    Axis::Y => bounds.height(),
+                };
+                dimension as f32 * p / 100.0
             }
             Expr::BoundsWidth => bounds.width() as f32,
             Expr::BoundsHeight => bounds.height() as f32,
@@ -145,13 +181,13 @@ impl<'a> DrawingEngine<'a> {
             Expr::BoundsRight => bounds.max.x as f32,
             Expr::BoundsBottom => bounds.max.y as f32,
             Expr::Scale => self.scale as f32,
-            Expr::Add(a, b) => self.eval_expr(a, bounds) + self.eval_expr(b, bounds),
-            Expr::Sub(a, b) => self.eval_expr(a, bounds) - self.eval_expr(b, bounds),
-            Expr::Mul(a, b) => self.eval_expr(a, bounds) * self.eval_expr(b, bounds),
+            Expr::Add(a, b) => self.eval_expr(a, bounds, axis) + self.eval_expr(b, bounds, axis),
+            Expr::Sub(a, b) => self.eval_expr(a, bounds, axis) - self.eval_expr(b, bounds, axis),
+            Expr::Mul(a, b) => self.eval_expr(a, bounds, axis) * self.eval_expr(b, bounds, axis),
             Expr::Div(a, b) => {
-                let divisor = self.eval_expr(b, bounds);
+                let divisor = self.eval_expr(b, bounds, axis);
                 if divisor != 0.0 {
-                    self.eval_expr(a, bounds) / divisor
+                    self.eval_expr(a, bounds, axis) / divisor
                 } else {
                     0.0
                 }
@@ -185,7 +221,7 @@ impl<'a> DrawingEngine<'a> {
         let width = self.eval_expr(&stroke.width, Rect {
             min: crate::types::Point { x: rect.top_left().x as i32, y: rect.top_left().y as i32 },
             max: crate::types::Point { x: rect.bottom_right().x as i32, y: rect.bottom_right().y as i32 },
-        });
+        }, Axis::X);
 
         if let Some(color) = self.eval_paint(&stroke.paint) {
             let tl = rect.top_left();
