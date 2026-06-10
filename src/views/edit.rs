@@ -20,13 +20,13 @@ use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::{PopupDirection, PopupMode, UI};
-use crate::view_base::{HasMainFields, ViewBasics, parse_hex_color};
+use crate::view_base::{HasMainFields, ViewBasics};
 use super::{BUTTON_MIN_HEIGHT, BUTTON_MIN_WIDTH, Dimension, FieldsMain, FieldsTexted, Visibility};
 
 const DOUBLE_CLICK_MS: u128 = 400;
 const ICON_GAP_DIP: i32 = 2;
-const DEFAULT_ICON_TINT: u32 = 0xFFFFFFFF;
-const DEFAULT_ERROR_COLOR: u32 = 0xFFD83A3A;
+
+
 
 pub struct Edit {
     state: RefCell<FieldsTexted>,
@@ -59,13 +59,15 @@ pub struct Edit {
     icon_right_bytes: RefCell<Option<Vec<u8>>>,
     icon_right_is_svg: RefCell<bool>,
     icon_right_rasterized: RefCell<Option<(u32, u32, Vec<u8>)>>,
-    icon_tint: RefCell<u32>,
+    /// None = the theme's "icon_tint" token; Some = user override.
+    icon_tint: RefCell<Option<u32>>,
     // Track which icon (if any) absorbed the most recent mouse-down — used to
     // route the click on mouse-up only if release happens over the same icon.
     pressed_icon: RefCell<Option<bool>>, // Some(true)=left, Some(false)=right
     // Error state + colour
     error: RefCell<bool>,
-    error_color: RefCell<u32>,
+    /// None = the theme's "error" token; Some = user override.
+    error_color: RefCell<Option<u32>>,
     /// True while the left button is held after a press inside the text, so
     /// mouse-move extends the selection (even when the pointer leaves the view).
     dragging: RefCell<bool>,
@@ -119,10 +121,10 @@ impl Edit {
             icon_right_bytes: RefCell::new(None),
             icon_right_is_svg: RefCell::new(false),
             icon_right_rasterized: RefCell::new(None),
-            icon_tint: RefCell::new(DEFAULT_ICON_TINT),
+            icon_tint: RefCell::new(None),
             pressed_icon: RefCell::new(None),
             error: RefCell::new(false),
-            error_color: RefCell::new(DEFAULT_ERROR_COLOR),
+            error_color: RefCell::new(None),
             dragging: RefCell::new(false),
         }
     }
@@ -896,16 +898,16 @@ impl View for Edit {
                 *self.icon_right_rasterized.borrow_mut() = None;
             }
             "icon_tint" => {
-                if let Some(c) = parse_hex_color(value) {
-                    *self.icon_tint.borrow_mut() = c;
+                if let Some(c) = crate::view_base::parse_color_value(value) {
+                    *self.icon_tint.borrow_mut() = Some(c);
                 }
             }
             "error" => {
                 self.set_error(value == "true");
             }
             "error_color" => {
-                if let Some(c) = parse_hex_color(value) {
-                    *self.error_color.borrow_mut() = c;
+                if let Some(c) = crate::view_base::parse_color_value(value) {
+                    *self.error_color.borrow_mut() = Some(c);
                 }
             }
             &_ => {}
@@ -1038,7 +1040,7 @@ impl View for Edit {
 
         // Step 2.5: Draw leading/trailing icons (between text and borders).
         // Icons are square, sized to the field's inner (padded) height, vertically centred.
-        let tint = *self.icon_tint.borrow();
+        let tint = self.icon_tint.borrow().unwrap_or_else(|| theme.color("icon_tint"));
         let icon_size = inner_h;
         if icon_size > 0 {
             let inner_top = rect.min.y + padding.top;
@@ -1087,7 +1089,8 @@ impl View for Edit {
                 (rect.min.x + inset, rect.max.y - bottom_offset - line_h),
                 (rect.max.x - inset, rect.max.y - bottom_offset),
             );
-            theme.draw_rect(underline, *self.error_color.borrow());
+            let error_color = self.error_color.borrow().unwrap_or_else(|| theme.color("error"));
+            theme.draw_rect(underline, error_color);
         }
 
         // Step 4: Draw caret (on top of everything, only when no selection or always)

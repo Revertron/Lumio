@@ -19,8 +19,8 @@ use crate::views::popupmenu::PopupMenu;
 use crate::styles::selector::FontSelector;
 use crate::view_base::{HasMainFields, ViewBasics, parse_hex_color};
 
-const DEFAULT_LINK_COLOR: u32 = 0xFF3273DC; // Bulma link blue (same as Label)
-const DEFAULT_MARK_COLOR: u32 = 0xFFFFF59D; // soft yellow highlight for <mark>
+
+
 const BIG_FACTOR: f32 = 1.25;
 const SMALL_FACTOR: f32 = 0.8;
 /// Highlight colour behind selected text (same blue as `Edit`/`Memo`).
@@ -158,7 +158,8 @@ pub struct RichText {
     state: RefCell<FieldsTexted>,
     content: RefCell<RichContent>,
     laid: RefCell<Option<LaidOut>>,
-    link_color: RefCell<u32>,
+    /// None = the theme's "link" token; Some = user override.
+    link_color: RefCell<Option<u32>>,
     /// True when the content contains at least one link — gates mouse routing.
     has_link: Cell<bool>,
     /// Link pressed on mouse-down, so the click only fires if release lands on
@@ -212,7 +213,7 @@ impl RichText {
             }),
             content: RefCell::new(RichContent::default()),
             laid: RefCell::new(None),
-            link_color: RefCell::new(DEFAULT_LINK_COLOR),
+            link_color: RefCell::new(None),
             has_link: Cell::new(false),
             pressed_href: RefCell::new(None),
             clicked_href: RefCell::new(None),
@@ -274,7 +275,7 @@ impl RichText {
     }
 
     pub fn set_link_color(&self, color: u32) {
-        *self.link_color.borrow_mut() = color;
+        *self.link_color.borrow_mut() = Some(color);
     }
 
     fn invalidate(&self) {
@@ -823,7 +824,7 @@ fn apply_tag(cur: &SpanStyle, name: &str, attrs: &str, has_link: &mut bool) -> S
         "mark" => {
             s.background = get_attr(attrs, "color")
                 .and_then(|c| parse_color(&c))
-                .or(Some(DEFAULT_MARK_COLOR));
+                .or_else(|| Some(crate::drawing::current_color("mark")));
         }
         "big" => s.size_scale *= BIG_FACTOR,
         "small" => s.size_scale *= SMALL_FACTOR,
@@ -1007,8 +1008,8 @@ impl View for RichText {
                 }
             }
             "link_color" => {
-                if let Some(c) = parse_hex_color(value) {
-                    *self.link_color.borrow_mut() = c;
+                if let Some(c) = crate::view_base::parse_color_value(value) {
+                    *self.link_color.borrow_mut() = Some(c);
                 }
             }
             "selectable" => { self.set_selectable(value == "true") }
@@ -1084,7 +1085,7 @@ impl View for RichText {
         let oy = r.min.y + padding.top;
         let line_w = ((1.0 * scale).round() as i32).max(1);
         let default_color = theme.get_text_color(state.main.state, state.main.foreground.as_ref());
-        let link_color = *self.link_color.borrow();
+        let link_color = self.link_color.borrow().unwrap_or_else(|| theme.color("link"));
 
         let laid = self.laid.borrow();
         if let Some(laid) = &*laid {

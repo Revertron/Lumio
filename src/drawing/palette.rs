@@ -75,6 +75,10 @@ impl Palette {
             ("tooltip_back".to_string(), 0xFFFFFFDD),
             ("tooltip_border".to_string(), 0xFF808080),
             ("tooltip_text".to_string(), 0xFF000000),
+            ("link".to_string(), 0xFF3273DC),
+            ("mark".to_string(), 0xFFFFF59D),
+            ("error".to_string(), 0xFFD83A3A),
+            ("icon_tint".to_string(), 0xFFFFFFFF),
         ]);
         Palette { colors, dimensions: Self::default_dimensions(), typefaces: Self::default_typefaces() }
     }
@@ -100,6 +104,10 @@ impl Palette {
             ("tooltip_back".to_string(), 0xFF202020),
             ("tooltip_border".to_string(), 0xFF5F5F5F),
             ("tooltip_text".to_string(), 0xFFE0E0E0),
+            ("link".to_string(), 0xFF6CA9F0),
+            ("mark".to_string(), 0xFF6B5E1F),
+            ("error".to_string(), 0xFFE5484D),
+            ("icon_tint".to_string(), 0xFFFFFFFF),
         ]);
         Palette { colors, dimensions: Self::default_dimensions(), typefaces: Self::default_typefaces() }
     }

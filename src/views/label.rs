@@ -18,10 +18,10 @@ use crate::views::{Borders, Dimension, Gravity, Visibility};
 use crate::views::popupmenu::PopupMenu;
 use crate::styles::selector::FontSelector;
 use crate::views::{FieldsMain, FieldsTexted};
-use crate::view_base::{HasMainFields, ViewBasics, parse_hex_color};
+use crate::view_base::{HasMainFields, ViewBasics};
 
-const DEFAULT_LINK_COLOR: u32 = 0xFF3273DC;
-const DEFAULT_ICON_TINT: u32 = 0xFFFFFFFF;
+
+
 const ICON_GAP_DIP: i32 = 2;
 /// Highlight colour behind selected text (same blue as `Edit`/`Memo`).
 
@@ -30,7 +30,8 @@ pub struct Label {
     /// When true, render as a hyperlink: link-coloured text + underline; the
     /// view becomes focusable and dispatches `EventType::Click`.
     link: RefCell<bool>,
-    link_color: RefCell<u32>,
+    /// None = the theme's "link" token; Some = user override.
+    link_color: RefCell<Option<u32>>,
     /// Tracks press-down on the label so `on_mouse_button_up` only fires the
     /// click when release lands on the label too (drag-off cancels).
     pressed: RefCell<bool>,
@@ -50,7 +51,8 @@ pub struct Label {
     right_icon_bytes: RefCell<Option<Vec<u8>>>,
     right_icon_is_svg: RefCell<bool>,
     right_icon_rasterized: RefCell<Option<(u32, u32, Vec<u8>)>>,
-    icon_tint: RefCell<u32>,
+    /// None = the theme's "icon_tint" token; Some = user override.
+    icon_tint: RefCell<Option<u32>>,
     /// Track which icon (if any) absorbed the most recent mouse-down, so the
     /// click only fires on mouse-up if the release lands over the same icon.
     pressed_icon: RefCell<Option<bool>>, // Some(true)=left, Some(false)=right
@@ -101,7 +103,7 @@ impl Label {
                 listeners: HashMap::new()
             }),
             link: RefCell::new(false),
-            link_color: RefCell::new(DEFAULT_LINK_COLOR),
+            link_color: RefCell::new(None),
             pressed: RefCell::new(false),
             background_color: RefCell::new(None),
             text_color: RefCell::new(None),
@@ -114,7 +116,7 @@ impl Label {
             right_icon_bytes: RefCell::new(None),
             right_icon_is_svg: RefCell::new(false),
             right_icon_rasterized: RefCell::new(None),
-            icon_tint: RefCell::new(DEFAULT_ICON_TINT),
+            icon_tint: RefCell::new(None),
             pressed_icon: RefCell::new(None),
             last_layout_params: std::cell::Cell::new(None),
             selectable: RefCell::new(false),
@@ -154,7 +156,7 @@ impl Label {
     }
 
     pub fn set_icon_tint(&self, tint: u32) {
-        *self.icon_tint.borrow_mut() = tint;
+        *self.icon_tint.borrow_mut() = Some(tint);
     }
 
     /// `&self` visibility setter. Safe to call from inside an event handler
@@ -606,15 +608,15 @@ impl View for Label {
             "single_line" => { self.state.borrow_mut().single_line = value.parse().unwrap_or(false) }
             "link" => { self.set_link(value == "true") }
             "link_color" => {
-                if let Some(c) = parse_hex_color(value) {
-                    *self.link_color.borrow_mut() = c;
+                if let Some(c) = crate::view_base::parse_color_value(value) {
+                    *self.link_color.borrow_mut() = Some(c);
                 }
             }
             "background_color" => {
-                self.set_background_color(parse_hex_color(value));
+                self.set_background_color(crate::view_base::parse_color_value(value));
             }
             "text_color" => {
-                self.set_text_color(parse_hex_color(value));
+                self.set_text_color(crate::view_base::parse_color_value(value));
             }
             "corner_radius" => {
                 if let Ok(r) = value.parse::<i32>() {
@@ -624,7 +626,7 @@ impl View for Label {
             "left_icon" => { self.set_left_icon(value); }
             "right_icon" => { self.set_right_icon(value); }
             "icon_tint" => {
-                if let Some(c) = parse_hex_color(value) {
+                if let Some(c) = crate::view_base::parse_color_value(value) {
                     self.set_icon_tint(c);
                 }
             }
@@ -736,7 +738,7 @@ impl View for Label {
             let color = if let Some(c) = *self.text_color.borrow() {
                 c
             } else if is_link {
-                *self.link_color.borrow()
+                self.link_color.borrow().unwrap_or_else(|| theme.color("link"))
             } else {
                 theme.get_text_color(state.main.state, state.main.foreground.as_ref())
             };
@@ -788,7 +790,7 @@ impl View for Label {
 
         // Icons (drawn after text so their square hit area sits over the
         // padded reservation rather than under any background-colour fill).
-        let tint = *self.icon_tint.borrow();
+        let tint = self.icon_tint.borrow().unwrap_or_else(|| theme.color("icon_tint"));
         if inner_h > 0 {
             let icon_size = inner_h;
             let inner_top = rect.min.y + padding.top;
