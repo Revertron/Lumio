@@ -242,7 +242,7 @@ impl View for RadioButton {
         let box_rect = super::super::types::rect((rect.min.x + left_inset, rect.min.y + box_y), (rect.min.x + left_inset + box_size, rect.min.y + box_y + box_size));
 
         // Step 1: Draw radio background (circle)
-        theme.draw_radiobutton_back(box_rect, state.main.state);
+        theme.draw_component("radio.back", box_rect, state.main.state);
 
         // Step 2: Draw text label
         if let Some(text) = &state.cached_text {
@@ -253,11 +253,11 @@ impl View for RadioButton {
         }
 
         // Step 3: Draw radio border (circle)
-        theme.draw_radiobutton_body(box_rect, state.main.state);
+        theme.draw_component("radio.body", box_rect, state.main.state);
 
         // Step 4: Draw indicator dot if checked
         if state.main.state.checked {
-            theme.draw_radiobutton_indicator(box_rect, state.main.state);
+            theme.draw_component("radio.indicator", box_rect, state.main.state);
         }
 
         theme.pop_clip();

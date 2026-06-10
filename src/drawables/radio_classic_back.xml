@@ -1,0 +1,12 @@
+<!-- Classic radio button interior: white circle filling the box -->
+<selector>
+    <item>
+        <layer-list>
+            <item>
+                <shape type="circle">
+                    <solid color="@surface"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

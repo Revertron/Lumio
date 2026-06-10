@@ -1,0 +1,12 @@
+<!-- Classic radio button selection dot (45% of the circle radius) -->
+<selector>
+    <item>
+        <layer-list>
+            <item>
+                <shape type="circle" radius="22.5%">
+                    <solid color="@text"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

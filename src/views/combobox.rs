@@ -279,7 +279,7 @@ impl View for ComboBox {
 
         // Step 4: Draw raised button with arrow inside the sunken area
         theme.draw_component("button.back", button_rect, state.main.state);
-        theme.draw_combobox_arrow(button_rect, state.main.state);
+        theme.draw_component("combo.arrow", button_rect, state.main.state);
         theme.draw_component("button.body", button_rect, state.main.state);
 
         theme.pop_clip();

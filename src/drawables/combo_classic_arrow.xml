@@ -1,0 +1,12 @@
+<!-- Classic combo box dropdown arrow: filled downward triangle, 8x4 dips -->
+<selector>
+    <item>
+        <layer-list>
+            <item>
+                <shape type="triangle" p1="50%-4,50%-2" p2="50%+4,50%-2" p3="50%,50%+2">
+                    <solid color="@text"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

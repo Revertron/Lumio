@@ -205,7 +205,7 @@ impl View for CheckBox {
 
         // Step 4: Draw checkmark if checked (on top of borders)
         if state.main.state.checked {
-            theme.draw_checkbox_checkmark(box_rect, state.main.state);
+            theme.draw_component("checkbox.checkmark", box_rect, state.main.state);
         }
 
         theme.pop_clip();

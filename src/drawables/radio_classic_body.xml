@@ -1,0 +1,26 @@
+<!-- Classic radio button outline; focused state adds an outer ring -->
+<selector>
+    <item state_focused="true">
+        <layer-list>
+            <item>
+                <shape type="circle">
+                    <stroke width="1" color="@border_light"/>
+                </shape>
+            </item>
+            <item>
+                <shape type="circle" radius="50%+2">
+                    <stroke width="1" color="@border_dark"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item>
+        <layer-list>
+            <item>
+                <shape type="circle">
+                    <stroke width="1" color="@border_light"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>
