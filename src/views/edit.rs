@@ -489,7 +489,7 @@ impl Edit {
 
         let x_offset = self.x_of_char_pos(caret_pos);
         rect.min.x = my_rect.min.x + padding.left + left_inset + x_offset;
-        rect.max.x = rect.min.x + (1f64 * scale) as i32;
+        rect.max.x = rect.min.x + (crate::drawing::current_dimension("caret.width") as f64 * scale) as i32;
 
         *self.caret_rect.borrow_mut() = rect;
         *self.caret_time.borrow_mut() = Instant::now();

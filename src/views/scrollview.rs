@@ -12,7 +12,7 @@ use crate::types::{Point, Rect, rect};
 use crate::ui::UI;
 use crate::views::{Borders, Dimension, Direction, FieldsMain, Gravity, Visibility};
 
-const SCROLLBAR_WIDTH: i32 = 16;
+
 const SCROLL_LINE: i32 = 20;
 const MIN_THUMB_SIZE: i32 = 16;
 
@@ -75,7 +75,7 @@ impl ScrollView {
     }
 
     fn scaled_scrollbar_width(&self, scale: f64) -> i32 {
-        (SCROLLBAR_WIDTH as f64 * scale).round() as i32
+        (crate::drawing::current_dimension("scrollbar.thickness") as f64 * scale).round() as i32
     }
 
     fn needs_scrollbar(&self) -> bool {

@@ -17,7 +17,7 @@ use crate::view_base::{HasMainFields, ViewBasics};
 use crate::views::label::Label;
 use crate::views::{Borders, Dimension, FieldsMain, Gravity, HAlign, Visibility};
 
-const SCROLLBAR_WIDTH: i32 = 14;
+
 const MIN_THUMB_SIZE: i32 = 16;
 const DEFAULT_MIN_COL_WIDTH: i32 = 32;
 /// Distance in dip between the grid's outer border and the inner content
@@ -562,7 +562,7 @@ impl TableView {
 
     fn scrollbar_thickness(&self) -> i32 {
         let scale = self.state.borrow().scale;
-        (SCROLLBAR_WIDTH as f64 * scale).round() as i32
+        (crate::drawing::current_dimension("scrollbar.thickness") as f64 * scale).round() as i32
     }
 
     fn resolve_scrollbar_visibility(&self) {

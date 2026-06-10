@@ -54,6 +54,12 @@ impl<'h> Classic<'h> {
         self.apply_color(Color::from_hex_argb(hex))
     }
 
+    /// The default typeface of the currently active palette. Convenience for
+    /// app startup (`UI::from_xml`), where no theme instance exists yet.
+    pub fn typeface() -> Typeface {
+        crate::drawing::current_typeface("default")
+    }
+
     pub fn new(graphics: &'h mut Graphics2D, drawable_registry: &'h DrawableRegistry, palette: &'h Palette, image_cache: &'h mut ImageCache, width: i32, height: i32, scale: f64) -> Self {
         let current_clip = rect((0, 0), (width, height));
         Classic {
@@ -78,8 +84,8 @@ impl<'h> Theme for Classic<'h> {
         self.set_clip(self.current_clip);
     }
 
-    fn typeface() -> Typeface {
-        Typeface::default()
+    fn typeface(&self, role: &str) -> Typeface {
+        self.palette.typeface(role)
     }
 
     fn get_back_color(&self, state: ViewState, selector: Option<&MainSelector>) -> u32 {
@@ -110,6 +116,10 @@ impl<'h> Theme for Classic<'h> {
 
     fn color(&self, token: &str) -> u32 {
         self.palette.color(token)
+    }
+
+    fn dimension(&self, token: &str) -> f32 {
+        self.palette.dimension(token)
     }
 
     fn set_clip(&mut self, rect: Rect<i32>) {

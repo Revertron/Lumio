@@ -43,6 +43,7 @@ impl<T> Win<T> {
 
     /// Choose the palette the window starts with (default: `Palette::classic()`).
     pub fn set_palette(&mut self, palette: Palette) {
+        crate::drawing::set_current_palette(palette.clone());
         self.palette = palette;
     }
 }
@@ -88,7 +89,10 @@ impl<T> WindowHandler<T> for Win<T> {
 
     fn on_draw(&mut self, helper: &mut WindowHelper<T>, graphics: &mut Graphics2D) {
         if let Some(palette) = self.ui.take_pending_palette() {
+            crate::drawing::set_current_palette(palette.clone());
             self.palette = palette;
+            // Dimensions may differ between palettes; re-run layout with them.
+            self.ui.layout(self.width, self.height, helper.get_scale_factor());
         }
         let scale = helper.get_scale_factor();
         let mut theme = Classic::new(graphics, &self.drawable_registry, &self.palette, &mut self.image_cache, self.width as i32, self.height as i32, scale);

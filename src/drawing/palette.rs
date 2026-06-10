@@ -1,15 +1,50 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
-/// Named color tokens resolved at draw time by the drawing engine
-/// (for `color="@token"` references in drawable XML) and by views
-/// (via `Theme::color`).
+use crate::themes::Typeface;
+
+/// The theme's resource bundle: named colors, dimensions and typefaces.
 ///
-/// Every entry must carry an explicit alpha byte (`0xAARRGGBB`): token values
-/// are used verbatim via `Color::from_hex_argb`, while literal 6-digit hex
-/// colors in drawable XML get full alpha added by the parser. An entry without
-/// alpha would render fully transparent.
+/// Colors are resolved at draw time by the drawing engine (for
+/// `color="@token"` references in drawable XML) and by views (via
+/// `Theme::color`). Every color entry must carry an explicit alpha byte
+/// (`0xAARRGGBB`): token values are used verbatim via `Color::from_hex_argb`,
+/// while literal 6-digit hex colors in drawable XML get full alpha added by
+/// the parser. An entry without alpha would render fully transparent.
+///
+/// Dimensions are in dips (callers multiply by scale). Because layout runs
+/// before any per-frame `Theme` exists, views read them through
+/// [`current_dimension`], which queries the thread-local palette kept in sync
+/// by the window handler.
+#[derive(Clone)]
 pub struct Palette {
     colors: HashMap<String, u32>,
+    dimensions: HashMap<String, f32>,
+    typefaces: HashMap<String, Typeface>,
+}
+
+thread_local! {
+    /// The palette currently in effect, for resolution outside paint (layout
+    /// code, app startup). The window handler replaces it on palette change.
+    static CURRENT: RefCell<Rc<Palette>> = RefCell::new(Rc::new(Palette::classic()));
+}
+
+/// Make `palette` the one returned by the thread-local accessors below.
+/// Called by the window handler whenever the active palette changes.
+pub fn set_current_palette(palette: Palette) {
+    CURRENT.with(|current| *current.borrow_mut() = Rc::new(palette));
+}
+
+/// Resolve a dimension token (dips) against the currently active palette.
+/// Usable from layout code, where no `Theme` instance exists yet.
+pub fn current_dimension(token: &str) -> f32 {
+    CURRENT.with(|current| current.borrow().dimension(token))
+}
+
+/// Resolve a typeface role against the currently active palette.
+pub fn current_typeface(role: &str) -> Typeface {
+    CURRENT.with(|current| current.borrow().typeface(role))
 }
 
 impl Palette {
@@ -31,7 +66,7 @@ impl Palette {
             ("table_separator".to_string(), 0xFFD0D0D0),
             ("progress_fill".to_string(), 0xFF000080),
         ]);
-        Palette { colors }
+        Palette { colors, dimensions: Self::default_dimensions(), typefaces: Self::default_typefaces() }
     }
 
     /// A dark counterpart of the Classic palette: same raised/sunken 3D
@@ -53,7 +88,27 @@ impl Palette {
             ("table_separator".to_string(), 0xFF454545),
             ("progress_fill".to_string(), 0xFF2D7DD2),
         ]);
-        Palette { colors }
+        Palette { colors, dimensions: Self::default_dimensions(), typefaces: Self::default_typefaces() }
+    }
+
+    /// Dimension tokens (dips) shared by both built-in palettes.
+    fn default_dimensions() -> HashMap<String, f32> {
+        HashMap::from([
+            ("scrollbar.thickness".to_string(), 16.0),
+            ("caret.width".to_string(), 1.0),
+            ("checkbox.box_size".to_string(), 16.0),
+            ("radio.box_size".to_string(), 16.0),
+            ("radio.left_inset".to_string(), 4.0),
+        ])
+    }
+
+    /// Typeface roles shared by both built-in palettes. Unknown roles fall
+    /// back to "default", so themes only need to override the roles they
+    /// care about.
+    fn default_typefaces() -> HashMap<String, Typeface> {
+        HashMap::from([
+            ("default".to_string(), Typeface::default()),
+        ])
     }
 
     /// Resolve a token to an ARGB color. An unknown token is a bug in the
@@ -66,6 +121,27 @@ impl Palette {
                 debug_assert!(false, "Unknown color token: {}", token);
                 0xFFFF00FF
             }
+        }
+    }
+
+    /// Resolve a dimension token to dips. An unknown token is a bug in the
+    /// theme: it panics in debug builds and collapses to 0 in release builds
+    /// so it stays visible.
+    pub fn dimension(&self, token: &str) -> f32 {
+        match self.dimensions.get(token) {
+            Some(value) => *value,
+            None => {
+                debug_assert!(false, "Unknown dimension token: {}", token);
+                0.0
+            }
+        }
+    }
+
+    /// Resolve a typeface role; unknown roles fall back to "default".
+    pub fn typeface(&self, role: &str) -> Typeface {
+        match self.typefaces.get(role) {
+            Some(typeface) => typeface.clone(),
+            None => self.typefaces.get("default").cloned().unwrap_or_default(),
         }
     }
 }
@@ -88,6 +164,26 @@ mod tests {
         for (token, color) in &palette.colors {
             assert_eq!(color >> 24, 0xFF, "token '{}' must carry explicit FF alpha", token);
         }
+    }
+
+    #[test]
+    fn test_dimension_tokens_resolve() {
+        let palette = Palette::classic();
+        assert_eq!(palette.dimension("scrollbar.thickness"), 16.0);
+        assert_eq!(palette.dimension("caret.width"), 1.0);
+        // dark palette covers the same dimension tokens
+        let dark = Palette::dark();
+        for token in palette.dimensions.keys() {
+            assert!(dark.dimensions.contains_key(token), "dark missing dimension '{}'", token);
+        }
+    }
+
+    #[test]
+    fn test_typeface_roles_fall_back_to_default() {
+        let palette = Palette::classic();
+        let default = palette.typeface("default");
+        let unknown = palette.typeface("no_such_role");
+        assert_eq!(default.font_name, unknown.font_name);
     }
 
     #[test]

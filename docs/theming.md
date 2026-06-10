@@ -1,10 +1,29 @@
 # Theme & Styling System Redesign
 
 Design doc for ROADMAP.md Tier 1, item 1.
-Status: **phases 1-4 implemented** (palette tokens, role drawables, legacy
+Status: **phases 1-5 implemented** (palette tokens, role drawables, legacy
 draw_* methods removed, dark palette + runtime switching via
-`ui.set_palette(Palette::dark())`). Phases 5 (metrics/typography tokens) and
-6 (`style=`/`@` references in layout XML) remain.
+`ui.set_palette(Palette::dark())`, dimension + typeface tokens). Phase 6
+(`style=`/`@` references in layout XML) remains.
+
+Phase-5 implementation notes, deviating from the sketch below where reality
+required it:
+- Dimensions live in `Palette` (the theme resource bundle) as dip values.
+  Because **layout runs before any per-frame `Theme` exists**, views resolve
+  them through `drawing::current_dimension(token)` — a thread-local "current
+  palette" kept in sync by `Win` (same pattern as the assets provider). The
+  `Theme::dimension()` resolver exists for paint-time use.
+- Token set is deliberately minimal: `scrollbar.thickness` (16 — unified;
+  TableView previously used 14), `caret.width`, `checkbox.box_size`,
+  `radio.box_size`, `radio.left_inset`. Other widget constants (item paddings,
+  tab paddings, dialog metrics) stay in code until a theme needs them.
+- Typography: `Theme::typeface(role)` is instance-level and palette-backed;
+  unknown roles fall back to `"default"`. `Classic::typeface()` remains as an
+  inherent convenience returning the current palette's default (used by
+  examples before a theme exists). Only the "default" role is seeded — add
+  roles when a consumer appears.
+- Palette changes trigger a full relayout (dimensions may differ between
+  palettes).
 
 ## Goal
 

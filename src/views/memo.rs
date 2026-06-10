@@ -448,7 +448,7 @@ impl Memo {
                 y: my_rect.min.y + padding.top + caret_y.round() as i32,
             },
             max: Point {
-                x: my_rect.min.x + padding.left + x_in_line.round() as i32 + (1f64 * scale) as i32,
+                x: my_rect.min.x + padding.left + x_in_line.round() as i32 + (crate::drawing::current_dimension("caret.width") as f64 * scale) as i32,
                 y: my_rect.min.y + padding.top + (caret_y + line_height).round() as i32,
             },
         };

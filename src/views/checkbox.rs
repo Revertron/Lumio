@@ -33,7 +33,7 @@ impl HasMainFields for CheckBox {
 impl ViewBasics for CheckBox {}
 
 const DEFAULT_TEXT_MARGIN: i32 = 6;
-const DEFAULT_BOX_SIZE: i32 = 16;
+
 
 #[allow(dead_code)]
 impl CheckBox {
@@ -107,7 +107,7 @@ impl CheckBox {
         if let Some(typeface) = typeface {
             if let Some(font) = get_font_family(&typeface.font_name, typeface.font_style) {
                 let scale = scale.round() as i32;
-                let box_size = DEFAULT_BOX_SIZE * scale;
+                let box_size = (crate::drawing::current_dimension("checkbox.box_size") as i32) * scale;
                 let text_margin = self.text_margin * scale;
                 let width = max_width - box_size - text_margin;
                 let options = match single_line {
@@ -159,8 +159,8 @@ impl View for CheckBox {
         let padding = self.get_padding(scale);
         let horizontal = padding.left + padding.right;
         let vertical = padding.top + padding.bottom;
-        let max_width = width.max(DEFAULT_BOX_SIZE) - horizontal;
-        let max_height = height.max(DEFAULT_BOX_SIZE) - vertical;
+        let max_width = width.max(crate::drawing::current_dimension("checkbox.box_size") as i32) - horizontal;
+        let max_height = height.max(crate::drawing::current_dimension("checkbox.box_size") as i32) - vertical;
         let (new_width, _new_height) = self.calculate_size(max_width, max_height, scale);
         let single_line = self.state.borrow().single_line;
         self.layout_text(new_width, single_line, scale);
@@ -180,7 +180,7 @@ impl View for CheckBox {
 
     fn paint(&self, origin: Point<i32>, theme: &mut dyn Theme) {
         let state = self.state.borrow();
-        let box_size = DEFAULT_BOX_SIZE * state.main.scale.round() as i32;
+        let box_size = (crate::drawing::current_dimension("checkbox.box_size") as i32) * state.main.scale.round() as i32;
         let mut rect = state.main.rect;
         rect.move_by(origin);
         theme.push_clip();
@@ -262,7 +262,7 @@ impl View for CheckBox {
     fn get_content_size(&self) -> (i32, i32) {
         let state = self.state.borrow();
         let scale = state.main.scale.round() as i32;
-        let box_size = DEFAULT_BOX_SIZE * scale;
+        let box_size = (crate::drawing::current_dimension("checkbox.box_size") as i32) * scale;
         let text_margin = self.text_margin * scale;
         match &state.cached_text {
             None => (box_size, box_size),

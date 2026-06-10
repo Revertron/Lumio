@@ -10,11 +10,17 @@ use super::types::Rect;
 
 pub trait Theme {
     fn clear_screen(&mut self);
-    fn typeface() -> Typeface where Self: Sized;
+    /// Resolve a typeface role (e.g. "default") against the theme's palette.
+    /// Unknown roles fall back to "default".
+    fn typeface(&self, role: &str) -> Typeface;
     fn get_back_color(&self, state: ViewState, selector: Option<&MainSelector>) -> u32;
     fn get_text_color(&self, state: ViewState, selector: Option<&MainSelector>) -> u32;
     /// Resolve a named palette color token (e.g. "selection") to an ARGB color.
     fn color(&self, token: &str) -> u32;
+    /// Resolve a named palette dimension token (e.g. "scrollbar.thickness")
+    /// to dips. Layout code without a `Theme` instance uses
+    /// `drawing::current_dimension` instead.
+    fn dimension(&self, token: &str) -> f32;
     fn set_clip(&mut self, rect: Rect<i32>);
     fn clip_rect(&mut self, rect: Rect<i32>) -> Rect<i32>;
     fn push_clip(&mut self);
