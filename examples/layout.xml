@@ -1,5 +1,9 @@
 <Frame id="main" width="min" height="max" direction="vertical" font="Noto Sans" font_style="Regular" padding="0">
+    <Style name="card" background="@surface" border_color="@border_light"/>
+    <Style name="hint" text_color="@text_hint"/>
+
     <Label id="label1" text="Label with NotoSans font" padding="4"/>
+    <Label id="label2" text="Styled hint label (style=hint, @text_hint token)" style="hint" padding="4"/>
     <Frame id="buttons1" direction="horizontal" padding="0" width="min">
         <Button id="btn1" text="Button 1" margin="4" tooltip="This is Button 1"/>
         <Button id="btn2" text="Button 2" margin="4" width="300" tooltip="A wider button"/>
@@ -14,7 +18,7 @@
 
     <Separator width="max" height="3" padding="1" />
 
-    <Frame width="min" height="min" direction="vertical" padding_right="4" background="#FFDD44">
+    <Frame style="card" width="min" height="min" direction="vertical" padding_right="4">
         <RadioButton id="rb1" text="Option A" group="options"/>
         <RadioButton id="rb2" text="Option B" group="options"/>
         <RadioButton id="rb3" text="Option C" group="options" checked="true"/>

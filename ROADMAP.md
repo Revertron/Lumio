@@ -21,9 +21,12 @@ The gaps cluster into five areas:
 
 ## Tier 1 — Foundations that unblock real apps
 
-### 1. Theme & styling system: resource-bundle themes
+### 1. Theme & styling system: resource-bundle themes — DONE
 
 The big one — full design in **[docs/theming.md](docs/theming.md)**.
+Implemented 2026-06: all six phases, including the dark palette
+(`ui.set_palette(Palette::dark())`), dimension/typeface tokens, `@token`
+references and `style=` bundles in layout XML.
 
 A theme becomes a resource bundle (drawables + color palette + metrics +
 typography) instead of a code module; the `Theme` trait shrinks to primitive

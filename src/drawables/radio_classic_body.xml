@@ -4,7 +4,7 @@
         <layer-list>
             <item>
                 <shape type="circle">
-                    <stroke width="1" color="@border_light"/>
+                    <stroke width="1" color="@outline"/>
                 </shape>
             </item>
             <item>
@@ -18,7 +18,7 @@
         <layer-list>
             <item>
                 <shape type="circle">
-                    <stroke width="1" color="@border_light"/>
+                    <stroke width="1" color="@outline"/>
                 </shape>
             </item>
         </layer-list>

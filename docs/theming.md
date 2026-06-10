@@ -1,10 +1,27 @@
 # Theme & Styling System Redesign
 
 Design doc for ROADMAP.md Tier 1, item 1.
-Status: **phases 1-5 implemented** (palette tokens, role drawables, legacy
+Status: **all six phases implemented.** Palette tokens, role drawables, legacy
 draw_* methods removed, dark palette + runtime switching via
-`ui.set_palette(Palette::dark())`, dimension + typeface tokens). Phase 6
-(`style=`/`@` references in layout XML) remains.
+`ui.set_palette(Palette::dark())`, dimension + typeface tokens, `@token`
+references and `style=` bundles in layout XML.
+
+Phase-6 implementation notes:
+- `background="@token"` / `text_color="@token"` in layout XML store
+  `DrawState::Token`, resolved at **paint** time — they follow theme switches.
+  Plain-u32 attributes (`border_color`, `icon_tint`, `error_color`,
+  `link_color`, `background_color`) resolve `@tokens` at **load** time via
+  `drawing::current_color` — a later palette switch does not update them.
+  RichText `<mark>` default resolves at parse time too.
+- `<Style name="card" background="@surface" .../>` (self-closing, must precede
+  use) or `UI::add_style()` register attribute bundles; `style="card"` applies
+  them before the element's own attributes, so own attributes win.
+- Edit/Label/RichText defaults (error underline, link color, mark highlight,
+  icon tint) are `Option<u32>`: `None` falls back to the theme's
+  `error`/`link`/`mark`/`icon_tint` tokens at paint time, any explicit value
+  (XML or setter) is a user override. New `outline` token for standalone
+  control outlines (radio circles) where the 3D shadow tone is too subtle in
+  dark mode.
 
 Phase-5 implementation notes, deviating from the sketch below where reality
 required it:
