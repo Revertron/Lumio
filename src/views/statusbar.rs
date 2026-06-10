@@ -14,8 +14,6 @@ use crate::view_base::{HasMainFields, ViewBasics, FontManager};
 const DEFAULT_HEIGHT: u32 = 22;
 const SECTION_PADDING_H: i32 = 4;
 const SECTION_INSET: i32 = 2;
-const INSET_SHADOW: u32 = 0xFF808080;
-const INSET_HIGHLIGHT: u32 = 0xFFFFFFFF;
 
 /// A section within the StatusBar, holding its text and cached layout.
 struct Section {
@@ -257,13 +255,13 @@ impl View for StatusBar {
 
             // Sunken inset: shadow on top & left, highlight on bottom & right
             // Top shadow
-            theme.draw_rect(rect((sx, section_top), (sx_end, section_top + 1)), INSET_SHADOW);
+            theme.draw_rect(rect((sx, section_top), (sx_end, section_top + 1)), theme.color("border_light"));
             // Left shadow
-            theme.draw_rect(rect((sx, section_top), (sx + 1, section_bottom)), INSET_SHADOW);
+            theme.draw_rect(rect((sx, section_top), (sx + 1, section_bottom)), theme.color("border_light"));
             // Bottom highlight
-            theme.draw_rect(rect((sx, section_bottom - 1), (sx_end, section_bottom)), INSET_HIGHLIGHT);
+            theme.draw_rect(rect((sx, section_bottom - 1), (sx_end, section_bottom)), theme.color("highlight"));
             // Right highlight
-            theme.draw_rect(rect((sx_end - 1, section_top), (sx_end, section_bottom)), INSET_HIGHLIGHT);
+            theme.draw_rect(rect((sx_end - 1, section_top), (sx_end, section_bottom)), theme.color("highlight"));
 
             // Draw text centered vertically within the inset area
             if let Some(ref cached) = section.cached_text {

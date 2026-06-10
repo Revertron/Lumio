@@ -3,7 +3,7 @@ use std::time::Duration;
 use speedy2d::dimen::Vector2;
 use speedy2d::Graphics2D;
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, MouseScrollDistance, UserEventSender, VirtualKeyCode, WindowHandler, WindowHelper, WindowStartupInfo};
-use crate::drawing::DrawableRegistry;
+use crate::drawing::{DrawableRegistry, Palette};
 use super::ui::UI;
 use super::themes::*;
 use super::themes::ImageCache;
@@ -11,6 +11,7 @@ use super::themes::ImageCache;
 pub struct Win<T> {
     ui: UI,
     drawable_registry: DrawableRegistry,
+    palette: Palette,
     image_cache: ImageCache,
     width: u32,
     height: u32,
@@ -28,6 +29,7 @@ impl<T> Win<T> {
         Win {
             ui,
             drawable_registry: DrawableRegistry::new(),
+            palette: Palette::classic(),
             image_cache: ImageCache::new(),
             width: 0,
             height: 0,
@@ -81,7 +83,7 @@ impl<T> WindowHandler<T> for Win<T> {
 
     fn on_draw(&mut self, helper: &mut WindowHelper<T>, graphics: &mut Graphics2D) {
         let scale = helper.get_scale_factor();
-        let mut theme = Classic::new(graphics, &self.drawable_registry, &mut self.image_cache, self.width as i32, self.height as i32, scale);
+        let mut theme = Classic::new(graphics, &self.drawable_registry, &self.palette, &mut self.image_cache, self.width as i32, self.height as i32, scale);
         self.ui.paint(&mut theme);
     }
 

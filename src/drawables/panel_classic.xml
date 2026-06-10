@@ -5,17 +5,17 @@
             <!-- Background -->
             <item>
                 <shape type="rect">
-                    <solid color="#d4d0c8"/>
+                    <solid color="@background"/>
                 </shape>
             </item>
 
             <!-- Simple border - all four edges -->
             <item>
                 <shape type="rect">
-                    <stroke width="1" color="#808080" top="0" left="0" right="0"/>
-                    <stroke width="1" color="#808080" bottom="0" left="0" right="0"/>
-                    <stroke width="1" color="#808080" left="0" top="0" bottom="0"/>
-                    <stroke width="1" color="#808080" right="0" top="0" bottom="0"/>
+                    <stroke width="1" color="@border_light" top="0" left="0" right="0"/>
+                    <stroke width="1" color="@border_light" bottom="0" left="0" right="0"/>
+                    <stroke width="1" color="@border_light" left="0" top="0" bottom="0"/>
+                    <stroke width="1" color="@border_light" right="0" top="0" bottom="0"/>
                 </shape>
             </item>
         </layer-list>

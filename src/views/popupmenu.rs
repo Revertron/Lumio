@@ -21,9 +21,6 @@ const SEPARATOR_HEIGHT: i32 = 3;
 const ICON_TEXT_GAP: i32 = 6;
 const ITEM_PADDING_LEFT: i32 = 6;
 const ITEM_PADDING_RIGHT: i32 = 12;
-const HIGHLIGHT_COLOR: u32 = 0xff0000c0;
-const HIGHLIGHT_TEXT_COLOR: u32 = 0xffffffff;
-const NORMAL_TEXT_COLOR: u32 = 0xff000000;
 
 /// Data for a single menu item.
 pub struct MenuItem {
@@ -229,7 +226,7 @@ impl View for PopupMenu {
         theme.clip_rect(r);
 
         // Draw background (same frame as Button)
-        theme.draw_component("button_classic_back", r, state.state);
+        theme.draw_component("button.back", r, state.state);
 
         let padding = state.padding.scaled(scale);
         let icon_size = (ICON_SIZE as f64 * scale).round() as i32;
@@ -266,10 +263,10 @@ impl View for PopupMenu {
 
             // Highlight hovered item
             let text_color = if hovered == Some(i) {
-                theme.draw_rect(item_rect, HIGHLIGHT_COLOR);
-                HIGHLIGHT_TEXT_COLOR
+                theme.draw_rect(item_rect, theme.color("item_highlight"));
+                theme.color("item_highlight_text")
             } else {
-                NORMAL_TEXT_COLOR
+                theme.color("text")
             };
 
             // Draw icon
@@ -293,7 +290,7 @@ impl View for PopupMenu {
         }
 
         // Draw border frame (same as Button)
-        theme.draw_component("button_classic_body", r, state.state);
+        theme.draw_component("button.body", r, state.state);
 
         theme.pop_clip();
     }

@@ -172,7 +172,7 @@ impl View for Button {
         theme.clip_rect(rect);
 
         // Step 1: Draw background (before text)
-        theme.draw_component("button_classic_back", rect, state.main.state);
+        theme.draw_component("button.back", rect, state.main.state);
 
         // Step 2: Draw text
         if let Some(text) = &state.cached_text {
@@ -183,7 +183,7 @@ impl View for Button {
         }
 
         // Step 3: Draw borders/body (after text, covers edges)
-        theme.draw_component("button_classic_body", rect, state.main.state);
+        theme.draw_component("button.body", rect, state.main.state);
 
         theme.pop_clip();
     }

@@ -24,7 +24,6 @@ const DEFAULT_MARK_COLOR: u32 = 0xFFFFF59D; // soft yellow highlight for <mark>
 const BIG_FACTOR: f32 = 1.25;
 const SMALL_FACTOR: f32 = 0.8;
 /// Highlight colour behind selected text (same blue as `Edit`/`Memo`).
-const SELECTION_COLOR: u32 = 0xff000080;
 
 /// The resolved style of a contiguous run of characters. Cheap to clone — the
 /// only heap field is the (shared) link target. Produced by the HTML parser and
@@ -1139,7 +1138,7 @@ impl View for RichText {
                 // 1b. Selection band over any highlight backgrounds.
                 let line_sel = sel_line_rects.get(li).copied().flatten();
                 if let Some(sel) = line_sel {
-                    theme.draw_rect(sel, SELECTION_COLOR);
+                    theme.draw_rect(sel, theme.color("selection"));
                 }
                 // 2. Text, word by word. Words under the selection band get a
                 // second, cropped draw in a contrasting color; the crop rect

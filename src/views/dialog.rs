@@ -23,7 +23,6 @@ const ICON_TEXT_GAP: i32 = 12;
 const CONTENT_BUTTON_GAP: i32 = 16;
 const BUTTON_GAP: i32 = 6;
 const DIALOG_PADDING: i32 = 8;
-const TEXT_COLOR: u32 = 0xff000000;
 
 /// Which side of the button bar a button belongs to.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -358,7 +357,7 @@ impl View for Dialog {
         theme.clip_rect(r);
 
         // Background frame
-        theme.draw_component("button_classic_back", r, state.state);
+        theme.draw_component("button.back", r, state.state);
 
         let padding = state.padding.scaled(scale);
         let icon_size = (DIALOG_ICON_SIZE as f64 * scale).round() as i32;
@@ -393,7 +392,7 @@ impl View for Dialog {
             // Paint message text
             if let Some(ref text) = *self.cached_message.borrow() {
                 let text_y = r.min.y + padding.top;
-                theme.draw_text(text_x as f32, text_y as f32, TEXT_COLOR, text);
+                theme.draw_text(text_x as f32, text_y as f32, theme.color("text"), text);
             }
         }
 
@@ -403,7 +402,7 @@ impl View for Dialog {
         }
 
         // Border frame
-        theme.draw_component("button_classic_body", r, state.state);
+        theme.draw_component("button.body", r, state.state);
 
         theme.pop_clip();
     }

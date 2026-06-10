@@ -6,7 +6,7 @@
             <!-- White background -->
             <item>
                 <shape type="rect">
-                    <solid color="#ffffff"/>
+                    <solid color="@surface"/>
                 </shape>
             </item>
 
@@ -14,19 +14,19 @@
             <item>
                 <shape type="rect">
                     <!-- Outer border: Gray on top-left -->
-                    <stroke width="1" color="#808080" top="0" left="0" right="1"/>
-                    <stroke width="1" color="#808080" left="0" top="0" bottom="1"/>
+                    <stroke width="1" color="@border_light" top="0" left="0" right="1"/>
+                    <stroke width="1" color="@border_light" left="0" top="0" bottom="1"/>
 
                     <!-- Inner shadow: Dark on top-left -->
-                    <stroke width="1" color="#404040" top="1" left="1" right="1"/>
-                    <stroke width="1" color="#404040" left="1" top="1" bottom="1"/>
+                    <stroke width="1" color="@border_dark" top="1" left="1" right="1"/>
+                    <stroke width="1" color="@border_dark" left="1" top="1" bottom="1"/>
 
                     <!-- Inner highlight: Background on bottom-right -->
-                    <stroke width="1" color="#d4d0c8" bottom="1" left="1" right="1"/>
-                    <stroke width="1" color="#d4d0c8" right="1" top="1" bottom="1"/>
+                    <stroke width="1" color="@background" bottom="1" left="1" right="1"/>
+                    <stroke width="1" color="@background" right="1" top="1" bottom="1"/>
 
                     <!-- Outer highlight: White on bottom -->
-                    <stroke width="1" color="#ffffff" bottom="0" left="1" right="1"/>
+                    <stroke width="1" color="@highlight" bottom="0" left="1" right="1"/>
                 </shape>
             </item>
         </layer-list>

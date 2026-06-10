@@ -144,9 +144,9 @@ impl View for ImageButton {
 
         // Draw background when not flat, or when hovered/pressed (but skip if hover_image handles hover)
         if !flat {
-            theme.draw_component("button_classic_back", r, state.state);
+            theme.draw_component("button.back", r, state.state);
         } else if (state.state.hovered || state.state.pressed) && !has_hover_image {
-            theme.draw_component("button_classic_back", r, state.state);
+            theme.draw_component("button.back", r, state.state);
         }
 
         // Pick which image bytes to draw: hover image when hovered/pressed, otherwise normal
@@ -195,9 +195,9 @@ impl View for ImageButton {
 
         // Draw borders when not flat, or when pressed (unless no_inset suppresses it)
         if !flat && !(no_inset && state.state.pressed) {
-            theme.draw_component("button_classic_body", r, state.state);
+            theme.draw_component("button.body", r, state.state);
         } else if state.state.pressed && !no_inset {
-            theme.draw_component("button_classic_body", r, state.state);
+            theme.draw_component("button.body", r, state.state);
         }
 
         theme.pop_clip();

@@ -24,7 +24,6 @@ const DEFAULT_LINK_COLOR: u32 = 0xFF3273DC;
 const DEFAULT_ICON_TINT: u32 = 0xFFFFFFFF;
 const ICON_GAP_DIP: i32 = 2;
 /// Highlight colour behind selected text (same blue as `Edit`/`Memo`).
-const SELECTION_COLOR: u32 = 0xff000080;
 
 pub struct Label {
     state: RefCell<FieldsTexted>,
@@ -761,7 +760,7 @@ impl View for Label {
                     let x_left = if line == start_line { text_left + start_x.round() as i32 } else { text_left };
                     let x_right = if line == end_line { text_left + end_x.round() as i32 } else { line_right };
                     let sel_rect = crate::types::rect((x_left, y_top), (x_right, y_bottom));
-                    theme.draw_rect(sel_rect, SELECTION_COLOR);
+                    theme.draw_rect(sel_rect, theme.color("selection"));
                     sel_rects.push(sel_rect);
                 }
             }

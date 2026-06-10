@@ -3,6 +3,7 @@ use speedy2d::color::Color;
 use speedy2d::dimen::Vector2;
 use speedy2d::shape::Rectangle;
 
+use super::palette::Palette;
 use super::primitives::*;
 use crate::types::Rect;
 
@@ -15,11 +16,12 @@ pub struct DrawContext {
 pub struct DrawingEngine<'a> {
     graphics: &'a mut Graphics2D,
     scale: f64,
+    palette: &'a Palette,
 }
 
 impl<'a> DrawingEngine<'a> {
-    pub fn new(graphics: &'a mut Graphics2D, scale: f64) -> Self {
-        DrawingEngine { graphics, scale }
+    pub fn new(graphics: &'a mut Graphics2D, scale: f64, palette: &'a Palette) -> Self {
+        DrawingEngine { graphics, scale, palette }
     }
 
     /// Draw a drawable within the given bounds
@@ -169,6 +171,7 @@ impl<'a> DrawingEngine<'a> {
                     Some(*c)
                 }
             }
+            PaintKind::Token(name) => Some(Color::from_hex_argb(self.palette.color(name))),
             PaintKind::Gradient(_) => {
                 // TODO: Gradient support
                 None

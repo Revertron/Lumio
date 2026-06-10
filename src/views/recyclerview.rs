@@ -1054,7 +1054,7 @@ impl View for RecyclerView {
         theme.clip_rect(rect);
 
         // Step 1: Draw background (before items)
-        theme.draw_component("edit_field_classic_back", rect, self.get_state().unwrap());
+        theme.draw_component("edit.back", rect, self.get_state().unwrap());
 
         let padding = self.get_padding(self.state.borrow().scale);
         let scroll_x = *self.scroll_x.borrow();
@@ -1069,7 +1069,7 @@ impl View for RecyclerView {
         }
 
         // Step 2: Draw borders (after items)
-        theme.draw_component("edit_field_classic_body", rect, self.get_state().unwrap());
+        theme.draw_component("edit.body", rect, self.get_state().unwrap());
 
         theme.pop_clip();
     }

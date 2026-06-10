@@ -23,8 +23,6 @@ use crate::ui::{PopupDirection, PopupMode, UI};
 use crate::view_base::{HasMainFields, ViewBasics, parse_hex_color};
 use super::{BUTTON_MIN_HEIGHT, BUTTON_MIN_WIDTH, Dimension, FieldsMain, FieldsTexted, Visibility};
 
-const SELECTION_COLOR: u32 = 0xff000080;
-const PLACEHOLDER_COLOR: u32 = 0xff808080;
 const DOUBLE_CLICK_MS: u128 = 400;
 const ICON_GAP_DIP: i32 = 2;
 const DEFAULT_ICON_TINT: u32 = 0xFFFFFFFF;
@@ -972,7 +970,7 @@ impl View for Edit {
         // Step 1: Draw background
         theme.push_clip();
         theme.clip_rect(rect);
-        theme.draw_component("edit_field_classic_back", rect, state.main.state);
+        theme.draw_component("edit.back", rect, state.main.state);
         theme.pop_clip();
 
         // Step 2: Draw selection highlight + text (or placeholder)
@@ -1006,7 +1004,7 @@ impl View for Edit {
                         (text_rect.min.x + x1 + scroll_x, text_rect.min.y),
                         (text_rect.min.x + x2 + scroll_x, text_rect.max.y),
                     );
-                    theme.draw_rect(rect, SELECTION_COLOR);
+                    theme.draw_rect(rect, theme.color("selection"));
                     sel_rect = Some(rect);
                 }
             }
@@ -1028,7 +1026,7 @@ impl View for Edit {
                 theme.draw_text(
                     text_rect.min.x as f32,
                     (text_rect.min.y as f32 + y).round(),
-                    PLACEHOLDER_COLOR,
+                    theme.color("text_hint"),
                     &placeholder_text,
                 );
                 drop(state);
@@ -1075,7 +1073,7 @@ impl View for Edit {
         rect.move_by(origin);
         theme.push_clip();
         theme.clip_rect(rect);
-        theme.draw_component("edit_field_classic_body", rect, state.main.state);
+        theme.draw_component("edit.body", rect, state.main.state);
         theme.pop_clip();
 
         // Step 3.5: Error underline. Draw a 2-dip line just above the existing
@@ -1097,7 +1095,7 @@ impl View for Edit {
             let mut caret_rect = self.get_caret_rect(state.main.scale);
             caret_rect.move_by(origin);
             caret_rect.move_by((scroll_x, 0));
-            theme.draw_component("edit_caret_classic", caret_rect, state.main.state);
+            theme.draw_component("edit.caret", caret_rect, state.main.state);
         }
     }
 

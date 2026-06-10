@@ -166,7 +166,7 @@ impl DrawableParser {
                         "solid" => {
                             let color = Self::get_attr(&e, "color")?;
                             fill = Some(Paint {
-                                kind: PaintKind::Color(Self::parse_color(&color)?),
+                                kind: Self::parse_paint_kind(&color)?,
                                 opacity: 1.0,
                             });
                         }
@@ -240,7 +240,7 @@ impl DrawableParser {
             .parse::<f32>()
             .map_err(|e| format!("Invalid width: {}", e))?;
 
-        let color = Self::parse_color(&Self::get_attr(element, "color")?)?;
+        let color = Self::parse_paint_kind(&Self::get_attr(element, "color")?)?;
 
         let top = Self::get_attr_opt(element, "top")
             .and_then(|s| s.parse::<f32>().ok());
@@ -273,7 +273,7 @@ impl DrawableParser {
         let width = Expr::Literal(stroke.width);
 
         let paint = Paint {
-            kind: PaintKind::Color(stroke.color),
+            kind: stroke.color.clone(),
             opacity: 1.0,
         };
 
@@ -371,6 +371,19 @@ impl DrawableParser {
         Self::get_attr(element, name).ok()
     }
 
+    /// Parse a color attribute: `@name` becomes a palette token resolved at
+    /// draw time, anything else must be a literal `#RRGGBB`/`#AARRGGBB` color.
+    fn parse_paint_kind(color_str: &str) -> Result<PaintKind, String> {
+        if let Some(token) = color_str.strip_prefix('@') {
+            if token.is_empty() {
+                return Err("Empty color token name".to_string());
+            }
+            Ok(PaintKind::Token(token.to_string()))
+        } else {
+            Ok(PaintKind::Color(Self::parse_color(color_str)?))
+        }
+    }
+
     fn parse_color(color_str: &str) -> Result<Color, String> {
         if color_str.starts_with('#') {
             let hex = &color_str[1..];
@@ -414,11 +427,73 @@ impl DrawableParser {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::themes::ViewState;
+
+    #[test]
+    fn test_solid_color_token_parses() {
+        let xml = r#"<selector>
+            <item>
+                <layer-list>
+                    <item>
+                        <shape type="rect">
+                            <solid color="@surface"/>
+                            <stroke width="1" color="@border_dark" top="0"/>
+                        </shape>
+                    </item>
+                </layer-list>
+            </item>
+        </selector>"#;
+
+        let selector = DrawableParser::parse_selector(xml).expect("selector should parse");
+        let drawable = selector.get_drawable(&ViewState::default()).expect("default state");
+
+        let mut tokens = Vec::new();
+        fn collect(commands: &[DrawCommand], tokens: &mut Vec<String>) {
+            for cmd in commands {
+                match cmd {
+                    DrawCommand::Rect { fill, stroke, .. } => {
+                        if let Some(Paint { kind: PaintKind::Token(t), .. }) = fill {
+                            tokens.push(t.clone());
+                        }
+                        if let Some(s) = stroke {
+                            if let PaintKind::Token(t) = &s.paint.kind {
+                                tokens.push(t.clone());
+                            }
+                        }
+                    }
+                    DrawCommand::Line { stroke: Some(s), .. } => {
+                        if let PaintKind::Token(t) = &s.paint.kind {
+                            tokens.push(t.clone());
+                        }
+                    }
+                    DrawCommand::Group { commands } => collect(commands, tokens),
+                    _ => {}
+                }
+            }
+        }
+        collect(&drawable.commands, &mut tokens);
+
+        assert!(tokens.contains(&"surface".to_string()));
+        assert!(tokens.contains(&"border_dark".to_string()));
+    }
+
+    #[test]
+    fn test_invalid_color_still_errors() {
+        assert!(DrawableParser::parse_paint_kind("red").is_err());
+        assert!(DrawableParser::parse_paint_kind("@").is_err());
+        assert!(matches!(DrawableParser::parse_paint_kind("@text"), Ok(PaintKind::Token(t)) if t == "text"));
+        assert!(matches!(DrawableParser::parse_paint_kind("#ffffff"), Ok(PaintKind::Color(_))));
+    }
+}
+
 /// Stroke definition for parsing
 #[derive(Debug, Clone)]
 struct StrokeDefinition {
     width: f32,
-    color: Color,
+    color: PaintKind,
     top: Option<f32>,
     bottom: Option<f32>,
     left: Option<f32>,

@@ -21,7 +21,7 @@ const SCROLLBAR_WIDTH: i32 = 14;
 const MIN_THUMB_SIZE: i32 = 16;
 const DEFAULT_MIN_COL_WIDTH: i32 = 32;
 /// Distance in dip between the grid's outer border and the inner content
-/// (header/body/scrollbars). Two dip lets the 2-pixel `edit_field_classic_body`
+/// (header/body/scrollbars). Two dip lets the 2-pixel `edit.body`
 /// border sit cleanly outside the chrome instead of overlapping it.
 const BORDER_INSET_DIP: i32 = 2;
 // Padding in dip. Scaled at layout time. Kept small so the row stays tight
@@ -31,8 +31,6 @@ const DEFAULT_HEADER_PAD_V: i32 = 3;
 const DEFAULT_ROW_PAD_V: i32 = 2;
 const DEFAULT_CELL_PAD_H: i32 = 6;
 const DIVIDER_GRAB_DIP: i32 = 3;
-const SELECTION_COLOR: u32 = 0xFFCCE0F5; // light blue underlay so cell text stays readable
-const SEPARATOR_COLOR: u32 = 0xFFD0D0D0;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ColumnWidth {
@@ -814,7 +812,7 @@ impl TableView {
             };
             let x0 = cx - half_w;
             let x1 = cx + half_w;
-            theme.draw_rect(rect((x0, y), (x1, y + 1)), 0xFF000000);
+            theme.draw_rect(rect((x0, y), (x1, y + 1)), theme.color("text"));
         }
     }
 }
@@ -916,7 +914,7 @@ impl View for TableView {
 
         // Outer background
         let main_state = self.state.borrow().state;
-        theme.draw_component("edit_field_classic_back", r, main_state);
+        theme.draw_component("edit.back", r, main_state);
 
         let header_h = self.header_height_px.get();
         let bw = self.body_width();
@@ -954,7 +952,7 @@ impl View for TableView {
 
             // Selection highlight (light underlay so cell text remains readable)
             if self.selected_raw.get() == Some(raw) {
-                theme.draw_rect(row_rect, SELECTION_COLOR);
+                theme.draw_rect(row_rect, theme.color("table_selection"));
             }
 
             // Cells — each cell's own paint() draws at (origin + cell.rect.min).
@@ -974,7 +972,7 @@ impl View for TableView {
 
             // Row separator
             let sep_y = row_top + row_h - 1;
-            theme.draw_rect(rect((body_origin.x, sep_y), (body_origin.x + bw, sep_y + 1)), SEPARATOR_COLOR);
+            theme.draw_rect(rect((body_origin.x, sep_y), (body_origin.x + bw, sep_y + 1)), theme.color("table_separator"));
         }
         drop(order); drop(cols); drop(col_offs); drop(rows);
 
@@ -1014,7 +1012,7 @@ impl View for TableView {
                     HAlign::Center => cell_rect.min.x + (cw - tw) / 2,
                 };
                 let ty = cell_rect.min.y + (header_h - th) / 2;
-                theme.draw_text(tx as f32, ty as f32, 0xFF000000, block);
+                theme.draw_text(tx as f32, ty as f32, theme.color("text"), block);
             }
             if let Some((sc, dir)) = sort
                 && sc == c
@@ -1064,7 +1062,7 @@ impl View for TableView {
         }
 
         // Outer border
-        theme.draw_component("edit_field_classic_body", r, main_state);
+        theme.draw_component("edit.body", r, main_state);
 
         theme.pop_clip();
     }

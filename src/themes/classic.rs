@@ -14,7 +14,7 @@ use super::super::themes::utils::draw_dashed_rectangle;
 use super::super::types::Rect;
 use super::super::types;
 use super::super::types::rect;
-use super::super::drawing::{Drawable, DrawableRegistry, DrawingEngine};
+use super::super::drawing::{Drawable, DrawableRegistry, DrawingEngine, Palette};
 use super::super::views::Direction;
 
 /// Cache for GPU image handles, keyed by the raw pointer of the source byte slice.
@@ -30,6 +30,7 @@ pub struct Classic<'h> {
     clip_stack: VecDeque<Rect<i32>>,
     opacity_stack: Vec<f32>,
     drawable_registry: &'h DrawableRegistry,
+    palette: &'h Palette,
     image_cache: &'h mut ImageCache,
 }
 
@@ -62,7 +63,7 @@ impl<'h> Classic<'h> {
         self.apply_color(Color::from_hex_argb(hex))
     }
 
-    pub fn new(graphics: &'h mut Graphics2D, drawable_registry: &'h DrawableRegistry, image_cache: &'h mut ImageCache, width: i32, height: i32, scale: f64) -> Self {
+    pub fn new(graphics: &'h mut Graphics2D, drawable_registry: &'h DrawableRegistry, palette: &'h Palette, image_cache: &'h mut ImageCache, width: i32, height: i32, scale: f64) -> Self {
         let current_clip = rect((0, 0), (width, height));
         Classic {
             graphics,
@@ -73,6 +74,7 @@ impl<'h> Classic<'h> {
             clip_stack: VecDeque::new(),
             opacity_stack: Vec::new(),
             drawable_registry,
+            palette,
             image_cache,
         }
     }
@@ -81,7 +83,7 @@ impl<'h> Classic<'h> {
 impl<'h> Theme for Classic<'h> {
     fn clear_screen(&mut self) {
         self.graphics.set_clip(None);
-        self.graphics.clear_screen(Color::from_hex_rgb(Classic::BACKGROUND));
+        self.graphics.clear_screen(Color::from_hex_rgb(self.palette.color("background")));
         self.set_clip(self.current_clip);
     }
 
@@ -99,7 +101,7 @@ impl<'h> Theme for Classic<'h> {
                 }
             }
         }
-        Classic::BACKGROUND
+        self.palette.color("background")
     }
 
     fn get_text_color(&self, state: ViewState, selector: Option<&MainSelector>) -> u32 {
@@ -112,7 +114,11 @@ impl<'h> Theme for Classic<'h> {
                 }
             }
         }
-        0xff000000
+        self.palette.color("text")
+    }
+
+    fn color(&self, token: &str) -> u32 {
+        self.palette.color(token)
     }
 
     fn set_clip(&mut self, rect: Rect<i32>) {
@@ -402,7 +408,7 @@ impl<'h> Theme for Classic<'h> {
 
     // New drawable-based methods implementation
     fn draw_drawable(&mut self, drawable: &Drawable, rect: Rect<i32>) {
-        let mut engine = DrawingEngine::new(self.graphics, self.scale);
+        let mut engine = DrawingEngine::new(self.graphics, self.scale, self.palette);
         engine.draw_drawable(drawable, rect);
     }
 
@@ -410,11 +416,11 @@ impl<'h> Theme for Classic<'h> {
         &self.drawable_registry
     }
 
-    fn draw_component(&mut self, drawable_name: &str, rect: Rect<i32>, state: ViewState) {
+    fn draw_component(&mut self, role: &str, rect: Rect<i32>, state: ViewState) {
         // Get drawable from registry
-        if let Some(selector) = self.drawable_registry.get(drawable_name) {
+        if let Some(selector) = self.drawable_registry.get(role) {
             if let Some(drawable) = selector.get_drawable(&state) {
-                let mut engine = DrawingEngine::new(self.graphics, self.scale);
+                let mut engine = DrawingEngine::new(self.graphics, self.scale, self.palette);
                 engine.draw_drawable(drawable, rect);
             }
         }

@@ -13,6 +13,8 @@ pub trait Theme {
     fn typeface() -> Typeface where Self: Sized;
     fn get_back_color(&self, state: ViewState, selector: Option<&MainSelector>) -> u32;
     fn get_text_color(&self, state: ViewState, selector: Option<&MainSelector>) -> u32;
+    /// Resolve a named palette color token (e.g. "selection") to an ARGB color.
+    fn color(&self, token: &str) -> u32;
     fn set_clip(&mut self, rect: Rect<i32>);
     fn clip_rect(&mut self, rect: Rect<i32>) -> Rect<i32>;
     fn push_clip(&mut self);
@@ -62,9 +64,9 @@ pub trait Theme {
     /// Get the drawable registry for this theme
     fn get_drawable_registry(&self) -> &DrawableRegistry;
 
-    /// Draw a component using a drawable from the registry
-    /// This method has a default implementation that can be overridden
-    fn draw_component(&mut self, drawable_name: &str, rect: Rect<i32>, state: ViewState);
+    /// Draw a widget visual by role name (e.g. "button.back"), resolved to
+    /// the theme's drawable for that role and the given state.
+    fn draw_component(&mut self, role: &str, rect: Rect<i32>, state: ViewState);
 
     /// Draw an image from raw file bytes, scaled to fit the given rect.
     /// The image is cached by the byte slice pointer for efficiency.

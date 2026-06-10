@@ -5,7 +5,7 @@
         <layer-list>
             <item>
                 <shape type="rect">
-                    <solid color="#ffffff"/>
+                    <solid color="@surface"/>
                 </shape>
             </item>
         </layer-list>

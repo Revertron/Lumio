@@ -21,19 +21,16 @@ impl DrawableRegistry {
     /// Load all embedded drawable XML files
     fn load_embedded_drawables(&mut self) {
         println!("Loading drawables");
-        // Classic theme drawables
-        self.load_drawable("button_classic", include_str!("../drawables/button_classic.xml"));
-        self.load_drawable("button_classic_back", include_str!("../drawables/button_classic_back.xml"));
-        self.load_drawable("button_classic_body", include_str!("../drawables/button_classic_body.xml"));
-        self.load_drawable("edit_field_classic_back", include_str!("../drawables/edit_field_classic_back.xml"));
-        self.load_drawable("edit_field_classic_body", include_str!("../drawables/edit_field_classic_body.xml"));
-        self.load_drawable("edit_caret_classic", include_str!("../drawables/edit_caret_classic.xml"));
-        self.load_drawable("checkbox_classic", include_str!("../drawables/checkbox_classic.xml"));
-        self.load_drawable("panel_classic", include_str!("../drawables/panel_classic.xml"));
-
-        // Future: Add more themes here
-        // self.load_drawable("button_modern", include_str!("../../../res/drawables/button_modern.xml"));
-        // self.load_drawable("button_material", include_str!("../../../res/drawables/button_material.xml"));
+        // Drawables are registered under role names ("button.back"); the XML
+        // files hold the Classic theme's skin for each role.
+        self.load_drawable("button", include_str!("../drawables/button_classic.xml"));
+        self.load_drawable("button.back", include_str!("../drawables/button_classic_back.xml"));
+        self.load_drawable("button.body", include_str!("../drawables/button_classic_body.xml"));
+        self.load_drawable("edit.back", include_str!("../drawables/edit_field_classic_back.xml"));
+        self.load_drawable("edit.body", include_str!("../drawables/edit_field_classic_body.xml"));
+        self.load_drawable("edit.caret", include_str!("../drawables/edit_caret_classic.xml"));
+        self.load_drawable("checkbox.box", include_str!("../drawables/checkbox_classic.xml"));
+        self.load_drawable("panel", include_str!("../drawables/panel_classic.xml"));
     }
 
     /// Load a single drawable from XML string
@@ -78,18 +75,18 @@ mod tests {
     fn test_registry_loads_drawables() {
         let registry = DrawableRegistry::new();
 
-        // Check that all classic drawables are loaded
-        assert!(registry.contains("button_classic"));
-        assert!(registry.contains("edit_field_classic_back"));
-        assert!(registry.contains("checkbox_classic"));
-        assert!(registry.contains("panel_classic"));
+        // Check that all role drawables are loaded
+        assert!(registry.contains("button"));
+        assert!(registry.contains("edit.back"));
+        assert!(registry.contains("checkbox.box"));
+        assert!(registry.contains("panel"));
     }
 
     #[test]
     fn test_registry_get_drawable() {
         let registry = DrawableRegistry::new();
 
-        let button = registry.get("button_classic");
+        let button = registry.get("button");
         assert!(button.is_some());
 
         let nonexistent = registry.get("nonexistent");
@@ -102,6 +99,6 @@ mod tests {
 
         let drawables = registry.list_drawables();
         assert!(drawables.len() >= 4);
-        assert!(drawables.contains(&"button_classic".to_string()));
+        assert!(drawables.contains(&"button".to_string()));
     }
 }

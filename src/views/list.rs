@@ -170,7 +170,7 @@ impl View for List {
         let state = self.get_state().unwrap();
 
         // Step 1: Draw background (before items)
-        theme.draw_component("edit_field_classic_back", rect, state);
+        theme.draw_component("edit.back", rect, state);
 
         //let color = theme.get_text_color(self.state.borrow().state, &self.state.borrow().foreground);
         let mut y = rect.min.y;
@@ -180,12 +180,12 @@ impl View for List {
         for v in self.texts.borrow().iter() {
             if let Some(text) = v {
                 let text_height = text.height().ceil() as i32;
-                let mut text_color: u32 = 0xff000000;
+                let mut text_color: u32 = theme.color("text");
                 if let Some(s) = selected {
                     if s == index {
                         let rect = super::super::types::rect((rect.min.x + 2, (y + scroll_y)), (rect.max.x - 2, (y + scroll_y) + text_height));
-                        theme.draw_rect(rect, 0xff0000C0);
-                        text_color = 0xffffffff;
+                        theme.draw_rect(rect, theme.color("item_highlight"));
+                        text_color = theme.color("item_highlight_text");
                     }
                 }
 
@@ -196,7 +196,7 @@ impl View for List {
         }
 
         // Step 2: Draw borders (after items)
-        theme.draw_component("edit_field_classic_body", rect, state);
+        theme.draw_component("edit.body", rect, state);
 
         theme.pop_clip();
     }

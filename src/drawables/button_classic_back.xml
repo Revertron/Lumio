@@ -5,7 +5,7 @@
         <layer-list>
             <item>
                 <shape type="rect">
-                    <solid color="#e4e0d8"/>
+                    <solid color="@background_hover"/>
                 </shape>
             </item>
         </layer-list>
@@ -15,7 +15,7 @@
         <layer-list>
             <item>
                 <shape type="rect">
-                    <solid color="#e4e0d8"/>
+                    <solid color="@background_hover"/>
                 </shape>
             </item>
         </layer-list>
@@ -26,7 +26,7 @@
         <layer-list>
             <item>
                 <shape type="rect">
-                    <solid color="#d4d0c8"/>
+                    <solid color="@background"/>
                 </shape>
             </item>
         </layer-list>

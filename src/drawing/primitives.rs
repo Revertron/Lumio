@@ -93,6 +93,8 @@ pub struct Paint {
 #[derive(Debug, Clone)]
 pub enum PaintKind {
     Color(Color),
+    /// Named palette color (`color="@token"` in drawable XML), resolved at draw time.
+    Token(String),
     Gradient(Gradient),
     None,
 }

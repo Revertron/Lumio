@@ -20,8 +20,6 @@ use crate::ui::{PopupDirection, PopupMode, UI};
 use crate::view_base::{HasMainFields, ViewBasics};
 use super::{BUTTON_MIN_HEIGHT, BUTTON_MIN_WIDTH, Dimension, FieldsMain, FieldsTexted, Visibility};
 
-const SELECTION_COLOR: u32 = 0xff000080;
-const PLACEHOLDER_COLOR: u32 = 0xff808080;
 const DOUBLE_CLICK_MS: u128 = 400;
 
 pub struct Memo {
@@ -959,7 +957,7 @@ impl Memo {
                         (x_left, y_top.max(text_rect.min.y)),
                         (x_right, y_bottom.min(text_rect.max.y)),
                     );
-                    theme.draw_rect(sel_rect, SELECTION_COLOR);
+                    theme.draw_rect(sel_rect, theme.color("selection"));
                     rects.push(sel_rect);
                 }
             }
@@ -1064,7 +1062,7 @@ impl View for Memo {
         // Step 1: Draw background
         theme.push_clip();
         theme.clip_rect(rect);
-        theme.draw_component("edit_field_classic_back", rect, state.main.state);
+        theme.draw_component("edit.back", rect, state.main.state);
         theme.pop_clip();
 
         // Step 2: Draw selection highlight + text (or placeholder)
@@ -1102,7 +1100,7 @@ impl View for Memo {
                 theme.draw_text(
                     text_rect.min.x as f32,
                     text_rect.min.y as f32,
-                    PLACEHOLDER_COLOR,
+                    theme.color("text_hint"),
                     &placeholder_text,
                 );
             }
@@ -1115,7 +1113,7 @@ impl View for Memo {
         rect.move_by(origin);
         theme.push_clip();
         theme.clip_rect(rect);
-        theme.draw_component("edit_field_classic_body", rect, state.main.state);
+        theme.draw_component("edit.body", rect, state.main.state);
         theme.pop_clip();
 
         // Step 4: Draw caret
@@ -1127,7 +1125,7 @@ impl View for Memo {
             let view_top = rect.min.y + padding.top;
             let view_bottom = rect.max.y - padding.bottom;
             if caret_rect.max.y > view_top && caret_rect.min.y < view_bottom {
-                theme.draw_component("edit_caret_classic", caret_rect, state.main.state);
+                theme.draw_component("edit.caret", caret_rect, state.main.state);
             }
         }
     }

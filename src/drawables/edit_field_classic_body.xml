@@ -7,9 +7,9 @@
             <item>
                 <shape type="rect">
                     <!-- Top: from x=0 to x=width-1, at y=0 -->
-                    <stroke width="1" color="#808080" top="0" left="0" right="1"/>
+                    <stroke width="1" color="@border_light" top="0" left="0" right="1"/>
                     <!-- Left: from y=0 to y=height-1, at x=0 -->
-                    <stroke width="1" color="#808080" left="0" top="0" bottom="1"/>
+                    <stroke width="1" color="@border_light" left="0" top="0" bottom="1"/>
                 </shape>
             </item>
 
@@ -17,9 +17,9 @@
             <item>
                 <shape type="rect">
                     <!-- Top: from x=1 to x=width-1, at y=1 -->
-                    <stroke width="1" color="#404040" top="1" left="1" right="1"/>
+                    <stroke width="1" color="@border_dark" top="1" left="1" right="1"/>
                     <!-- Left: from y=1 to y=height-1, at x=1 -->
-                    <stroke width="1" color="#404040" left="1" top="1" bottom="1"/>
+                    <stroke width="1" color="@border_dark" left="1" top="1" bottom="1"/>
                 </shape>
             </item>
 
@@ -27,9 +27,9 @@
             <item>
                 <shape type="rect">
                     <!-- Bottom: from x=1 to x=width-1, at y=height-1 -->
-                    <stroke width="1" color="#d4d0c8" bottom="2" left="1" right="1"/>
+                    <stroke width="1" color="@background" bottom="2" left="1" right="1"/>
                     <!-- Right: from y=1 to y=height-1, at x=width-1 -->
-                    <stroke width="1" color="#d4d0c8" right="2" top="1" bottom="1"/>
+                    <stroke width="1" color="@background" right="2" top="1" bottom="1"/>
                 </shape>
             </item>
 
@@ -37,8 +37,8 @@
             <item>
                 <shape type="rect">
                     <!-- Bottom: from x=1 to x=width-1, at y=height -->
-                    <stroke width="1" color="#ffffff" bottom="1" left="1" right="0"/>
-                    <stroke width="1" color="#ffffff" top="0" bottom="0" right="1"/>
+                    <stroke width="1" color="@highlight" bottom="1" left="1" right="0"/>
+                    <stroke width="1" color="@highlight" top="0" bottom="0" right="1"/>
                 </shape>
             </item>
         </layer-list>
