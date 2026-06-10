@@ -88,6 +88,10 @@ pub struct UI {
     /// A palette change requested from app code (e.g. inside an event
     /// handler); picked up by the window handler before the next paint.
     pending_palette: Option<crate::drawing::Palette>,
+    /// Named attribute bundles, applied to a view via `style="name"` in
+    /// layout XML before the view's own attributes (own attributes win).
+    /// Registered from `<Style name="..." .../>` elements or [`UI::add_style`].
+    styles: HashMap<String, Vec<(String, String)>>,
 }
 
 #[allow(dead_code)]
@@ -101,6 +105,7 @@ impl UI {
             pending_removals: Vec::new(),
             requested_cursor: None,
             pending_palette: None,
+            styles: HashMap::new(),
         };
         ui.register::<Label>("Label");
         ui.register::<Button>("Button");
@@ -552,7 +557,11 @@ impl UI {
                 },
                 Ok(Event::Empty(ref e)) => {
                     let tag_name = String::from_utf8(e.name().0.to_vec()).unwrap();
-                    if tag_name == "Item" {
+                    if tag_name == "Style" {
+                        // <Style name="..." attr=.../> registers an attribute
+                        // bundle; must be self-closing and precede its users.
+                        ui.parse_style(e);
+                    } else if tag_name == "Item" {
                         // Handle <Item text="..."/> inside ComboBox
                         if let Some(parent) = stack.last() {
                             let text = UI::get_attribute(e, "text").unwrap_or_default();
@@ -602,28 +611,69 @@ impl UI {
     }
 
     fn parse_element(ui: &mut UI, e: &BytesStart) -> Element {
-        let attributes = e
+        let attributes: Vec<(String, String)> = e
             .attributes()
             .map(|a| a.unwrap())
-            .collect::<Vec<_>>();
-        //println!("attributes values: {:?}", attributes);
+            .map(|a| {
+                let name = String::from_utf8(a.key.0.to_vec()).unwrap();
+                let value = match a.value {
+                    Cow::Borrowed(c) => String::from_utf8(c.to_vec()).unwrap(),
+                    Cow::Owned(c) => String::from_utf8(c).unwrap(),
+                };
+                (name, value)
+            })
+            .collect();
         let view_type = String::from_utf8(e.name().0.to_vec()).unwrap();
         let view = ui.create(&view_type);
-        //println!("Loaded {}", &view_type);
-        for attribute in attributes {
-            let name = String::from_utf8(attribute.key.0.to_vec()).unwrap();
-            let value = match attribute.value {
-                Cow::Borrowed(c) => {
-                    String::from_utf8(c.to_vec()).unwrap()
+        // Apply the style bundle (if any) first, so the element's own
+        // attributes override what the style sets.
+        if let Some((_, style_name)) = attributes.iter().find(|(name, _)| name == "style") {
+            match ui.styles.get(style_name) {
+                Some(bundle) => {
+                    for (name, value) in bundle {
+                        view.borrow_mut().set_any(name, value);
+                    }
                 }
-                Cow::Owned(c) => {
-                    String::from_utf8(c.to_vec()).unwrap()
-                }
-            };
-            view.borrow_mut().set_any(&name, &value);
-            //println!("Attribute: {} = {}", &name, &value);
+                None => eprintln!("Unknown style '{}' on <{}>", style_name, view_type),
+            }
+        }
+        for (name, value) in &attributes {
+            if name == "style" {
+                continue;
+            }
+            view.borrow_mut().set_any(name, value);
         }
         view
+    }
+
+    /// Register the attribute bundle of a `<Style name="..." .../>` element.
+    fn parse_style(&mut self, e: &BytesStart) {
+        let Some(name) = UI::get_attribute(e, "name") else {
+            eprintln!("<Style> element without a name attribute, ignored");
+            return;
+        };
+        let mut bundle = Vec::new();
+        for attr in e.attributes().flatten() {
+            let key = String::from_utf8(attr.key.0.to_vec()).unwrap();
+            if key == "name" {
+                continue;
+            }
+            let value = match attr.value {
+                Cow::Borrowed(c) => String::from_utf8(c.to_vec()).unwrap(),
+                Cow::Owned(c) => String::from_utf8(c).unwrap(),
+            };
+            bundle.push((key, value));
+        }
+        self.styles.insert(name, bundle);
+    }
+
+    /// Register an attribute bundle usable via `style="name"` in layout XML
+    /// parsed afterwards (e.g. item layouts inflated at runtime).
+    pub fn add_style(&mut self, name: &str, attributes: &[(&str, &str)]) {
+        let bundle = attributes.iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        self.styles.insert(name.to_string(), bundle);
     }
 
     fn get_attribute(e: &BytesStart, name: &str) -> Option<String> {
@@ -765,7 +815,7 @@ impl UI {
 
         // Position below and to the right of the cursor
         let mut ox = self.mouse_pos.x;
-        let mut oy = self.mouse_pos.y + (self.scale * 20f64).round() as i32;
+        let mut oy = self.mouse_pos.y + (self.scale * 15f64).round() as i32;
 
         // Clamp to window bounds
         ox = ox.max(0).min(w - pw);
