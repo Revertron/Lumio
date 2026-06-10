@@ -256,7 +256,7 @@ impl View for TabView {
             (my_rect.min.x, my_rect.min.y + tab_bar_h),
             (my_rect.max.x, my_rect.max.y),
         );
-        theme.draw_tab_content_area(content_rect, view_state);
+        theme.draw_component("tab.content", content_rect, view_state);
 
         let active = self.active_tab.get();
 
@@ -270,7 +270,7 @@ impl View for TabView {
             // Inactive tabs are shorter — offset top by 2 scaled pixels
             let inset = (2.0 * scale).round() as i32;
             tr.min.y += inset;
-            theme.draw_tab_inactive(tr, view_state);
+            theme.draw_component("tab.inactive", tr, view_state);
 
             // Draw text centered
             if let Some(ref text) = tab.cached_title {
@@ -286,7 +286,7 @@ impl View for TabView {
             let tab = &self.tabs[active];
             let mut tr = tab.tab_rect;
             tr.move_by(start);
-            theme.draw_tab_active(tr, view_state);
+            theme.draw_component("tab.active", tr, view_state);
 
             if let Some(ref text) = tab.cached_title {
                 let text_x = tr.min.x as f32 + (tr.width() as f32 - text.width()) / 2.0;

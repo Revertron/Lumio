@@ -1,0 +1,43 @@
+<!-- Classic tab content area: raised 3D panel (white top/left, dark
+     bottom/right, light inner shadow). -->
+<selector>
+    <item>
+        <layer-list>
+            <item>
+                <shape type="rect">
+                    <solid color="@background"/>
+                </shape>
+            </item>
+            <item>
+                <shape type="line" x1="0" y1="0" x2="100%" y2="0">
+                    <stroke width="1" color="@highlight"/>
+                </shape>
+            </item>
+            <item>
+                <shape type="line" x1="0" y1="0" x2="0" y2="100%">
+                    <stroke width="1" color="@highlight"/>
+                </shape>
+            </item>
+            <item>
+                <shape type="line" x1="0" y1="100%-1" x2="100%" y2="100%-1">
+                    <stroke width="1" color="@border_dark"/>
+                </shape>
+            </item>
+            <item>
+                <shape type="line" x1="100%-1" y1="0" x2="100%-1" y2="100%">
+                    <stroke width="1" color="@border_dark"/>
+                </shape>
+            </item>
+            <item>
+                <shape type="line" x1="1" y1="100%-2" x2="100%-1" y2="100%-2">
+                    <stroke width="1" color="@border_light"/>
+                </shape>
+            </item>
+            <item>
+                <shape type="line" x1="100%-2" y1="1" x2="100%-2" y2="100%-1">
+                    <stroke width="1" color="@border_light"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

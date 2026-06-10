@@ -36,6 +36,9 @@ impl DrawableRegistry {
         self.load_drawable("radio.indicator", include_str!("../drawables/radio_classic_indicator.xml"));
         self.load_drawable("checkbox.checkmark", include_str!("../drawables/checkbox_classic_checkmark.xml"));
         self.load_drawable("combo.arrow", include_str!("../drawables/combo_classic_arrow.xml"));
+        self.load_drawable("tab.active", include_str!("../drawables/tab_classic_active.xml"));
+        self.load_drawable("tab.inactive", include_str!("../drawables/tab_classic_inactive.xml"));
+        self.load_drawable("tab.content", include_str!("../drawables/tab_classic_content.xml"));
     }
 
     /// Load a single drawable from XML string
