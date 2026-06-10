@@ -12,7 +12,7 @@ use super::themes::{Theme, Typeface, ViewState};
 use super::traits::{Container, Element, View, WeakElement};
 use super::types::{Point, Rect, rect};
 use super::ui::UI;
-use super::views::{Dimension, Direction, FieldsMain, Gravity, Visibility};
+use super::views::{Dimension, Direction, FieldsMain, Gravity, LayoutParams, Visibility};
 use super::view_base::{HasMainFields, ViewBasics};
 
 pub struct Frame {
@@ -208,6 +208,11 @@ impl View for Frame {
                 }
             }
             "breaking" => { self.set_breaking(value.parse().unwrap_or(false)) }
+            "layout" => {
+                if let Some(layout) = super::layout::create_layout(value) {
+                    self.layout = layout;
+                }
+            }
             "background_image" => { self.background_image_mut().set_path(value) }
             "background_image_opacity" => {
                 if let Ok(o) = value.parse::<f32>() {
@@ -347,6 +352,14 @@ impl View for Frame {
 
     fn set_gravity(&self, gravity: Gravity) {
         self.base_set_gravity(gravity);
+    }
+
+    fn get_layout_params(&self) -> LayoutParams {
+        self.base_get_layout_params()
+    }
+
+    fn set_layout_params(&self, params: LayoutParams) {
+        self.base_set_layout_params(params);
     }
 
     fn get_bounds(&self) -> (Dimension, Dimension) {

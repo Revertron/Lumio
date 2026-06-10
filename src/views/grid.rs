@@ -287,6 +287,8 @@ impl View for Grid {
     fn get_margin(&self, scale: f64) -> Borders { self.base_get_margin(scale) }
     fn set_margin(&self, t: i32, l: i32, r: i32, b: i32) { self.base_set_margin(t, l, r, b); }
     fn get_gravity(&self) -> Gravity { self.base_get_gravity() }
+    fn get_layout_params(&self) -> super::LayoutParams { self.base_get_layout_params() }
+    fn set_layout_params(&self, params: super::LayoutParams) { self.base_set_layout_params(params); }
     fn set_gravity(&self, g: Gravity) { self.base_set_gravity(g); }
     fn get_bounds(&self) -> (Dimension, Dimension) { self.base_get_bounds() }
     fn get_content_size(&self) -> (i32, i32) {

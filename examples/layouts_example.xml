@@ -1,0 +1,23 @@
+<Frame id="main" layout="dock" width="max" height="max">
+    <Frame dock="top" width="max" height="48" background="#2d6da3" padding="8">
+        <Label text="Toolbar (dock=top)" text_color="#ffffff"/>
+    </Frame>
+    <Frame dock="bottom" width="max" height="32" background="#3a3f47" padding="6">
+        <Label text="Status bar (dock=bottom)" text_color="#cccccc"/>
+    </Frame>
+    <Frame dock="left" width="200" height="max" direction="vertical" background="#444a54" padding="8">
+        <Label text="Sidebar (dock=left)" text_color="#ffffff"/>
+        <Button text="Item 1" width="180"/>
+        <Button text="Item 2" width="180"/>
+    </Frame>
+    <Frame id="content" layout="overlay" width="max" height="max" background="#22252a">
+        <Frame width="max" height="max"
+               background_image="wallpaper.jpg" background_size="cover" background_image_opacity="0.5"/>
+        <Frame width="340" height="160" gravity="center" background="#cc1d2330" border_color="#5599ff" padding="12">
+            <Label text="Overlay card (gravity=center)" text_color="#ffffff"/>
+        </Frame>
+        <Frame width="220" height="48" gravity="right|bottom" margin="16" background="#aa3344" padding="12">
+            <Label text="Badge (right|bottom)" text_color="#ffffff"/>
+        </Frame>
+    </Frame>
+</Frame>

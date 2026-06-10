@@ -78,7 +78,8 @@ pub struct FieldsMain {
     pub parent: Option<WeakElement>,
     pub font_manager: FontManager,
     pub tooltip: Option<String>,
-    pub gravity: Gravity
+    pub gravity: Gravity,
+    pub layout_params: LayoutParams
 }
 
 impl FieldsMain {
@@ -102,7 +103,8 @@ impl FieldsMain {
             parent: None,
             font_manager: FontManager::new(),
             tooltip: None,
-            gravity: Gravity::default()
+            gravity: Gravity::default(),
+            layout_params: LayoutParams::default()
         }
     }
 
@@ -361,3 +363,45 @@ pub enum HAlign { Left, Center, Right }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum VAlign { Top, Center, Bottom }
+
+/// Which edge a child takes inside a `DockLayout` parent.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub enum Dock {
+    Left,
+    Top,
+    Right,
+    Bottom,
+    /// Take all space left over by the docked siblings (typically the last child).
+    #[default]
+    Fill
+}
+
+impl FromStr for Dock {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "left" => Dock::Left,
+            "top" => Dock::Top,
+            "right" => Dock::Right,
+            "bottom" => Dock::Bottom,
+            _ => Dock::Fill
+        })
+    }
+}
+
+/// Per-child hints consumed by the parent's `Layout`, not by the view itself:
+/// `dock` (XML attr `dock`) is read by `DockLayout`, `weight` (XML attr
+/// `weight`) is read by `LinearLayout` to share leftover space between `Max`
+/// children proportionally.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct LayoutParams {
+    pub dock: Dock,
+    pub weight: f32
+}
+
+impl Default for LayoutParams {
+    fn default() -> Self {
+        Self { dock: Dock::default(), weight: 1.0 }
+    }
+}

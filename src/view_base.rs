@@ -3,7 +3,7 @@ use crate::styles::selector::{DrawState, MainSelector};
 use crate::themes::{FontStyle, Typeface, ViewState};
 use crate::traits::{Element, WeakElement};
 use crate::types::Rect;
-use crate::views::{Borders, Dimension, FieldsMain, Gravity, Visibility};
+use crate::views::{Borders, Dimension, Dock, FieldsMain, Gravity, LayoutParams, Visibility};
 
 /// Manages font/typeface inheritance and manipulation
 #[derive(Clone, Default)]
@@ -258,6 +258,14 @@ pub trait ViewBasics: HasMainFields {
         self.main_fields().borrow_mut().gravity = gravity;
     }
 
+    fn base_get_layout_params(&self) -> LayoutParams {
+        self.main_fields().borrow().layout_params
+    }
+
+    fn base_set_layout_params(&self, params: LayoutParams) {
+        self.main_fields().borrow_mut().layout_params = params;
+    }
+
     /// Handle common properties in set_any. Returns true if handled, false if not.
     fn base_set_any(&self, name: &str, value: &str) -> bool {
         let fields = self.main_fields();
@@ -369,6 +377,18 @@ pub trait ViewBasics: HasMainFields {
             "gravity" => {
                 if let Ok(g) = value.parse::<Gravity>() {
                     fields.borrow_mut().gravity = g;
+                }
+                true
+            }
+            "dock" => {
+                if let Ok(d) = value.parse::<Dock>() {
+                    fields.borrow_mut().layout_params.dock = d;
+                }
+                true
+            }
+            "weight" => {
+                if let Ok(w) = value.parse::<f32>() && w > 0.0 {
+                    fields.borrow_mut().layout_params.weight = w;
                 }
                 true
             }

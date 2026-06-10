@@ -3,7 +3,7 @@ use downcast_rs::Downcast;
 use super::themes::Typeface;
 use super::traits::Element;
 use super::types::rect;
-use super::views::{Borders, Dimension, Direction, Gravity, HAlign, VAlign, Visibility};
+use super::views::{Borders, Dimension, Direction, Dock, Gravity, HAlign, VAlign, Visibility};
 
 /// A layout strategy for containers: positions children inside a parent's
 /// content area. `Frame` delegates all child placement to its `Layout`,
@@ -31,6 +31,18 @@ pub trait Layout: Downcast {
 }
 
 impl_downcast!(Layout);
+
+/// Creates a layout by the name used in the `layout="..."` XML attribute on
+/// `Frame`: `linear` (the default), `overlay` (alias `stack`), `dock`.
+/// Unknown names return `None`, leaving the frame's current layout in place.
+pub fn create_layout(name: &str) -> Option<Box<dyn Layout>> {
+    match name {
+        "linear" => Some(Box::new(LinearLayout::default())),
+        "overlay" | "stack" => Some(Box::new(OverlayLayout)),
+        "dock" => Some(Box::new(DockLayout)),
+        _ => None
+    }
+}
 
 /// The default layout: children flow one after another along `direction`.
 /// With `breaking` enabled (horizontal only), children wrap to the next row
@@ -357,5 +369,168 @@ impl LinearLayout {
                 cursor += size + margin_before + margin_after;
             }
         }
+    }
+}
+
+/// Stacks all children on top of each other (Z-order = declaration order,
+/// last child paints on top). Each child gets the whole content area and
+/// positions itself within it via its `gravity`; margins inset the child
+/// from the area's edges.
+pub struct OverlayLayout;
+
+impl Layout for OverlayLayout {
+    fn arrange(&self, children: &[Element], _bounds: (Dimension, Dimension), width: i32, height: i32, padding: &Borders, typeface: &Typeface, scale: f64) {
+        let content_w = width - padding.left - padding.right;
+        let content_h = height - padding.top - padding.bottom;
+        for v in children.iter() {
+            let mut v = v.try_borrow_mut().unwrap();
+            if v.get_visibility() == Visibility::Gone {
+                continue;
+            }
+            let margins = v.get_margin(scale);
+            let (b_w, b_h) = v.get_bounds();
+            // Max children get the full area (calculate_size subtracts margins
+            // itself); others measure inside the margin-inset area.
+            let avail_w = if matches!(b_w, Dimension::Max) { content_w } else { (content_w - margins.left - margins.right).max(0) };
+            let avail_h = if matches!(b_h, Dimension::Max) { content_h } else { (content_h - margins.top - margins.bottom).max(0) };
+            v.layout_content(padding.left + margins.left, padding.top + margins.top, avail_w, avail_h, typeface, scale);
+            // Place by gravity. Recompute the absolute target from the
+            // canonical anchors each pass — some views cache layout and
+            // re-return their last rect on subsequent layout_content calls.
+            let r = v.get_rect();
+            let gravity = v.get_gravity();
+            let band_w = (content_w - margins.left - margins.right - r.width()).max(0);
+            let band_h = (content_h - margins.top - margins.bottom - r.height()).max(0);
+            let x = padding.left + margins.left + match gravity.horizontal() {
+                HAlign::Left => 0,
+                HAlign::Center => band_w / 2,
+                HAlign::Right => band_w
+            };
+            let y = padding.top + margins.top + match gravity.vertical() {
+                VAlign::Top => 0,
+                VAlign::Center => band_h / 2,
+                VAlign::Bottom => band_h
+            };
+            if r.min.x != x || r.min.y != y {
+                v.set_rect(rect((x, y), (x + r.width(), y + r.height())));
+            }
+        }
+    }
+}
+
+/// Children consume the edge they declare via `dock="left|top|right|bottom"`;
+/// a child with `dock="fill"` (the default) takes all the remaining space —
+/// typically the last child. Each docked child shrinks the region that later
+/// siblings see, so declaration order matters (a top toolbar declared before
+/// a left sidebar spans the full width; declared after, it starts beside it).
+pub struct DockLayout;
+
+impl Layout for DockLayout {
+    fn arrange(&self, children: &[Element], _bounds: (Dimension, Dimension), width: i32, height: i32, padding: &Borders, typeface: &Typeface, scale: f64) {
+        // The remaining free region, in parent-relative coordinates.
+        let mut left = padding.left;
+        let mut top = padding.top;
+        let mut right = width - padding.right;
+        let mut bottom = height - padding.bottom;
+        for v in children.iter() {
+            let mut v = v.try_borrow_mut().unwrap();
+            if v.get_visibility() == Visibility::Gone {
+                continue;
+            }
+            let m = v.get_margin(scale);
+            let dock = v.get_layout_params().dock;
+            let (b_w, b_h) = v.get_bounds();
+            let region_w = (right - left).max(0);
+            let region_h = (bottom - top).max(0);
+            // Max children get the full region (calculate_size subtracts
+            // margins itself); others measure inside the margin-inset region.
+            let avail_w = if matches!(b_w, Dimension::Max) { region_w } else { (region_w - m.left - m.right).max(0) };
+            let avail_h = if matches!(b_h, Dimension::Max) { region_h } else { (region_h - m.top - m.bottom).max(0) };
+            let r = v.layout_content(left + m.left, top + m.top, avail_w, avail_h, typeface, scale);
+            let (w, h) = (r.width(), r.height());
+            // Recompute the absolute target from the region anchors — right/
+            // bottom docked children must be moved to the far edge, and cached
+            // views may re-return a stale rect from layout_content.
+            let (x, y) = match dock {
+                Dock::Left | Dock::Top | Dock::Fill => (left + m.left, top + m.top),
+                Dock::Right => ((right - m.right - w).max(left + m.left), top + m.top),
+                Dock::Bottom => (left + m.left, (bottom - m.bottom - h).max(top + m.top))
+            };
+            if r.min.x != x || r.min.y != y {
+                v.set_rect(rect((x, y), (x + w, y + h)));
+            }
+            match dock {
+                Dock::Left => left += m.left + w + m.right,
+                Dock::Top => top += m.top + h + m.bottom,
+                Dock::Right => right -= m.left + w + m.right,
+                Dock::Bottom => bottom -= m.top + h + m.bottom,
+                Dock::Fill => {}
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use super::*;
+    use crate::containers::Frame;
+    use crate::traits::View;
+
+    fn frame(w: Dimension, h: Dimension, attrs: &[(&str, &str)]) -> Element {
+        let mut f = Frame::new(rect((0, 0), (0, 0)), w, h);
+        for (k, v) in attrs {
+            f.set_any(k, v);
+        }
+        Rc::new(RefCell::new(f))
+    }
+
+    fn arrange(layout: &dyn Layout, children: &[Element]) {
+        layout.arrange(children, (Dimension::Max, Dimension::Max), 400, 300, &Borders::default(), &Typeface::default(), 1.0);
+    }
+
+    #[test]
+    fn dock_top_left_fill() {
+        let children = vec![
+            frame(Dimension::Max, Dimension::Dip(40), &[("dock", "top")]),
+            frame(Dimension::Dip(100), Dimension::Max, &[("dock", "left")]),
+            frame(Dimension::Max, Dimension::Max, &[]),
+        ];
+        arrange(&DockLayout, &children);
+        assert_eq!(children[0].borrow().get_rect(), rect((0, 0), (400, 40)));
+        assert_eq!(children[1].borrow().get_rect(), rect((0, 40), (100, 300)));
+        assert_eq!(children[2].borrow().get_rect(), rect((100, 40), (400, 300)));
+    }
+
+    #[test]
+    fn dock_right_bottom() {
+        let children = vec![
+            frame(Dimension::Dip(80), Dimension::Max, &[("dock", "right")]),
+            frame(Dimension::Max, Dimension::Dip(30), &[("dock", "bottom")]),
+        ];
+        arrange(&DockLayout, &children);
+        assert_eq!(children[0].borrow().get_rect(), rect((320, 0), (400, 300)));
+        assert_eq!(children[1].borrow().get_rect(), rect((0, 270), (320, 300)));
+    }
+
+    #[test]
+    fn overlay_gravity_placement() {
+        let children = vec![
+            frame(Dimension::Dip(100), Dimension::Dip(50), &[("gravity", "center")]),
+            frame(Dimension::Dip(100), Dimension::Dip(50), &[("gravity", "right|bottom"), ("margin", "10")]),
+        ];
+        arrange(&OverlayLayout, &children);
+        assert_eq!(children[0].borrow().get_rect(), rect((150, 125), (250, 175)));
+        assert_eq!(children[1].borrow().get_rect(), rect((290, 240), (390, 290)));
+    }
+
+    #[test]
+    fn create_layout_by_name() {
+        assert!(create_layout("linear").unwrap().downcast_ref::<LinearLayout>().is_some());
+        assert!(create_layout("overlay").unwrap().downcast_ref::<OverlayLayout>().is_some());
+        assert!(create_layout("stack").unwrap().downcast_ref::<OverlayLayout>().is_some());
+        assert!(create_layout("dock").unwrap().downcast_ref::<DockLayout>().is_some());
+        assert!(create_layout("nonsense").is_none());
     }
 }

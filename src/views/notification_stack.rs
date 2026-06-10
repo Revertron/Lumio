@@ -346,6 +346,8 @@ impl View for NotificationStack {
     fn get_margin(&self, scale: f64) -> Borders { self.base_get_margin(scale) }
     fn set_margin(&self, top: i32, left: i32, right: i32, bottom: i32) { self.base_set_margin(top, left, right, bottom); }
     fn get_gravity(&self) -> Gravity { self.base_get_gravity() }
+    fn get_layout_params(&self) -> super::LayoutParams { self.base_get_layout_params() }
+    fn set_layout_params(&self, params: super::LayoutParams) { self.base_set_layout_params(params); }
     fn set_gravity(&self, gravity: Gravity) { self.base_set_gravity(gravity); }
     fn get_bounds(&self) -> (Dimension, Dimension) { self.base_get_bounds() }
     fn get_content_size(&self) -> (i32, i32) { (0, 0) }

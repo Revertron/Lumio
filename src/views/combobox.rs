@@ -320,6 +320,14 @@ impl View for ComboBox {
         self.base_get_gravity()
     }
 
+    fn get_layout_params(&self) -> super::LayoutParams {
+        self.base_get_layout_params()
+    }
+
+    fn set_layout_params(&self, params: super::LayoutParams) {
+        self.base_set_layout_params(params);
+    }
+
     fn set_gravity(&self, gravity: Gravity) {
         self.base_set_gravity(gravity);
     }
@@ -688,6 +696,14 @@ impl View for ComboDropdown {
 
     fn get_gravity(&self) -> Gravity {
         self.base_get_gravity()
+    }
+
+    fn get_layout_params(&self) -> super::LayoutParams {
+        self.base_get_layout_params()
+    }
+
+    fn set_layout_params(&self, params: super::LayoutParams) {
+        self.base_set_layout_params(params);
     }
 
     fn set_gravity(&self, gravity: Gravity) {

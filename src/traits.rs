@@ -8,7 +8,7 @@ use super::ui::UI;
 use super::themes::{Theme, ViewState};
 use super::types::{Rect, Point};
 use super::themes::Typeface;
-use super::views::{Borders, Dimension, Gravity, Visibility};
+use super::views::{Borders, Dimension, Gravity, LayoutParams, Visibility};
 
 pub type Element = Rc<RefCell<dyn View>>;
 pub type WeakElement = Weak<RefCell<dyn View>>;
@@ -44,6 +44,12 @@ pub trait View: Downcast {
     fn get_gravity(&self) -> Gravity { Gravity::default() }
     #[allow(unused_variables)]
     fn set_gravity(&self, gravity: Gravity) {}
+    /// Per-child layout hints (`dock`, `weight` XML attrs) consumed by the
+    /// parent's `Layout`. Views backed by `FieldsMain` override this to
+    /// return the stored values; the default is dock=Fill, weight=1.
+    fn get_layout_params(&self) -> LayoutParams { LayoutParams::default() }
+    #[allow(unused_variables)]
+    fn set_layout_params(&self, params: LayoutParams) {}
     fn get_x(&self) -> i32 { self.get_rect().min.x }
     fn get_y(&self) -> i32 { self.get_rect().min.y }
     fn get_rect_width(&self) -> i32 { self.get_rect().width() }
