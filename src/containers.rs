@@ -166,8 +166,12 @@ impl Frame {
                 continue;
             }
             let margins = v.get_margin(scale);
-            v.layout_content(xx + margins.left, yy + margins.top, new_width - xx - padding.right, new_height - yy - padding.bottom, typeface, scale);
-            let (w, h) = v.calculate_full_size(scale);
+            // Use the rect set by layout_content — it honors configured Dimensions
+            // (Dip/Percent), unlike calculate_full_size which re-derives the size
+            // from raw content and undersizes fixed-size children (same fix as in
+            // layout_two_pass pass 1).
+            let r = v.layout_content(xx + margins.left, yy + margins.top, new_width - xx - padding.right, new_height - yy - padding.bottom, typeface, scale);
+            let (w, h) = (r.width(), r.height());
             match self.direction {
                 Direction::Horizontal => xx = xx + w + margins.left + margins.right,
                 Direction::Vertical => yy = yy + h + margins.top + margins.bottom
@@ -175,13 +179,13 @@ impl Frame {
             if xx > max_x {
                 yy += max_height + margins.top;
                 xx = padding.left + margins.left;
-                v.layout_content(xx, yy + margins.top, new_width - xx - padding.right, new_height - yy - padding.bottom, typeface, scale);
-                let (w, h) = v.calculate_full_size(scale);
+                let r = v.layout_content(xx, yy + margins.top, new_width - xx - padding.right, new_height - yy - padding.bottom, typeface, scale);
+                let (w, h) = (r.width(), r.height());
                 xx += w;
                 max_height = h + margins.bottom;
             }
             if v.is_break() {
-                let (_, h) = v.calculate_full_size(scale);
+                let h = v.get_rect().height();
                 xx = padding.left;
                 yy += h + margins.bottom;
             }
