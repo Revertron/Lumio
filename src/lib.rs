@@ -6,6 +6,7 @@ pub mod ui;
 pub mod events;
 pub mod traits;
 pub mod containers;
+pub mod layout;
 pub mod background;
 pub mod views;
 pub mod win;
