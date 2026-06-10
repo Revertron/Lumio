@@ -355,21 +355,21 @@ pub trait ViewBasics: HasMainFields {
                 true
             }
             "background" => {
-                if let Some(color) = parse_hex_color(value) {
+                if let Some(draw_state) = parse_draw_state(value) {
                     let mut selector = MainSelector::new();
-                    selector.add_state(ViewState::no_focus(), DrawState::Color(color));
+                    selector.add_state(ViewState::no_focus(), draw_state);
                     fields.borrow_mut().background = Some(selector);
                 }
                 true
             }
             "text_color" => {
-                if let Some(color) = parse_hex_color(value) {
-                    fields.borrow_mut().foreground = Some(uniform_color_selector(color));
+                if let Some(draw_state) = parse_draw_state(value) {
+                    fields.borrow_mut().foreground = Some(uniform_color_selector(draw_state));
                 }
                 true
             }
             "border_color" => {
-                if let Some(color) = parse_hex_color(value) {
+                if let Some(color) = parse_color_value(value) {
                     fields.borrow_mut().border_color = Some(color);
                 }
                 true
@@ -397,10 +397,10 @@ pub trait ViewBasics: HasMainFields {
     }
 }
 
-/// Build a `MainSelector` that returns the given color for every possible `ViewState`.
-/// Used by XML attributes like `text_color` where the user wants a single color regardless
-/// of focus/hover/press state.
-fn uniform_color_selector(color: u32) -> MainSelector {
+/// Build a `MainSelector` that returns the given draw state for every possible
+/// `ViewState`. Used by XML attributes like `text_color` where the user wants
+/// a single color regardless of focus/hover/press state.
+fn uniform_color_selector(draw_state: DrawState) -> MainSelector {
     let mut selector = MainSelector::new();
     for bits in 0u8..64 {
         selector.add_state(ViewState {
@@ -410,7 +410,7 @@ fn uniform_color_selector(color: u32) -> MainSelector {
             hovered: bits & 8 != 0,
             pressed: bits & 16 != 0,
             checked: bits & 32 != 0,
-        }, DrawState::Color(color));
+        }, draw_state.clone());
     }
     selector
 }
@@ -422,5 +422,27 @@ pub(crate) fn parse_hex_color(s: &str) -> Option<u32> {
         6 => u32::from_str_radix(hex, 16).ok().map(|c| 0xFF000000 | c),
         8 => u32::from_str_radix(hex, 16).ok(),
         _ => None,
+    }
+}
+
+/// Parse a color attribute into a `DrawState`: `@token` becomes a palette
+/// reference resolved at paint time (follows theme switches), `#hex` a literal.
+fn parse_draw_state(s: &str) -> Option<DrawState> {
+    match s.strip_prefix('@') {
+        Some(token) if !token.is_empty() => Some(DrawState::Token(token.to_string())),
+        Some(_) => None,
+        None => parse_hex_color(s).map(DrawState::Color),
+    }
+}
+
+/// Parse a color attribute into a concrete u32: `@token` resolves against the
+/// palette active right now (a later theme switch will NOT update it — used
+/// for plain-u32 attributes like `border_color` or `icon_tint`), `#hex` is
+/// parsed literally.
+pub(crate) fn parse_color_value(s: &str) -> Option<u32> {
+    match s.strip_prefix('@') {
+        Some(token) if !token.is_empty() => Some(crate::drawing::current_color(token)),
+        Some(_) => None,
+        None => parse_hex_color(s),
     }
 }

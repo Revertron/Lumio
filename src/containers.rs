@@ -281,14 +281,13 @@ impl View for Frame {
         theme.push_clip();
         theme.clip_rect(rect);
         let state = self.state.borrow();
-        if let Some(bg) = state.background.as_ref() {
-            if let Some(crate::styles::selector::DrawState::Color(c)) = bg.get_state(&state.state) {
-                theme.draw_rect(rect, *c);
-            } else {
-                theme.draw_component("panel.back", rect, state.state);
+        match state.background.as_ref().and_then(|bg| bg.get_state(&state.state)) {
+            Some(crate::styles::selector::DrawState::Color(c)) => theme.draw_rect(rect, *c),
+            Some(crate::styles::selector::DrawState::Token(t)) => {
+                let c = theme.color(t);
+                theme.draw_rect(rect, c);
             }
-        } else {
-            theme.draw_component("panel.back", rect, state.state);
+            _ => theme.draw_component("panel.back", rect, state.state),
         }
         if let Some(bg) = self.background_image.borrow_mut().as_mut() {
             bg.paint(theme, rect, &state.padding.scaled(state.scale), state.scale);

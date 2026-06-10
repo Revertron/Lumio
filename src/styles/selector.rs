@@ -2,9 +2,13 @@ use std::collections::HashMap;
 use super::super::themes::ViewState;
 
 #[allow(unused)]
+#[derive(Clone)]
 pub enum DrawState {
     Transparent,
     Color(u32),
+    /// Named palette color (`background="@token"` in layout XML), resolved
+    /// against the active palette at paint time so it follows theme switches.
+    Token(String),
     Image(String),
     Gradient(u32, u32, u32, u32)
 }

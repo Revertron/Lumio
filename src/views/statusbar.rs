@@ -171,14 +171,13 @@ impl View for StatusBar {
         theme.clip_rect(r);
 
         // Draw background
-        if let Some(bg) = state.background.as_ref() {
-            if let Some(crate::styles::selector::DrawState::Color(c)) = bg.get_state(&state.state) {
-                theme.draw_rect(r, *c);
-            } else {
-                theme.draw_component("panel.back", r, state.state);
+        match state.background.as_ref().and_then(|bg| bg.get_state(&state.state)) {
+            Some(crate::styles::selector::DrawState::Color(c)) => theme.draw_rect(r, *c),
+            Some(crate::styles::selector::DrawState::Token(t)) => {
+                let c = theme.color(t);
+                theme.draw_rect(r, c);
             }
-        } else {
-            theme.draw_component("panel.back", r, state.state);
+            _ => theme.draw_component("panel.back", r, state.state),
         }
 
         let view_state = state.state;

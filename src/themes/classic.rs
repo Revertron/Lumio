@@ -94,6 +94,7 @@ impl<'h> Theme for Classic<'h> {
                 match s {
                     DrawState::Transparent => return 0x00000000,
                     DrawState::Color(c) => return *c,
+                    DrawState::Token(t) => return self.palette.color(t),
                     _ => {}
                 }
             }
@@ -107,6 +108,7 @@ impl<'h> Theme for Classic<'h> {
                 match s {
                     DrawState::Transparent => return 0x00000000,
                     DrawState::Color(c) => return *c,
+                    DrawState::Token(t) => return self.palette.color(t),
                     _ => {}
                 }
             }
