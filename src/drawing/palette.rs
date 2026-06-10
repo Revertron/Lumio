@@ -42,6 +42,13 @@ pub fn current_dimension(token: &str) -> f32 {
     CURRENT.with(|current| current.borrow().dimension(token))
 }
 
+/// Resolve a color token against the currently active palette. For code that
+/// runs outside paint (e.g. the tooltip is assembled in `UI` before any
+/// `Theme` instance exists); paint code should prefer `Theme::color`.
+pub fn current_color(token: &str) -> u32 {
+    CURRENT.with(|current| current.borrow().color(token))
+}
+
 /// Resolve a typeface role against the currently active palette.
 pub fn current_typeface(role: &str) -> Typeface {
     CURRENT.with(|current| current.borrow().typeface(role))
@@ -65,6 +72,9 @@ impl Palette {
             ("table_selection".to_string(), 0xFFCCE0F5),
             ("table_separator".to_string(), 0xFFD0D0D0),
             ("progress_fill".to_string(), 0xFF000080),
+            ("tooltip_back".to_string(), 0xFFFFFFDD),
+            ("tooltip_border".to_string(), 0xFF808080),
+            ("tooltip_text".to_string(), 0xFF000000),
         ]);
         Palette { colors, dimensions: Self::default_dimensions(), typefaces: Self::default_typefaces() }
     }
@@ -87,6 +97,9 @@ impl Palette {
             ("table_selection".to_string(), 0xFF2A4D6E),
             ("table_separator".to_string(), 0xFF454545),
             ("progress_fill".to_string(), 0xFF2D7DD2),
+            ("tooltip_back".to_string(), 0xFF202020),
+            ("tooltip_border".to_string(), 0xFF5F5F5F),
+            ("tooltip_text".to_string(), 0xFFE0E0E0),
         ]);
         Palette { colors, dimensions: Self::default_dimensions(), typefaces: Self::default_typefaces() }
     }

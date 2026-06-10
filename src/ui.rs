@@ -737,6 +737,7 @@ impl UI {
             l.set_width(Dimension::Min);
             l.set_height(Dimension::Min);
             l.set_any("font_size", "18");
+            l.set_any("text_color", &format!("#{:08X}", crate::drawing::current_color("tooltip_text")));
         }
 
         let frame: Element = Rc::new(RefCell::new(Frame::default()));
@@ -746,8 +747,8 @@ impl UI {
             f.set_width(Dimension::Min);
             f.set_height(Dimension::Min);
             f.set_padding(2, 4, 4, 2);
-            f.set_background(Some(0xFFFFFFDD));
-            f.set_border_color(Some(0xFF808080));
+            f.set_background(Some(crate::drawing::current_color("tooltip_back")));
+            f.set_border_color(Some(crate::drawing::current_color("tooltip_border")));
             label.borrow_mut().set_parent(Some(Rc::downgrade(&frame)));
             f.as_container_mut().unwrap().add_view(label);
         }
@@ -764,7 +765,7 @@ impl UI {
 
         // Position below and to the right of the cursor
         let mut ox = self.mouse_pos.x;
-        let mut oy = self.mouse_pos.y + 20;
+        let mut oy = self.mouse_pos.y + (self.scale * 20f64).round() as i32;
 
         // Clamp to window bounds
         ox = ox.max(0).min(w - pw);
