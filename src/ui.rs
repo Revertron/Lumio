@@ -526,7 +526,11 @@ impl UI {
                         // children as nested views. `read_text` returns the inner
                         // slice verbatim and consumes the matching end tag, so this
                         // element gets no `Event::End` — attach it as a leaf here.
-                        let inner = reader.read_text(e.name()).map(|c| c.into_owned()).unwrap_or_default();
+                        let inner = reader
+                            .read_text(e.name())
+                            .ok()
+                            .and_then(|t| t.decode().ok().map(|c| c.into_owned()))
+                            .unwrap_or_default();
                         element.borrow_mut().set_any("html", &inner);
                         match stack.last() {
                             Some(parent) => {

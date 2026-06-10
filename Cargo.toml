@@ -8,7 +8,7 @@ keywords = ["gui", "ui", "xml", "desktop", "framework"]
 categories = ["gui", "rendering"]
 
 [dependencies]
-quick-xml = "0.39.2"
+quick-xml = "0.40.1"
 downcast-rs = "2.0.2"
 speedy2d = { path = "../Speedy2D" }
 image = "0.25.10"
