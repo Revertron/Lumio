@@ -38,7 +38,7 @@ XML-only, and `style=` / `@token` references become available in layout XML.
   yellow, TableView selection) into themed tokens.
 - Add a visible **focus indicator** (currently focus has no visual at all).
 
-### 2. Edit/Memo maturity
+### 2. Edit/Memo maturity — DONE
 
 In rough order of pain:
 
@@ -46,7 +46,9 @@ In rough order of pain:
   coalescing in both Edit and Memo (Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z).
 - **Password masking** — DONE 2026-06: `password="true"` on Edit renders
   bullets and disables copy/cut.
-- **Input filters** — numeric-only, charset whitelist, custom validator hook.
+- **Input filters** — DONE 2026-06: per-char predicate via
+  `set_input_filter()`, `filter="numeric"` and `allowed_chars="..."` in XML;
+  an insert containing any disallowed character is rejected wholesale.
 
 All contained within the two views.
 

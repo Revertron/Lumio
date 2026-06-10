@@ -11,7 +11,7 @@ use std::hash::{Hash, Hasher};
 
 use crate::assets::{get_asset, get_font_family};
 use crate::events::EventType;
-use crate::common::{delete_char, delete_range, insert_str, TextEditOp, TextSnapshot, UNDO_LIMIT};
+use crate::common::{delete_char, delete_range, insert_str, InputFilter, TextEditOp, TextSnapshot, UNDO_LIMIT};
 use crate::svg;
 use crate::views::{Borders, Gravity};
 use crate::views::popupmenu::PopupMenu;
@@ -79,6 +79,10 @@ pub struct Edit {
     last_edit_op: std::cell::Cell<Option<TextEditOp>>,
     /// Render the content as bullets and disable copy/cut.
     password: RefCell<bool>,
+    /// Per-character input filter: when set, a typed or pasted insert
+    /// containing any disallowed character is rejected wholesale.
+    /// Programmatic set_text() bypasses it.
+    input_filter: RefCell<Option<InputFilter>>,
 }
 
 impl HasMainFields for Edit {
@@ -138,6 +142,7 @@ impl Edit {
             redo_stack: RefCell::new(Vec::new()),
             last_edit_op: std::cell::Cell::new(None),
             password: RefCell::new(false),
+            input_filter: RefCell::new(None),
         }
     }
 
@@ -389,6 +394,21 @@ impl Edit {
 
     pub fn set_max_length(&self, max_length: Option<usize>) {
         *self.max_length.borrow_mut() = max_length;
+    }
+
+    /// Restrict typed and pasted input. The predicate judges each character;
+    /// an insert containing any disallowed character is rejected wholesale
+    /// (a paste with one stray character inserts nothing). Programmatic
+    /// `set_text()` is not filtered. Pass `None` to remove the filter.
+    pub fn set_input_filter(&self, filter: Option<InputFilter>) {
+        *self.input_filter.borrow_mut() = filter;
+    }
+
+    fn passes_filter(&self, s: &str) -> bool {
+        match self.input_filter.borrow().as_ref() {
+            Some(filter) => s.chars().all(filter),
+            None => true,
+        }
     }
 
     pub fn set_single_line(&self, single_line: bool) {
@@ -827,7 +847,7 @@ impl Edit {
     /// Insert text at caret, replacing selection if any. Respects max_length and read_only.
     /// Returns true if text was modified.
     fn insert_text_at_caret(&self, ui: &mut UI, s: &str) -> bool {
-        if *self.read_only.borrow() || s.is_empty() {
+        if *self.read_only.borrow() || s.is_empty() || !self.passes_filter(s) {
             return false;
         }
         // Single chars are typing (coalesced); larger inserts (paste) are not.
@@ -1004,6 +1024,15 @@ impl View for Edit {
                 if let Ok(n) = value.parse::<usize>() {
                     self.set_max_length(Some(n));
                 }
+            }
+            "filter" => {
+                if value == "numeric" {
+                    self.set_input_filter(Some(Box::new(|c: char| c.is_ascii_digit())));
+                }
+            }
+            "allowed_chars" => {
+                let set: std::collections::HashSet<char> = value.chars().collect();
+                self.set_input_filter(Some(Box::new(move |c| set.contains(&c))));
             }
             "icon_left" => {
                 *self.icon_left_path.borrow_mut() = value.to_owned();
@@ -1842,5 +1871,60 @@ mod tests {
         edit.select_all();
         // Early-returns before touching the system clipboard.
         edit.copy_to_clipboard();
+    }
+
+    #[test]
+    fn test_numeric_filter_rejects_non_digits() {
+        let (edit, mut ui) = edit_and_ui();
+        edit.set_input_filter(Some(Box::new(|c: char| c.is_ascii_digit())));
+        assert!(edit.insert_text_at_caret(&mut ui, "1"));
+        assert!(!edit.insert_text_at_caret(&mut ui, "a"));
+        assert!(edit.insert_text_at_caret(&mut ui, "2"));
+        assert_eq!(edit.get_text(), "12");
+    }
+
+    #[test]
+    fn test_filter_rejects_whole_paste_with_one_bad_char() {
+        let (edit, mut ui) = edit_and_ui();
+        edit.set_input_filter(Some(Box::new(|c: char| c.is_ascii_digit())));
+        assert!(!edit.insert_text_at_caret(&mut ui, "12 34"));
+        assert_eq!(edit.get_text(), "");
+        assert!(edit.insert_text_at_caret(&mut ui, "1234"));
+        assert_eq!(edit.get_text(), "1234");
+    }
+
+    #[test]
+    fn test_rejected_insert_leaves_undo_history_alone() {
+        let (edit, mut ui) = edit_and_ui();
+        edit.set_input_filter(Some(Box::new(|c: char| c.is_ascii_digit())));
+        edit.insert_text_at_caret(&mut ui, "1");
+        edit.insert_text_at_caret(&mut ui, "a"); // rejected: no undo entry
+        edit.insert_text_at_caret(&mut ui, "2"); // still coalesces with "1"
+        assert!(edit.undo(&mut ui));
+        assert_eq!(edit.get_text(), "");
+        assert!(!edit.undo(&mut ui));
+    }
+
+    #[test]
+    fn test_filter_xml_attributes() {
+        let (mut edit, mut ui) = edit_and_ui();
+        edit.set_any("filter", "numeric");
+        assert!(!edit.insert_text_at_caret(&mut ui, "x"));
+        assert!(edit.insert_text_at_caret(&mut ui, "7"));
+        edit.set_any("allowed_chars", "0123456789abcdef");
+        assert!(edit.insert_text_at_caret(&mut ui, "f"));
+        assert!(!edit.insert_text_at_caret(&mut ui, "g"));
+        assert_eq!(edit.get_text(), "7f");
+    }
+
+    #[test]
+    fn test_set_text_bypasses_filter_and_clearing_lifts_it() {
+        let (edit, mut ui) = edit_and_ui();
+        edit.set_input_filter(Some(Box::new(|c: char| c.is_ascii_digit())));
+        edit.set_text("not numeric");
+        assert_eq!(edit.get_text(), "not numeric");
+        edit.set_input_filter(None);
+        assert!(edit.insert_text_at_caret(&mut ui, "!")); // caret still at 0
+        assert_eq!(edit.get_text(), "!not numeric");
     }
 }

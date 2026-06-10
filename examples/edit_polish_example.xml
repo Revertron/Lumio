@@ -4,6 +4,12 @@
     <Label text="Password field (masked, copy disabled, Ctrl+Z undo):" margin_top="12"/>
     <Edit id="edit_pw" text="hunter2" password="true" icon_left="icons/lock-outline.svg" width="320" margin_top="4"/>
 
+    <Label text="Input filters — digits only / hex chars only:" margin_top="8"/>
+    <Frame direction="horizontal" width="min" height="min" margin_top="4">
+        <Edit id="edit_numeric" placeholder="numeric" filter="numeric" width="156"/>
+        <Edit id="edit_hex" placeholder="hex" allowed_chars="0123456789abcdefABCDEF" width="156" margin_left="8"/>
+    </Frame>
+
     <Label text="Plain edit (no icons):" margin_top="8"/>
     <Edit id="edit_plain" text="Hello, world" width="320" margin_top="4"/>
 

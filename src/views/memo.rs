@@ -9,7 +9,7 @@ use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseCursorType
 
 use crate::assets::get_font_family;
 use crate::events::EventType;
-use crate::common::{delete_char, delete_range, insert_str, TextEditOp, TextSnapshot, UNDO_LIMIT};
+use crate::common::{delete_char, delete_range, insert_str, InputFilter, TextEditOp, TextSnapshot, UNDO_LIMIT};
 use crate::views::{Borders, Gravity};
 use crate::views::popupmenu::PopupMenu;
 use crate::styles::selector::FontSelector;
@@ -55,6 +55,10 @@ pub struct Memo {
     /// The kind of the last mutation, for coalescing runs. Reset by caret
     /// moves so the next edit starts a fresh undo entry.
     last_edit_op: std::cell::Cell<Option<TextEditOp>>,
+    /// Per-character input filter: when set, a typed or pasted insert
+    /// containing any disallowed character is rejected wholesale.
+    /// Programmatic set_text() bypasses it.
+    input_filter: RefCell<Option<InputFilter>>,
 }
 
 impl HasMainFields for Memo {
@@ -105,6 +109,7 @@ impl Memo {
             undo_stack: RefCell::new(Vec::new()),
             redo_stack: RefCell::new(Vec::new()),
             last_edit_op: std::cell::Cell::new(None),
+            input_filter: RefCell::new(None),
         }
     }
 
@@ -234,6 +239,23 @@ impl Memo {
 
     pub fn set_max_length(&self, max_length: Option<usize>) {
         *self.max_length.borrow_mut() = max_length;
+    }
+
+    /// Restrict typed and pasted input. The predicate judges each character;
+    /// an insert containing any disallowed character is rejected wholesale
+    /// (a paste with one stray character inserts nothing). The predicate sees
+    /// `'\n'` too, so a restrictive filter also blocks Enter unless it allows
+    /// newlines. Programmatic `set_text()` is not filtered. Pass `None` to
+    /// remove the filter.
+    pub fn set_input_filter(&self, filter: Option<InputFilter>) {
+        *self.input_filter.borrow_mut() = filter;
+    }
+
+    fn passes_filter(&self, s: &str) -> bool {
+        match self.input_filter.borrow().as_ref() {
+            Some(filter) => s.chars().all(filter),
+            None => true,
+        }
     }
 
     pub fn set_max_lines(&self, max_lines: u32) {
@@ -875,7 +897,7 @@ impl Memo {
     }
 
     fn insert_text_at_caret(&self, ui: &mut UI, s: &str) -> bool {
-        if *self.read_only.borrow() || s.is_empty() {
+        if *self.read_only.borrow() || s.is_empty() || !self.passes_filter(s) {
             return false;
         }
         // Single chars are typing (coalesced); newlines and pastes are not.
@@ -1083,6 +1105,15 @@ impl View for Memo {
                 if let Ok(n) = value.parse::<u32>() {
                     self.set_max_lines(n);
                 }
+            }
+            "filter" => {
+                if value == "numeric" {
+                    self.set_input_filter(Some(Box::new(|c: char| c.is_ascii_digit())));
+                }
+            }
+            "allowed_chars" => {
+                let set: std::collections::HashSet<char> = value.chars().collect();
+                self.set_input_filter(Some(Box::new(move |c| set.contains(&c))));
             }
             &_ => {}
         }
@@ -1747,5 +1778,26 @@ mod tests {
         memo.set_text("fresh");
         assert!(!memo.undo(&mut ui));
         assert_eq!(memo.get_text(), "fresh");
+    }
+
+    #[test]
+    fn test_memo_filter_rejects_insert_including_newline() {
+        let (memo, mut ui) = memo_and_ui();
+        memo.set_input_filter(Some(Box::new(|c: char| c.is_ascii_digit())));
+        assert!(memo.insert_text_at_caret(&mut ui, "1"));
+        assert!(!memo.insert_text_at_caret(&mut ui, "x"));
+        // The predicate sees '\n' too — Enter is blocked by a digits-only filter.
+        assert!(!memo.insert_text_at_caret(&mut ui, "\n"));
+        assert_eq!(memo.get_text(), "1");
+    }
+
+    #[test]
+    fn test_memo_filter_allowing_newline_passes_enter() {
+        let (memo, mut ui) = memo_and_ui();
+        memo.set_input_filter(Some(Box::new(|c: char| c.is_ascii_digit() || c == '\n')));
+        assert!(memo.insert_text_at_caret(&mut ui, "1"));
+        assert!(memo.insert_text_at_caret(&mut ui, "\n"));
+        assert!(memo.insert_text_at_caret(&mut ui, "2"));
+        assert_eq!(memo.get_text(), "1\n2");
     }
 }

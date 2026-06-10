@@ -84,3 +84,8 @@ pub(crate) enum TextEditOp {
     Deleting,
     Other,
 }
+
+/// Per-character input filter for Edit/Memo: returns true if the character
+/// is allowed. An insert containing any disallowed character is rejected
+/// wholesale.
+pub type InputFilter = Box<dyn Fn(char) -> bool>;
