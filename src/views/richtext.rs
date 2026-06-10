@@ -1148,7 +1148,7 @@ impl View for RichText {
                     for w in &run.words {
                         theme.draw_text((ox + w.x) as f32, (oy + w.top) as f32, color, &w.block);
                         if let Some(sel) = line_sel {
-                            let sel_color = crate::themes::selection_text_color(color);
+                            let sel_color = crate::themes::selection_text_color(theme.color("selection"));
                             theme.draw_text_cropped((ox + w.x) as f32, (oy + w.top) as f32, sel, sel_color, &w.block);
                         }
                     }

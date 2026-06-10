@@ -34,6 +34,28 @@ impl Palette {
         Palette { colors }
     }
 
+    /// A dark counterpart of the Classic palette: same raised/sunken 3D
+    /// language, dark gray faces, light text.
+    pub fn dark() -> Self {
+        let colors = HashMap::from([
+            ("background".to_string(), 0xFF3C3C3C),
+            ("background_hover".to_string(), 0xFF4A4A4A),
+            ("surface".to_string(), 0xFF252525),
+            ("highlight".to_string(), 0xFF5F5F5F),
+            ("border_light".to_string(), 0xFF2B2B2B),
+            ("border_dark".to_string(), 0xFF161616),
+            ("text".to_string(), 0xFFE0E0E0),
+            ("text_hint".to_string(), 0xFF808080),
+            ("selection".to_string(), 0xFF264F78),
+            ("item_highlight".to_string(), 0xFF3060A8),
+            ("item_highlight_text".to_string(), 0xFFFFFFFF),
+            ("table_selection".to_string(), 0xFF2A4D6E),
+            ("table_separator".to_string(), 0xFF454545),
+            ("progress_fill".to_string(), 0xFF2D7DD2),
+        ]);
+        Palette { colors }
+    }
+
     /// Resolve a token to an ARGB color. An unknown token is a bug in the
     /// theme or drawable: it panics in debug builds and renders magenta in
     /// release builds so it stays visible.
@@ -64,6 +86,20 @@ mod tests {
     fn test_all_classic_tokens_have_alpha() {
         let palette = Palette::classic();
         for (token, color) in &palette.colors {
+            assert_eq!(color >> 24, 0xFF, "token '{}' must carry explicit FF alpha", token);
+        }
+    }
+
+    #[test]
+    fn test_dark_covers_same_tokens_as_classic() {
+        let classic = Palette::classic();
+        let dark = Palette::dark();
+        let mut classic_tokens: Vec<&String> = classic.colors.keys().collect();
+        let mut dark_tokens: Vec<&String> = dark.colors.keys().collect();
+        classic_tokens.sort();
+        dark_tokens.sort();
+        assert_eq!(classic_tokens, dark_tokens);
+        for (token, color) in &dark.colors {
             assert_eq!(color >> 24, 0xFF, "token '{}' must carry explicit FF alpha", token);
         }
     }

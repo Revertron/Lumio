@@ -4,6 +4,7 @@ pub use crate::traits::{View, Container, Element};
 pub use crate::events::EventType;
 pub use crate::assets::{AssetsProvider, set_provider, set_font_fallbacks};
 pub use crate::themes::{Theme, Classic, Typeface, FontStyle};
+pub use crate::drawing::Palette;
 pub use crate::containers::Frame;
 pub use crate::layout::{Layout, LinearLayout, OverlayLayout, DockLayout, create_layout};
 pub use crate::views::{Label, Button, Edit, CheckBox, RadioButton, ComboBox, ScrollView, ProgressBar, TabView, List, ImageButton, ImageView, Separator, SplitPanel, StatusBar, Memo, NotificationStack};

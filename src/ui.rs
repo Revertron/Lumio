@@ -85,6 +85,9 @@ pub struct UI {
     /// current `on_mouse_move` dispatch. Reset each move; resolved via
     /// [`UI::current_cursor`] and applied by the window handler.
     requested_cursor: Option<MouseCursorType>,
+    /// A palette change requested from app code (e.g. inside an event
+    /// handler); picked up by the window handler before the next paint.
+    pending_palette: Option<crate::drawing::Palette>,
 }
 
 #[allow(dead_code)]
@@ -97,6 +100,7 @@ impl UI {
             notification_stack: None,
             pending_removals: Vec::new(),
             requested_cursor: None,
+            pending_palette: None,
         };
         ui.register::<Label>("Label");
         ui.register::<Button>("Button");
@@ -827,6 +831,19 @@ impl UI {
     /// to drive the OS cursor.
     pub fn current_cursor(&self) -> MouseCursorType {
         self.requested_cursor.unwrap_or(MouseCursorType::Default)
+    }
+
+    /// Request a palette change (e.g. `Palette::dark()`). Applied by the
+    /// window handler before the next paint, so it is safe to call from
+    /// inside event handlers.
+    pub fn set_palette(&mut self, palette: crate::drawing::Palette) {
+        self.pending_palette = Some(palette);
+    }
+
+    /// Taken by the window handler each frame; `Some` means the app requested
+    /// a palette change since the last paint.
+    pub fn take_pending_palette(&mut self) -> Option<crate::drawing::Palette> {
+        self.pending_palette.take()
     }
 
     pub fn on_mouse_button_down(&mut self, position: Vector2<i32>, button: MouseButton) -> bool {

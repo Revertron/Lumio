@@ -76,12 +76,12 @@ pub trait Theme {
     fn pop_opacity(&mut self) {}
 }
 
-/// Contrast color for text drawn over a selection highlight:
-/// white for dark text, black for light text (by perceived luminance).
-pub fn selection_text_color(text_color: u32) -> u32 {
-    let r = (text_color >> 16) & 0xff;
-    let g = (text_color >> 8) & 0xff;
-    let b = text_color & 0xff;
+/// Contrast color for text drawn over a selection highlight: white on a dark
+/// selection background, black on a light one (by perceived luminance).
+pub fn selection_text_color(selection_background: u32) -> u32 {
+    let r = (selection_background >> 16) & 0xff;
+    let g = (selection_background >> 8) & 0xff;
+    let b = selection_background & 0xff;
     let lum = (299 * r + 587 * g + 114 * b) / 1000;
     if lum >= 128 { 0xff000000 } else { 0xffffffff }
 }

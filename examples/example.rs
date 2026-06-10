@@ -168,6 +168,14 @@ fn main() {
         }));
     }
 
+    if let Some(check) = ui.get_view("dark_mode") {
+        check.borrow_mut().on_event(EventType::CheckedChanged, Box::new(|ui, view| {
+            let dark = view.as_any().downcast_ref::<CheckBox>().map(|c| c.is_checked()).unwrap_or(false);
+            ui.set_palette(if dark { Palette::dark() } else { Palette::classic() });
+            true
+        }));
+    }
+
     if let Some(image) = ui.get_view("my_image") {
         image.borrow_mut().on_event(EventType::Click, Box::new(|_ui, _view| {
             println!("Image clicked!");

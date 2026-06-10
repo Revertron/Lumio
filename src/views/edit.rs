@@ -1014,7 +1014,7 @@ impl View for Edit {
             theme.draw_text(text_x, text_y, color, text);
             // Redraw the selected part in a contrasting color over the highlight
             if let Some(sel_rect) = sel_rect {
-                let sel_color = crate::themes::selection_text_color(color);
+                let sel_color = crate::themes::selection_text_color(theme.color("selection"));
                 theme.draw_text_cropped(text_x, text_y, sel_rect, sel_color, text);
             }
         } else if !self.placeholder.borrow().is_empty() {

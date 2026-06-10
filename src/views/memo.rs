@@ -1089,7 +1089,7 @@ impl View for Memo {
                 theme.draw_text(text_x, text_y, color, text);
                 // Redraw the selected part in a contrasting color over the highlight
                 if !sel_rects.is_empty() {
-                    let sel_color = crate::themes::selection_text_color(color);
+                    let sel_color = crate::themes::selection_text_color(theme.color("selection"));
                     for sel_rect in sel_rects {
                         theme.draw_text_cropped(text_x, text_y, sel_rect, sel_color, text);
                     }

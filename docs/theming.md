@@ -1,6 +1,10 @@
 # Theme & Styling System Redesign
 
-Design doc for ROADMAP.md Tier 1, item 1. Status: **proposed**.
+Design doc for ROADMAP.md Tier 1, item 1.
+Status: **phases 1-4 implemented** (palette tokens, role drawables, legacy
+draw_* methods removed, dark palette + runtime switching via
+`ui.set_palette(Palette::dark())`). Phases 5 (metrics/typography tokens) and
+6 (`style=`/`@` references in layout XML) remain.
 
 ## Goal
 

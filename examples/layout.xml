@@ -10,6 +10,8 @@
 
     <CheckBox id="checkbox1" text="Create awesome GUI in Rust?" margin="4"/>
 
+    <CheckBox id="dark_mode" text="Dark mode" margin="4"/>
+
     <Separator width="max" height="3" padding="1" />
 
     <Frame width="min" height="min" direction="vertical" padding_right="4" background="#FFDD44">

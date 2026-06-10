@@ -175,7 +175,7 @@ impl<'h> Theme for Classic<'h> {
         let rf = r as f32;
         // Top, bottom, and middle bands. Corners are filled by the four circles.
         // Note: circles overlap the bands by a fraction of a pixel; for opaque
-        // colours this is invisible. With low alpha (e.g. inside a fading
+        // colors this is invisible. With low alpha (e.g. inside a fading
         // notification) the corners will appear slightly more saturated.
         self.graphics.draw_rectangle(Rectangle::new(Vector2::new(x0 + rf, y0), Vector2::new(x1 - rf, y0 + rf)), c);
         self.graphics.draw_rectangle(Rectangle::new(Vector2::new(x0 + rf, y1 - rf), Vector2::new(x1 - rf, y1)), c);
