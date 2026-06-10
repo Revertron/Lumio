@@ -11,7 +11,7 @@ use std::hash::{Hash, Hasher};
 
 use crate::assets::{get_asset, get_font_family};
 use crate::events::EventType;
-use crate::common::{delete_char, delete_range, insert_str};
+use crate::common::{delete_char, delete_range, insert_str, TextEditOp, TextSnapshot, UNDO_LIMIT};
 use crate::svg;
 use crate::views::{Borders, Gravity};
 use crate::views::popupmenu::PopupMenu;
@@ -71,6 +71,14 @@ pub struct Edit {
     /// True while the left button is held after a press inside the text, so
     /// mouse-move extends the selection (even when the pointer leaves the view).
     dragging: RefCell<bool>,
+    // Undo/redo: snapshots taken before each mutating operation.
+    undo_stack: RefCell<Vec<TextSnapshot>>,
+    redo_stack: RefCell<Vec<TextSnapshot>>,
+    /// The kind of the last mutation, for coalescing runs. Reset by caret
+    /// moves so the next edit starts a fresh undo entry.
+    last_edit_op: std::cell::Cell<Option<TextEditOp>>,
+    /// Render the content as bullets and disable copy/cut.
+    password: RefCell<bool>,
 }
 
 impl HasMainFields for Edit {
@@ -126,7 +134,95 @@ impl Edit {
             error: RefCell::new(false),
             error_color: RefCell::new(None),
             dragging: RefCell::new(false),
+            undo_stack: RefCell::new(Vec::new()),
+            redo_stack: RefCell::new(Vec::new()),
+            last_edit_op: std::cell::Cell::new(None),
+            password: RefCell::new(false),
         }
+    }
+
+    fn current_snapshot(&self) -> TextSnapshot {
+        TextSnapshot {
+            text: self.state.borrow().text.clone(),
+            caret: *self.caret_pos.borrow(),
+            anchor: *self.selection_anchor.borrow(),
+        }
+    }
+
+    /// Record the state before a mutating operation. Consecutive operations
+    /// of the same kind (a typing run, a backspace run) coalesce into the
+    /// entry already on the stack.
+    fn remember_for_undo(&self, op: TextEditOp) {
+        if self.last_edit_op.get() == Some(op) && op != TextEditOp::Other {
+            return;
+        }
+        let snapshot = self.current_snapshot();
+        {
+            let mut undo = self.undo_stack.borrow_mut();
+            if undo.last() != Some(&snapshot) {
+                undo.push(snapshot);
+                if undo.len() > UNDO_LIMIT {
+                    undo.remove(0);
+                }
+            }
+        }
+        self.redo_stack.borrow_mut().clear();
+        self.last_edit_op.set(Some(op));
+    }
+
+    /// The caret moved without an edit — the next edit starts a new undo entry.
+    fn break_undo_coalescing(&self) {
+        self.last_edit_op.set(None);
+    }
+
+    fn restore_snapshot(&self, snapshot: TextSnapshot, ui: &mut UI) {
+        self.state.borrow_mut().text = snapshot.text;
+        *self.caret_pos.borrow_mut() = snapshot.caret;
+        *self.selection_anchor.borrow_mut() = snapshot.anchor;
+        self.on_text_changed(ui);
+    }
+
+    pub fn undo(&self, ui: &mut UI) -> bool {
+        if *self.read_only.borrow() {
+            return false;
+        }
+        let snapshot = self.undo_stack.borrow_mut().pop();
+        if let Some(snapshot) = snapshot {
+            self.redo_stack.borrow_mut().push(self.current_snapshot());
+            self.last_edit_op.set(None);
+            self.restore_snapshot(snapshot, ui);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn redo(&self, ui: &mut UI) -> bool {
+        if *self.read_only.borrow() {
+            return false;
+        }
+        let snapshot = self.redo_stack.borrow_mut().pop();
+        if let Some(snapshot) = snapshot {
+            self.undo_stack.borrow_mut().push(self.current_snapshot());
+            self.last_edit_op.set(None);
+            self.restore_snapshot(snapshot, ui);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Mask the content with bullets and disable copy/cut, for password entry.
+    pub fn set_password(&self, password: bool) {
+        *self.password.borrow_mut() = password;
+        self.state.borrow_mut().cached_text = None;
+        self.caret_rect.borrow_mut().clear();
+        let scale = self.state.borrow().main.scale;
+        self.layout_text(self.get_rect_width(), scale);
+    }
+
+    pub fn is_password(&self) -> bool {
+        *self.password.borrow()
     }
 
     pub fn set_error(&self, error: bool) {
@@ -259,6 +355,10 @@ impl Edit {
     }
 
     pub fn set_text(&self, text: &str) {
+        // Programmatic content replacement starts a fresh undo history.
+        self.undo_stack.borrow_mut().clear();
+        self.redo_stack.borrow_mut().clear();
+        self.last_edit_op.set(None);
         {
             let mut state = self.state.borrow_mut();
             state.text.clear();
@@ -412,7 +512,14 @@ impl Edit {
                 let base_size = typeface.font_size
                     .map(|dip| dip * scale as f32)
                     .unwrap_or(self.state.borrow().text_size);
-                let text = font.layout_text(&self.state.borrow().text, base_size, options);
+                // Password fields render bullets; one per char keeps all the
+                // glyph-based geometry (caret, selection, hit tests) valid.
+                let display = if *self.password.borrow() {
+                    "\u{2022}".repeat(self.state.borrow().text.chars().count())
+                } else {
+                    self.state.borrow().text.clone()
+                };
+                let text = font.layout_text(&display, base_size, options);
                 self.state.borrow_mut().cached_text = Some(text);
             }
         }
@@ -589,6 +696,7 @@ impl Edit {
     /// Called after any text mutation to invalidate cache, relayout, and fire TextChanged
     /// Handle navigation key action. Used by both on_key_down and key repeat in update().
     fn handle_nav_key(&self, ui: &mut UI, code: VirtualKeyCode, shift: bool, ctrl: bool) -> bool {
+        self.break_undo_coalescing();
         match code {
             VirtualKeyCode::Left => {
                 if !shift && self.has_selection() && !ctrl {
@@ -674,6 +782,7 @@ impl Edit {
                 if *self.read_only.borrow() {
                     return false;
                 }
+                self.remember_for_undo(TextEditOp::Deleting);
                 if self.has_selection() {
                     self.delete_selection();
                     self.on_text_changed(ui);
@@ -721,6 +830,8 @@ impl Edit {
         if *self.read_only.borrow() || s.is_empty() {
             return false;
         }
+        // Single chars are typing (coalesced); larger inserts (paste) are not.
+        self.remember_for_undo(if s.chars().count() == 1 { TextEditOp::Typing } else { TextEditOp::Other });
         let had_selection = self.delete_selection();
         let pos = *self.caret_pos.borrow();
         let current_len = self.state.borrow().text.chars().count();
@@ -748,6 +859,10 @@ impl Edit {
     }
 
     fn copy_to_clipboard(&self) {
+        // Never expose password content to the clipboard.
+        if *self.password.borrow() {
+            return;
+        }
         if let Some(text) = self.get_selected_text() {
             if let Ok(mut clipboard) = arboard::Clipboard::new() {
                 let _ = clipboard.set_text(text);
@@ -793,14 +908,17 @@ impl Edit {
 
                 match index {
                     0 => {
-                        // Cut: copy + delete selection
+                        // Cut: copy + delete selection (no-op for password fields)
                         if let Some(el) = ui.get_view(&edit_id) {
                             let b = el.borrow();
                             let edit = b.as_any().downcast_ref::<Edit>().unwrap();
-                            edit.copy_to_clipboard();
-                            if edit.has_selection() && !*edit.read_only.borrow() {
-                                edit.delete_selection();
-                                need_text_changed = true;
+                            if !*edit.password.borrow() {
+                                edit.copy_to_clipboard();
+                                if edit.has_selection() && !*edit.read_only.borrow() {
+                                    edit.remember_for_undo(TextEditOp::Other);
+                                    edit.delete_selection();
+                                    need_text_changed = true;
+                                }
                             }
                         }
                     }
@@ -822,6 +940,7 @@ impl Edit {
                             let b = el.borrow();
                             let edit = b.as_any().downcast_ref::<Edit>().unwrap();
                             if edit.has_selection() && !*edit.read_only.borrow() {
+                                edit.remember_for_undo(TextEditOp::Other);
                                 edit.delete_selection();
                                 need_text_changed = true;
                             }
@@ -879,6 +998,7 @@ impl View for Edit {
             }
             "placeholder" => { self.set_placeholder(value) }
             "readonly" => { self.set_read_only(value == "true") }
+            "password" => { self.set_password(value == "true") }
             "single_line" => { self.state.borrow_mut().single_line = value.parse().unwrap_or(true) }
             "maxlength" => {
                 if let Ok(n) = value.parse::<usize>() {
@@ -1322,6 +1442,7 @@ impl View for Edit {
         if !self.state.borrow().main.rect.hit((position.x, position.y)) {
             return false;
         }
+        self.break_undo_coalescing();
 
         if !matches!(button, MouseButton::Left) {
             self.state.borrow_mut().main.state.focused = true;
@@ -1476,12 +1597,17 @@ impl View for Edit {
                     return true;
                 }
                 VirtualKeyCode::X if ctrl => {
+                    // Password fields neither copy nor cut.
+                    if *self.password.borrow() {
+                        return false;
+                    }
                     if *self.read_only.borrow() {
                         self.copy_to_clipboard();
                         return false;
                     }
                     self.copy_to_clipboard();
                     if self.has_selection() {
+                        self.remember_for_undo(TextEditOp::Other);
                         self.delete_selection();
                         self.on_text_changed(ui);
                         return true;
@@ -1490,6 +1616,15 @@ impl View for Edit {
                 }
                 VirtualKeyCode::V if ctrl => {
                     return self.paste_from_clipboard(ui);
+                }
+                VirtualKeyCode::Z if ctrl && shift => {
+                    return self.redo(ui);
+                }
+                VirtualKeyCode::Z if ctrl => {
+                    return self.undo(ui);
+                }
+                VirtualKeyCode::Y if ctrl => {
+                    return self.redo(ui);
                 }
                 _ => {}
             }
@@ -1523,6 +1658,7 @@ impl View for Edit {
             if *self.read_only.borrow() {
                 return false;
             }
+            self.remember_for_undo(TextEditOp::Deleting);
             if self.has_selection() {
                 self.delete_selection();
                 self.on_text_changed(ui);
@@ -1547,6 +1683,7 @@ impl View for Edit {
             if *self.read_only.borrow() {
                 return false;
             }
+            self.remember_for_undo(TextEditOp::Deleting);
             if self.has_selection() {
                 self.delete_selection();
                 self.on_text_changed(ui);
@@ -1610,5 +1747,100 @@ impl Default for Edit {
     fn default() -> Self {
         let rect = rect((0, 0), (60, 24));
         Edit::new(rect, "", 48_f32)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn edit_and_ui() -> (Edit, UI) {
+        let ui = UI::new(800, 600, Typeface::default(), 1.0);
+        let edit = Edit::new(rect((0, 0), (200, 24)), "", 16.0);
+        (edit, ui)
+    }
+
+    #[test]
+    fn test_typing_run_coalesces_into_one_undo() {
+        let (edit, mut ui) = edit_and_ui();
+        edit.insert_text_at_caret(&mut ui, "a");
+        edit.insert_text_at_caret(&mut ui, "b");
+        edit.insert_text_at_caret(&mut ui, "c");
+        assert_eq!(edit.get_text(), "abc");
+        assert!(edit.undo(&mut ui));
+        assert_eq!(edit.get_text(), "");
+        assert!(!edit.undo(&mut ui));
+        assert!(edit.redo(&mut ui));
+        assert_eq!(edit.get_text(), "abc");
+    }
+
+    #[test]
+    fn test_paste_is_its_own_undo_entry() {
+        let (edit, mut ui) = edit_and_ui();
+        edit.insert_text_at_caret(&mut ui, "a");
+        edit.insert_text_at_caret(&mut ui, "pasted");
+        edit.insert_text_at_caret(&mut ui, "b");
+        assert_eq!(edit.get_text(), "apastedb");
+        edit.undo(&mut ui);
+        assert_eq!(edit.get_text(), "apasted");
+        edit.undo(&mut ui);
+        assert_eq!(edit.get_text(), "a");
+        edit.undo(&mut ui);
+        assert_eq!(edit.get_text(), "");
+    }
+
+    #[test]
+    fn test_caret_move_breaks_typing_coalescing() {
+        let (edit, mut ui) = edit_and_ui();
+        edit.insert_text_at_caret(&mut ui, "a");
+        edit.insert_text_at_caret(&mut ui, "b");
+        edit.break_undo_coalescing(); // as a click or arrow key would
+        edit.insert_text_at_caret(&mut ui, "c");
+        edit.undo(&mut ui);
+        assert_eq!(edit.get_text(), "ab");
+        edit.undo(&mut ui);
+        assert_eq!(edit.get_text(), "");
+    }
+
+    #[test]
+    fn test_set_text_clears_history() {
+        let (edit, mut ui) = edit_and_ui();
+        edit.insert_text_at_caret(&mut ui, "a");
+        edit.set_text("fresh");
+        assert!(!edit.undo(&mut ui));
+        assert_eq!(edit.get_text(), "fresh");
+    }
+
+    #[test]
+    fn test_new_edit_after_undo_clears_redo() {
+        let (edit, mut ui) = edit_and_ui();
+        edit.insert_text_at_caret(&mut ui, "a");
+        edit.undo(&mut ui);
+        edit.insert_text_at_caret(&mut ui, "x");
+        assert!(!edit.redo(&mut ui));
+        assert_eq!(edit.get_text(), "x");
+    }
+
+    #[test]
+    fn test_undo_restores_selection_deleted_by_typing() {
+        let (edit, mut ui) = edit_and_ui();
+        edit.set_text("hello");
+        edit.select_all();
+        edit.insert_text_at_caret(&mut ui, "x"); // replaces selection
+        assert_eq!(edit.get_text(), "x");
+        edit.undo(&mut ui);
+        assert_eq!(edit.get_text(), "hello");
+        assert_eq!(edit.get_selected_text().as_deref(), Some("hello"));
+    }
+
+    #[test]
+    fn test_password_blocks_clipboard_copy() {
+        let (edit, mut ui) = edit_and_ui();
+        edit.insert_text_at_caret(&mut ui, "secret");
+        edit.set_password(true);
+        assert!(edit.is_password());
+        edit.select_all();
+        // Early-returns before touching the system clipboard.
+        edit.copy_to_clipboard();
     }
 }

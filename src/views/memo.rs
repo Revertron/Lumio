@@ -9,7 +9,7 @@ use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseCursorType
 
 use crate::assets::get_font_family;
 use crate::events::EventType;
-use crate::common::{delete_char, delete_range, insert_str};
+use crate::common::{delete_char, delete_range, insert_str, TextEditOp, TextSnapshot, UNDO_LIMIT};
 use crate::views::{Borders, Gravity};
 use crate::views::popupmenu::PopupMenu;
 use crate::styles::selector::FontSelector;
@@ -49,6 +49,12 @@ pub struct Memo {
     /// True while the left button is held after a press inside the text, so
     /// mouse-move extends the selection (even when the pointer leaves the view).
     dragging: RefCell<bool>,
+    // Undo/redo: snapshots taken before each mutating operation.
+    undo_stack: RefCell<Vec<TextSnapshot>>,
+    redo_stack: RefCell<Vec<TextSnapshot>>,
+    /// The kind of the last mutation, for coalescing runs. Reset by caret
+    /// moves so the next edit starts a fresh undo entry.
+    last_edit_op: std::cell::Cell<Option<TextEditOp>>,
 }
 
 impl HasMainFields for Memo {
@@ -96,10 +102,88 @@ impl Memo {
             line_count: RefCell::new(1),
             line_offsets: RefCell::new(vec![0]),
             dragging: RefCell::new(false),
+            undo_stack: RefCell::new(Vec::new()),
+            redo_stack: RefCell::new(Vec::new()),
+            last_edit_op: std::cell::Cell::new(None),
+        }
+    }
+
+    fn current_snapshot(&self) -> TextSnapshot {
+        TextSnapshot {
+            text: self.state.borrow().text.clone(),
+            caret: *self.caret_pos.borrow(),
+            anchor: *self.selection_anchor.borrow(),
+        }
+    }
+
+    /// Record the state before a mutating operation. Consecutive operations
+    /// of the same kind (a typing run, a backspace run) coalesce into the
+    /// entry already on the stack.
+    fn remember_for_undo(&self, op: TextEditOp) {
+        if self.last_edit_op.get() == Some(op) && op != TextEditOp::Other {
+            return;
+        }
+        let snapshot = self.current_snapshot();
+        {
+            let mut undo = self.undo_stack.borrow_mut();
+            if undo.last() != Some(&snapshot) {
+                undo.push(snapshot);
+                if undo.len() > UNDO_LIMIT {
+                    undo.remove(0);
+                }
+            }
+        }
+        self.redo_stack.borrow_mut().clear();
+        self.last_edit_op.set(Some(op));
+    }
+
+    /// The caret moved without an edit — the next edit starts a new undo entry.
+    fn break_undo_coalescing(&self) {
+        self.last_edit_op.set(None);
+    }
+
+    fn restore_snapshot(&self, snapshot: TextSnapshot, ui: &mut UI) {
+        self.state.borrow_mut().text = snapshot.text;
+        *self.caret_pos.borrow_mut() = snapshot.caret;
+        *self.selection_anchor.borrow_mut() = snapshot.anchor;
+        self.on_text_changed(ui);
+    }
+
+    pub fn undo(&self, ui: &mut UI) -> bool {
+        if *self.read_only.borrow() {
+            return false;
+        }
+        let snapshot = self.undo_stack.borrow_mut().pop();
+        if let Some(snapshot) = snapshot {
+            self.redo_stack.borrow_mut().push(self.current_snapshot());
+            self.last_edit_op.set(None);
+            self.restore_snapshot(snapshot, ui);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn redo(&self, ui: &mut UI) -> bool {
+        if *self.read_only.borrow() {
+            return false;
+        }
+        let snapshot = self.redo_stack.borrow_mut().pop();
+        if let Some(snapshot) = snapshot {
+            self.undo_stack.borrow_mut().push(self.current_snapshot());
+            self.last_edit_op.set(None);
+            self.restore_snapshot(snapshot, ui);
+            true
+        } else {
+            false
         }
     }
 
     pub fn set_text(&self, text: &str) {
+        // Programmatic content replacement starts a fresh undo history.
+        self.undo_stack.borrow_mut().clear();
+        self.redo_stack.borrow_mut().clear();
+        self.last_edit_op.set(None);
         {
             let mut state = self.state.borrow_mut();
             state.text.clear();
@@ -596,6 +680,7 @@ impl Memo {
     }
 
     fn handle_nav_key(&self, ui: &mut UI, code: VirtualKeyCode, shift: bool, ctrl: bool) -> bool {
+        self.break_undo_coalescing();
         match code {
             VirtualKeyCode::Left => {
                 *self.preferred_x.borrow_mut() = None;
@@ -746,6 +831,7 @@ impl Memo {
                 if *self.read_only.borrow() {
                     return false;
                 }
+                self.remember_for_undo(TextEditOp::Deleting);
                 if self.has_selection() {
                     self.delete_selection();
                     self.on_text_changed(ui);
@@ -792,6 +878,9 @@ impl Memo {
         if *self.read_only.borrow() || s.is_empty() {
             return false;
         }
+        // Single chars are typing (coalesced); newlines and pastes are not.
+        self.remember_for_undo(if s.chars().count() == 1 && s != "
+" { TextEditOp::Typing } else { TextEditOp::Other });
         let had_selection = self.delete_selection();
         let pos = *self.caret_pos.borrow();
         let current_len = self.state.borrow().text.chars().count();
@@ -863,6 +952,7 @@ impl Memo {
                             let memo = b.as_any().downcast_ref::<Memo>().unwrap();
                             memo.copy_to_clipboard();
                             if memo.has_selection() && !*memo.read_only.borrow() {
+                                memo.remember_for_undo(TextEditOp::Other);
                                 memo.delete_selection();
                                 need_text_changed = true;
                             }
@@ -883,6 +973,7 @@ impl Memo {
                             let b = el.borrow();
                             let memo = b.as_any().downcast_ref::<Memo>().unwrap();
                             if memo.has_selection() && !*memo.read_only.borrow() {
+                                memo.remember_for_undo(TextEditOp::Other);
                                 memo.delete_selection();
                                 need_text_changed = true;
                             }
@@ -1337,6 +1428,7 @@ impl View for Memo {
 
     fn on_mouse_button_down(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
+        self.break_undo_coalescing();
         if !self.state.borrow().main.rect.hit((position.x, position.y)) {
             return false;
         }
@@ -1496,6 +1588,7 @@ impl View for Memo {
                     }
                     self.copy_to_clipboard();
                     if self.has_selection() {
+                        self.remember_for_undo(TextEditOp::Other);
                         self.delete_selection();
                         self.on_text_changed(ui);
                         return true;
@@ -1504,6 +1597,15 @@ impl View for Memo {
                 }
                 VirtualKeyCode::V if ctrl => {
                     return self.paste_from_clipboard(ui);
+                }
+                VirtualKeyCode::Z if ctrl && shift => {
+                    return self.redo(ui);
+                }
+                VirtualKeyCode::Z if ctrl => {
+                    return self.undo(ui);
+                }
+                VirtualKeyCode::Y if ctrl => {
+                    return self.redo(ui);
                 }
                 VirtualKeyCode::Return if shift => {
                     // Shift+Enter: insert newline
@@ -1540,6 +1642,7 @@ impl View for Memo {
             if *self.read_only.borrow() {
                 return false;
             }
+            self.remember_for_undo(TextEditOp::Deleting);
             if self.has_selection() {
                 self.delete_selection();
                 self.on_text_changed(ui);
@@ -1562,6 +1665,7 @@ impl View for Memo {
             if *self.read_only.borrow() {
                 return false;
             }
+            self.remember_for_undo(TextEditOp::Deleting);
             if self.has_selection() {
                 self.delete_selection();
                 self.on_text_changed(ui);
@@ -1599,5 +1703,49 @@ impl Default for Memo {
     fn default() -> Self {
         let rect = rect((0, 0), (60, 24));
         Memo::new(rect, "", 48_f32)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn memo_and_ui() -> (Memo, UI) {
+        let ui = UI::new(800, 600, Typeface::default(), 1.0);
+        let memo = Memo::new(rect((0, 0), (200, 100)), "", 16.0);
+        (memo, ui)
+    }
+
+    #[test]
+    fn test_memo_typing_run_coalesces() {
+        let (memo, mut ui) = memo_and_ui();
+        memo.insert_text_at_caret(&mut ui, "a");
+        memo.insert_text_at_caret(&mut ui, "b");
+        assert!(memo.undo(&mut ui));
+        assert_eq!(memo.get_text(), "");
+        assert!(memo.redo(&mut ui));
+        assert_eq!(memo.get_text(), "ab");
+    }
+
+    #[test]
+    fn test_memo_newline_is_own_undo_entry() {
+        let (memo, mut ui) = memo_and_ui();
+        memo.insert_text_at_caret(&mut ui, "a");
+        memo.insert_text_at_caret(&mut ui, "\n");
+        memo.insert_text_at_caret(&mut ui, "b");
+        assert_eq!(memo.get_text(), "a\nb");
+        memo.undo(&mut ui);
+        assert_eq!(memo.get_text(), "a\n");
+        memo.undo(&mut ui);
+        assert_eq!(memo.get_text(), "a");
+    }
+
+    #[test]
+    fn test_memo_set_text_clears_history() {
+        let (memo, mut ui) = memo_and_ui();
+        memo.insert_text_at_caret(&mut ui, "a");
+        memo.set_text("fresh");
+        assert!(!memo.undo(&mut ui));
+        assert_eq!(memo.get_text(), "fresh");
     }
 }

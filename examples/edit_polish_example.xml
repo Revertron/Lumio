@@ -1,6 +1,9 @@
 <Frame id="root" width="max" height="max" direction="vertical" padding="16">
     <Label text="Edit polish — leading/trailing icons + error state" font_size="18" margin_bottom="12"/>
 
+    <Label text="Password field (masked, copy disabled, Ctrl+Z undo):" margin_top="12"/>
+    <Edit id="edit_pw" text="hunter2" password="true" icon_left="icons/lock-outline.svg" width="320" margin_top="4"/>
+
     <Label text="Plain edit (no icons):" margin_top="8"/>
     <Edit id="edit_plain" text="Hello, world" width="320" margin_top="4"/>
 
@@ -27,6 +30,7 @@
 
     <Label text="Read-only — left lock icon copies value to clipboard:" margin_top="12"/>
     <Edit id="edit_ro" text="read-only-public-key" readonly="true" icon_left="icons/lock-outline.svg" width="320" margin_top="4"/>
+
 
     <Label text="Hyperlink Label (click me):" margin_top="12"/>
     <Label id="link1" text="Open the help page" link="true" margin_top="4"/>

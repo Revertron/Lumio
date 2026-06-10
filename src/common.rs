@@ -65,3 +65,22 @@ pub fn delete_char(text: &str, pos: usize) -> String {
     part1.push_str(&part2);
     part1
 }
+/// Maximum number of undo entries kept per text field.
+pub(crate) const UNDO_LIMIT: usize = 100;
+
+/// One undo/redo entry of a text field: the full state before a mutation.
+#[derive(Clone, PartialEq)]
+pub(crate) struct TextSnapshot {
+    pub text: String,
+    pub caret: usize,
+    pub anchor: Option<usize>,
+}
+
+/// Kind of mutating operation, used to coalesce runs: consecutive typing
+/// (or consecutive deleting) collapses into a single undo entry.
+#[derive(Clone, Copy, PartialEq)]
+pub(crate) enum TextEditOp {
+    Typing,
+    Deleting,
+    Other,
+}

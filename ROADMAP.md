@@ -42,8 +42,10 @@ XML-only, and `style=` / `@token` references become available in layout XML.
 
 In rough order of pain:
 
-- **Undo/redo** (Ctrl+Z/Y, command stack) — needed in any editor field.
-- **Password masking** — the attribute concept exists but renders nothing.
+- **Undo/redo** — DONE 2026-06: snapshot stacks with typing/deleting run
+  coalescing in both Edit and Memo (Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z).
+- **Password masking** — DONE 2026-06: `password="true"` on Edit renders
+  bullets and disables copy/cut.
 - **Input filters** — numeric-only, charset whitelist, custom validator hook.
 
 All contained within the two views.
