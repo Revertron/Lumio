@@ -794,7 +794,7 @@ impl ScrollView {
             (abs_origin.x + track.min.x, abs_origin.y + track.min.y),
             (abs_origin.x + track.max.x, abs_origin.y + track.max.y),
         );
-        theme.draw_scrollbar_track(abs_track, self.direction);
+        theme.draw_component("scrollbar.track", abs_track, ViewState::no_focus());
 
         // Arrow start button
         let arrow_start = self.arrow_start_rect();
@@ -807,7 +807,10 @@ impl ScrollView {
             hovered: self.arrow_start_pressed.get(),
             ..ViewState::no_focus()
         };
-        theme.draw_scrollbar_arrow_button(abs_arrow_start, arrow_start_state, true, self.direction);
+        let arrow_start_role = if self.direction == Direction::Vertical { "scrollbar.arrow.up" } else { "scrollbar.arrow.left" };
+        theme.draw_component("button.back", abs_arrow_start, arrow_start_state);
+        theme.draw_component("button.body", abs_arrow_start, arrow_start_state);
+        theme.draw_component(arrow_start_role, abs_arrow_start, arrow_start_state);
 
         // Arrow end button
         let arrow_end = self.arrow_end_rect();
@@ -820,7 +823,10 @@ impl ScrollView {
             hovered: self.arrow_end_pressed.get(),
             ..ViewState::no_focus()
         };
-        theme.draw_scrollbar_arrow_button(abs_arrow_end, arrow_end_state, false, self.direction);
+        let arrow_end_role = if self.direction == Direction::Vertical { "scrollbar.arrow.down" } else { "scrollbar.arrow.right" };
+        theme.draw_component("button.back", abs_arrow_end, arrow_end_state);
+        theme.draw_component("button.body", abs_arrow_end, arrow_end_state);
+        theme.draw_component(arrow_end_role, abs_arrow_end, arrow_end_state);
 
         // Thumb
         let thumb = self.thumb_rect();
@@ -833,7 +839,8 @@ impl ScrollView {
             hovered: false,
             ..ViewState::no_focus()
         };
-        theme.draw_scrollbar_thumb(abs_thumb, thumb_state, self.direction);
+        theme.draw_component("button.back", abs_thumb, thumb_state);
+        theme.draw_component("button.body", abs_thumb, thumb_state);
     }
 }
 

@@ -43,6 +43,11 @@ impl DrawableRegistry {
         self.load_drawable("separator.v", include_str!("../drawables/separator_classic_v.xml"));
         self.load_drawable("panel.back", include_str!("../drawables/panel_classic_back.xml"));
         self.load_drawable("progress.fill", include_str!("../drawables/progress_classic_fill.xml"));
+        self.load_drawable("scrollbar.track", include_str!("../drawables/scrollbar_classic_track.xml"));
+        self.load_drawable("scrollbar.arrow.up", include_str!("../drawables/scrollbar_classic_arrow_up.xml"));
+        self.load_drawable("scrollbar.arrow.down", include_str!("../drawables/scrollbar_classic_arrow_down.xml"));
+        self.load_drawable("scrollbar.arrow.left", include_str!("../drawables/scrollbar_classic_arrow_left.xml"));
+        self.load_drawable("scrollbar.arrow.right", include_str!("../drawables/scrollbar_classic_arrow_right.xml"));
     }
 
     /// Load a single drawable from XML string

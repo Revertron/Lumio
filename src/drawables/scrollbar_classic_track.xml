@@ -1,0 +1,12 @@
+<!-- Classic scrollbar track: plain background fill -->
+<selector>
+    <item>
+        <layer-list>
+            <item>
+                <shape type="rect">
+                    <solid color="@background"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

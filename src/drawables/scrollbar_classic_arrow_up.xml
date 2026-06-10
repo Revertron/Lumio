@@ -1,0 +1,22 @@
+<!-- Classic scrollbar up arrow (6x4 dips, nudged -0.5 to center within the
+     3D button borders; pressed state shifts by +1 dip). -->
+<selector>
+    <item state_pressed="true">
+        <layer-list>
+            <item>
+                <shape type="triangle" p1="50%+0.5,50%-1.5" p2="50%-2.5,50%+2.5" p3="50%+3.5,50%+2.5">
+                    <solid color="@text"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item>
+        <layer-list>
+            <item>
+                <shape type="triangle" p1="50%-0.5,50%-2.5" p2="50%-3.5,50%+1.5" p3="50%+2.5,50%+1.5">
+                    <solid color="@text"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

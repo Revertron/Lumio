@@ -15,7 +15,7 @@ use crate::types::{Point, Rect, point, rect};
 use crate::ui::UI;
 use crate::view_base::{HasMainFields, ViewBasics};
 use crate::views::label::Label;
-use crate::views::{Borders, Dimension, Direction, FieldsMain, Gravity, HAlign, Visibility};
+use crate::views::{Borders, Dimension, FieldsMain, Gravity, HAlign, Visibility};
 
 const SCROLLBAR_WIDTH: i32 = 14;
 const MIN_THUMB_SIZE: i32 = 16;
@@ -1032,24 +1032,34 @@ impl View for TableView {
             let thumb = self.v_thumb_rect(origin);
             let arrow_top = self.v_arrow_top_rect(origin);
             let arrow_bot = self.v_arrow_bottom_rect(origin);
-            theme.draw_scrollbar_arrow_button(arrow_top, unfocused, true, Direction::Vertical);
-            theme.draw_scrollbar_arrow_button(arrow_bot, unfocused, false, Direction::Vertical);
-            theme.draw_scrollbar_track(track, Direction::Vertical);
+            for (arrow_rect, role) in [(arrow_top, "scrollbar.arrow.up"), (arrow_bot, "scrollbar.arrow.down")] {
+                theme.draw_component("button.back", arrow_rect, unfocused);
+                theme.draw_component("button.body", arrow_rect, unfocused);
+                theme.draw_component(role, arrow_rect, unfocused);
+            }
+            theme.draw_component("scrollbar.track", track, unfocused);
             let mut s = main_state;
             s.pressed = matches!(self.drag.get(), DragKind::DragVThumb);
-            theme.draw_scrollbar_thumb(thumb, s, Direction::Vertical);
+            s.focused = false; // no focus ring on scrollbar thumbs
+            theme.draw_component("button.back", thumb, s);
+            theme.draw_component("button.body", thumb, s);
         }
         if self.h_scroll_visible.get() {
             let track = self.h_track_rect(origin);
             let thumb = self.h_thumb_rect(origin);
             let arrow_l = self.h_arrow_left_rect(origin);
             let arrow_r = self.h_arrow_right_rect(origin);
-            theme.draw_scrollbar_arrow_button(arrow_l, unfocused, true, Direction::Horizontal);
-            theme.draw_scrollbar_arrow_button(arrow_r, unfocused, false, Direction::Horizontal);
-            theme.draw_scrollbar_track(track, Direction::Horizontal);
+            for (arrow_rect, role) in [(arrow_l, "scrollbar.arrow.left"), (arrow_r, "scrollbar.arrow.right")] {
+                theme.draw_component("button.back", arrow_rect, unfocused);
+                theme.draw_component("button.body", arrow_rect, unfocused);
+                theme.draw_component(role, arrow_rect, unfocused);
+            }
+            theme.draw_component("scrollbar.track", track, unfocused);
             let mut s = main_state;
             s.pressed = matches!(self.drag.get(), DragKind::DragHThumb);
-            theme.draw_scrollbar_thumb(thumb, s, Direction::Horizontal);
+            s.focused = false; // no focus ring on scrollbar thumbs
+            theme.draw_component("button.back", thumb, s);
+            theme.draw_component("button.body", thumb, s);
         }
         // Dead corner where V and H scrollbars meet — fill flat so it blends
         // with the scrollbar tracks instead of leaving a confusing gap.
@@ -1058,7 +1068,7 @@ impl View for TableView {
             let v_sb = self.v_scrollbar_rect(origin);
             let h_sb = self.h_scrollbar_rect(origin);
             let corner = rect((v_sb.min.x, h_sb.min.y), (v_sb.min.x + thickness, h_sb.min.y + thickness));
-            theme.draw_scrollbar_track(corner, Direction::Vertical);
+            theme.draw_component("scrollbar.track", corner, unfocused);
         }
 
         // Outer border
