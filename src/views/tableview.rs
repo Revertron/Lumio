@@ -1002,7 +1002,7 @@ impl View for TableView {
             cell_state.hovered = h_hover == Some(c);
             cell_state.pressed = h_press == Some(c);
 
-            theme.draw_button_back(cell_rect, cell_state);
+            theme.draw_component("button.back", cell_rect, cell_state);
             if let Some(Some(block)) = header_blocks.get(c) {
                 let tw = block.width().ceil() as i32;
                 let th = block.height().ceil() as i32;
@@ -1019,7 +1019,7 @@ impl View for TableView {
             {
                 self.paint_sort_indicator(theme, cell_rect, dir);
             }
-            theme.draw_button_body(cell_rect, cell_state);
+            theme.draw_component("button.body", cell_rect, cell_state);
         }
         drop(cols); drop(col_offs); drop(header_blocks);
 

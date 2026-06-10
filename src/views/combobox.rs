@@ -263,7 +263,7 @@ impl View for ComboBox {
         theme.clip_rect(rect);
 
         // Step 1: Draw full edit-field area (white background + sunken border)
-        theme.draw_edit_back(rect, state.main.state);
+        theme.draw_component("edit.back", rect, state.main.state);
 
         // Step 2: Draw selected item text (left-aligned inside edit area)
         if let Some(text) = &state.cached_text {
@@ -275,7 +275,7 @@ impl View for ComboBox {
         }
 
         // Step 3: Draw sunken border over entire rect
-        theme.draw_edit_body(rect, state.main.state);
+        theme.draw_component("edit.body", rect, state.main.state);
 
         // Step 4: Draw raised button with arrow inside the sunken area
         theme.draw_component("button.back", button_rect, state.main.state);

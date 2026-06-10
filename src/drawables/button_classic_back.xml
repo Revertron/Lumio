@@ -11,6 +11,16 @@
         </layer-list>
     </item>
 
+    <item state_pressed="true">
+        <layer-list>
+            <item>
+                <shape type="rect">
+                    <solid color="@background_hover"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+
     <item state_focused="true">
         <layer-list>
             <item>
