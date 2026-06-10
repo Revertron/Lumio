@@ -80,7 +80,8 @@ impl View for Separator {
         let state = self.state.borrow();
         let mut r = state.rect;
         r.move_by(origin);
-        theme.draw_separator(r, state.state);
+        let role = if r.width() >= r.height() { "separator.h" } else { "separator.v" };
+        theme.draw_component(role, r, state.state);
     }
 
     fn get_state(&self) -> Option<ViewState> {

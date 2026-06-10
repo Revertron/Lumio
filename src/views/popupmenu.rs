@@ -251,7 +251,7 @@ impl View for PopupMenu {
                     (content_x, y),
                     (r.max.x - padding.right - 1, y + sep_h),
                 );
-                theme.draw_separator(sep_rect, state.state);
+                theme.draw_component("separator.h", sep_rect, state.state);
                 y += sep_h;
                 continue;
             }

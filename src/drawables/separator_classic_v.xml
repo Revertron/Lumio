@@ -1,0 +1,17 @@
+<!-- Classic vertical separator: etched line pair centered horizontally -->
+<selector>
+    <item>
+        <layer-list>
+            <item>
+                <shape type="line" x1="50%-1" y1="0" x2="50%-1" y2="100%">
+                    <stroke width="1" color="@border_light"/>
+                </shape>
+            </item>
+            <item>
+                <shape type="line" x1="50%" y1="0" x2="50%" y2="100%">
+                    <stroke width="1" color="@highlight"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

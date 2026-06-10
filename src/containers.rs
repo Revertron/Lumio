@@ -285,10 +285,10 @@ impl View for Frame {
             if let Some(crate::styles::selector::DrawState::Color(c)) = bg.get_state(&state.state) {
                 theme.draw_rect(rect, *c);
             } else {
-                theme.draw_panel_back(rect, state.state);
+                theme.draw_component("panel.back", rect, state.state);
             }
         } else {
-            theme.draw_panel_back(rect, state.state);
+            theme.draw_component("panel.back", rect, state.state);
         }
         if let Some(bg) = self.background_image.borrow_mut().as_mut() {
             bg.paint(theme, rect, &state.padding.scaled(state.scale), state.scale);

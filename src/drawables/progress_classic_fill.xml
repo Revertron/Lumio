@@ -1,0 +1,12 @@
+<!-- Classic progress bar fill: solid navy block -->
+<selector>
+    <item>
+        <layer-list>
+            <item>
+                <shape type="rect">
+                    <solid color="@progress_fill"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

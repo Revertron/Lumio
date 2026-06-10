@@ -175,10 +175,10 @@ impl View for StatusBar {
             if let Some(crate::styles::selector::DrawState::Color(c)) = bg.get_state(&state.state) {
                 theme.draw_rect(r, *c);
             } else {
-                theme.draw_panel_back(r, state.state);
+                theme.draw_component("panel.back", r, state.state);
             }
         } else {
-            theme.draw_panel_back(r, state.state);
+            theme.draw_component("panel.back", r, state.state);
         }
 
         let view_state = state.state;

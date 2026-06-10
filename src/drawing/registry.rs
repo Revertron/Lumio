@@ -39,6 +39,10 @@ impl DrawableRegistry {
         self.load_drawable("tab.active", include_str!("../drawables/tab_classic_active.xml"));
         self.load_drawable("tab.inactive", include_str!("../drawables/tab_classic_inactive.xml"));
         self.load_drawable("tab.content", include_str!("../drawables/tab_classic_content.xml"));
+        self.load_drawable("separator.h", include_str!("../drawables/separator_classic_h.xml"));
+        self.load_drawable("separator.v", include_str!("../drawables/separator_classic_v.xml"));
+        self.load_drawable("panel.back", include_str!("../drawables/panel_classic_back.xml"));
+        self.load_drawable("progress.fill", include_str!("../drawables/progress_classic_fill.xml"));
     }
 
     /// Load a single drawable from XML string

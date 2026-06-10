@@ -29,6 +29,7 @@ impl Palette {
             ("item_highlight_text".to_string(), 0xFFFFFFFF),
             ("table_selection".to_string(), 0xFFCCE0F5),
             ("table_separator".to_string(), 0xFFD0D0D0),
+            ("progress_fill".to_string(), 0xFF000080),
         ]);
         Palette { colors }
     }

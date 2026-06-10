@@ -291,10 +291,10 @@ impl View for SplitPanel {
             if let Some(crate::styles::selector::DrawState::Color(c)) = bg.get_state(&state.state) {
                 theme.draw_rect(my_rect, *c);
             } else {
-                theme.draw_panel_back(my_rect, state.state);
+                theme.draw_component("panel.back", my_rect, state.state);
             }
         } else {
-            theme.draw_panel_back(my_rect, state.state);
+            theme.draw_component("panel.back", my_rect, state.state);
         }
         if let Some(border_color) = state.border_color {
             let r = my_rect;
@@ -360,7 +360,8 @@ impl View for SplitPanel {
             (div_local.max.x + start.x, div_local.max.y + start.y),
         );
         let view_state = self.state.borrow().state;
-        theme.draw_separator(div_rect, view_state);
+        let role = if div_rect.width() >= div_rect.height() { "separator.h" } else { "separator.v" };
+        theme.draw_component(role, div_rect, view_state);
 
         theme.pop_clip();
     }

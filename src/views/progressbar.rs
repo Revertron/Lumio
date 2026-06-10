@@ -111,8 +111,10 @@ impl View for ProgressBar {
         let mut r = state.rect;
         r.move_by(origin);
 
-        // Draw sunken track
-        theme.draw_progressbar_track(r);
+        // Draw sunken track (same chrome as an edit field, like the legacy theme)
+        let no_focus = ViewState::no_focus();
+        theme.draw_component("edit.back", r, no_focus);
+        theme.draw_component("edit.body", r, no_focus);
 
         // Inner area (inside the 2px sunken border)
         let scale = state.scale;
@@ -132,7 +134,7 @@ impl View for ProgressBar {
                 (inner.min.x + pos, inner.min.y),
                 (inner.min.x + pos + block_width, inner.max.y),
             );
-            theme.draw_progressbar_fill(fill);
+            theme.draw_component("progress.fill", fill, no_focus);
         } else {
             // Determinate fill
             let fill_width = (inner_width as f32 * self.value.get()).round() as i32;
@@ -141,7 +143,7 @@ impl View for ProgressBar {
                     (inner.min.x, inner.min.y),
                     (inner.min.x + fill_width, inner.max.y),
                 );
-                theme.draw_progressbar_fill(fill);
+                theme.draw_component("progress.fill", fill, no_focus);
             }
         }
     }
