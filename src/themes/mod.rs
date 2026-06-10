@@ -20,24 +20,6 @@ pub trait Theme {
     fn push_clip(&mut self);
     fn pop_clip(&mut self);
 
-    // Legacy drawing methods (will be deprecated)
-    fn draw_button_back(&mut self, rect: Rect<i32>, state: ViewState);
-    fn draw_button_body(&mut self, rect: Rect<i32>, state: ViewState);
-    fn draw_button_text(&mut self, rect: Rect<i32>, state: ViewState, size: usize, text: &str);
-    fn draw_edit_back(&mut self, rect: Rect<i32>, state: ViewState);
-    fn draw_edit_body(&mut self, rect: Rect<i32>, state: ViewState);
-    fn draw_edit_caret(&mut self, rect: Rect<i32>, state: ViewState);
-    fn draw_checkbox_back(&mut self, rect: Rect<i32>, state: ViewState);
-    fn draw_checkbox_body(&mut self, rect: Rect<i32>, state: ViewState);
-    fn draw_checkbox_checkmark(&mut self, rect: Rect<i32>, state: ViewState);
-    fn draw_radiobutton_back(&mut self, rect: Rect<i32>, state: ViewState);
-    fn draw_radiobutton_body(&mut self, rect: Rect<i32>, state: ViewState);
-    fn draw_radiobutton_indicator(&mut self, rect: Rect<i32>, state: ViewState);
-    fn draw_combobox_arrow(&mut self, rect: Rect<i32>, state: ViewState);
-    fn draw_list_back(&mut self, rect: Rect<i32>, state: ViewState);
-    fn draw_list_body(&mut self, rect: Rect<i32>, state: ViewState);
-    fn draw_panel_back(&mut self, rect: Rect<i32>, state: ViewState);
-    fn draw_panel_body(&mut self, rect: Rect<i32>, state: ViewState);
     fn draw_text(&mut self, x: f32, y: f32, color: u32, text: &FormattedTextBlock);
 
     /// Like `draw_text`, but only glyphs inside `crop` are drawn (partial glyphs cropped).
@@ -88,23 +70,6 @@ pub trait Theme {
     fn draw_raw_image_tinted(&mut self, rect: Rect<i32>, rgba: &[u8], size: (u32, u32), cache_key: u64, _tint_argb: u32) {
         self.draw_raw_image(rect, rgba, size, cache_key);
     }
-
-    // Progress bar drawing methods
-    fn draw_progressbar_track(&mut self, rect: Rect<i32>);
-    fn draw_progressbar_fill(&mut self, rect: Rect<i32>);
-
-    // Scrollbar drawing methods
-    fn draw_scrollbar_track(&mut self, rect: Rect<i32>, direction: super::views::Direction);
-    fn draw_scrollbar_thumb(&mut self, rect: Rect<i32>, state: ViewState, direction: super::views::Direction);
-    fn draw_scrollbar_arrow_button(&mut self, rect: Rect<i32>, state: ViewState, toward_start: bool, direction: super::views::Direction);
-
-    // Tab view drawing methods
-    fn draw_tab_active(&mut self, rect: Rect<i32>, state: ViewState);
-    fn draw_tab_inactive(&mut self, rect: Rect<i32>, state: ViewState);
-    fn draw_tab_content_area(&mut self, rect: Rect<i32>, state: ViewState);
-
-    // Separator drawing method
-    fn draw_separator(&mut self, rect: Rect<i32>, state: ViewState);
 
     // Opacity stack for disabled views
     fn push_opacity(&mut self, _opacity: f32) {}
