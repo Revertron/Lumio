@@ -468,10 +468,13 @@ impl View for MenuBar {
         let hit = self.hit_title(position.x, position.y);
         let old = *self.hovered.borrow();
         *self.hovered.borrow_mut() = hit;
+        // Copy the open index out BEFORE the if: a let-chain scrutinee's
+        // RefCell borrow stays alive inside the block (unlike plain if-let),
+        // and open_menu needs to borrow_mut the same cell.
+        let open = *self.open_index.borrow();
         // While a menu is open, hovering another title switches to its menu.
-        if let Some(i) = hit
-            && let Some(open) = *self.open_index.borrow()
-            && open != i {
+        if let (Some(i), Some(o)) = (hit, open)
+            && o != i {
             self.open_menu(ui, i, false);
             return true;
         }
