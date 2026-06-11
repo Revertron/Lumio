@@ -16,7 +16,7 @@ use crate::views::{Borders, Dimension, FieldsMain, Gravity, Visibility};
 use crate::view_base::{HasMainFields, ViewBasics};
 
 const ICON_SIZE: i32 = 16;
-const ITEM_HEIGHT: i32 = 28;
+const ITEM_HEIGHT: i32 = 24;
 const SEPARATOR_HEIGHT: i32 = 3;
 const ICON_TEXT_GAP: i32 = 6;
 const ITEM_PADDING_LEFT: i32 = 6;

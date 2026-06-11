@@ -144,11 +144,11 @@ impl Palette {
     fn default_typefaces() -> HashMap<String, Typeface> {
         let sized = |size: f32| Typeface { font_size: Some(size), ..Typeface::default() };
         HashMap::from([
-            ("default".to_string(), sized(14.0)),
-            ("text".to_string(), sized(14.0)),
-            ("label".to_string(), sized(14.0)),
-            ("button".to_string(), sized(14.0)),
-            ("menu".to_string(), sized(13.0)),
+            ("default".to_string(), sized(16.0)),
+            ("text".to_string(), sized(16.0)),
+            ("label".to_string(), sized(16.0)),
+            ("button".to_string(), sized(16.0)),
+            ("menu".to_string(), sized(16.0)),
         ])
     }
 
