@@ -3,3 +3,4 @@
 .idea/
 _other/
 .claude/
+*.log

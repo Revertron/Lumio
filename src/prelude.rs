@@ -10,6 +10,7 @@ pub use crate::layout::{Layout, LinearLayout, OverlayLayout, DockLayout, create_
 pub use crate::views::{Label, Button, Edit, CheckBox, RadioButton, ComboBox, ScrollView, ProgressBar, TabView, List, ImageButton, ImageView, Separator, SplitPanel, StatusBar, Memo, NotificationStack};
 pub use crate::views::{RecyclerView, RecyclerAdapter, ViewHolder};
 pub use crate::views::{PopupMenu, MenuItem};
+pub use crate::views::{MenuBar, MenuData};
 pub use crate::views::{Dialog, DialogButton, ButtonSide};
 pub use crate::views::{Dimension, Direction, Borders, Gravity, HAlign, VAlign, Visibility, Dock, LayoutParams};
 pub use crate::views::{TableView, ColumnDef, ColumnWidth, SortDirection, Grid};

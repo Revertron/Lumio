@@ -1,0 +1,37 @@
+<Frame id="root" width="max" height="max" direction="vertical">
+    <MenuBar id="menubar">
+        <Menu title="File">
+            <MenuItem id="new" text="New"/>
+            <MenuItem id="open" text="Open..."/>
+            <Menu id="recent" title="Open Recent">
+                <MenuItem id="recent1" text="notes.txt"/>
+                <MenuItem id="recent2" text="report.md"/>
+                <Menu id="older" title="Older">
+                    <MenuItem id="recent3" text="todo_2025.txt"/>
+                    <MenuItem id="recent4" text="draft.rs"/>
+                </Menu>
+            </Menu>
+            <Separator/>
+            <MenuItem id="save" text="Save" icon="icons/content-save-outline.svg"/>
+            <MenuItem id="save_as" text="Save As..."/>
+            <Separator/>
+            <MenuItem id="exit" text="Exit"/>
+        </Menu>
+        <Menu title="Edit">
+            <MenuItem id="undo" text="Undo"/>
+            <MenuItem id="redo" text="Redo"/>
+            <Separator/>
+            <MenuItem id="cut" text="Cut"/>
+            <MenuItem id="copy" text="Copy"/>
+            <MenuItem id="paste" text="Paste"/>
+        </Menu>
+        <Menu title="Help">
+            <MenuItem id="about" text="About"/>
+        </Menu>
+    </MenuBar>
+    <Frame width="max" height="max" direction="vertical" padding="16">
+        <Label text="Click the menu titles above, or use the keyboard once a menu is open:" margin_bottom="4"/>
+        <Label text="Up/Down navigate, Right opens a submenu, Left closes it (or switches menus), Enter activates, Esc closes." text_color="@text_hint" margin_bottom="12"/>
+        <Label id="status" text="(no item clicked yet)" font_size="18"/>
+    </Frame>
+</Frame>

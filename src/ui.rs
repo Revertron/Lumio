@@ -15,7 +15,7 @@ use super::traits::{Element, View};
 use super::types::Point;
 use super::themes::Typeface;
 
-use super::views::{Button, Edit, Label, CheckBox, RadioButton, ComboBox, ScrollView, ProgressBar, TabView, List, RecyclerView, ImageButton, ImageView, PopupMenu, Dialog, Separator, SplitPanel, StatusBar, Memo, NotificationStack, TableView, TableColumn, TableRow, Grid, RichText};
+use super::views::{Button, Edit, Label, CheckBox, RadioButton, ComboBox, ScrollView, ProgressBar, TabView, List, RecyclerView, ImageButton, ImageView, PopupMenu, Dialog, Separator, SplitPanel, StatusBar, Memo, NotificationStack, TableView, TableColumn, TableRow, Grid, RichText, MenuBar, Menu, MenuItemTag};
 use super::views::Dimension;
 use std::time::Duration;
 
@@ -133,6 +133,9 @@ impl UI {
         ui.register::<TableRow>("TableRow");
         ui.register::<Grid>("Grid");
         ui.register::<RichText>("RichText");
+        ui.register::<MenuBar>("MenuBar");
+        ui.register::<Menu>("Menu");
+        ui.register::<MenuItemTag>("MenuItem");
         ui
     }
 
@@ -367,6 +370,36 @@ impl UI {
     /// Closes a popup by its view ID.
     pub fn close_popup(&mut self, id: &str) {
         self.overlays.retain(|entry| entry.element.borrow().get_id() != id);
+    }
+
+    /// Returns true if a popup overlay with this view ID is currently shown.
+    pub fn is_popup_open(&self, id: &str) -> bool {
+        !id.is_empty() && self.overlays.iter().any(|e| e.element.borrow().get_id() == id)
+    }
+
+    /// Returns true if this exact element is currently shown as an overlay.
+    pub(crate) fn overlay_exists(&self, element: &Element) -> bool {
+        self.overlays.iter().any(|e| Rc::ptr_eq(&e.element, element))
+    }
+
+    /// Removes this exact element from the overlays (pointer identity, so
+    /// safe even when several popups share an empty ID).
+    pub(crate) fn remove_overlay(&mut self, element: &Element) {
+        self.overlays.retain(|e| !Rc::ptr_eq(&e.element, element));
+    }
+
+    /// Finds the overlay entry holding exactly this view instance (pointer
+    /// identity), returning its element and window position. Lets a popup
+    /// locate itself — overlays are not part of the root tree, so a view
+    /// shown as a popup cannot learn its window position via parent pointers.
+    pub(crate) fn find_self_overlay(&self, view: &dyn View) -> Option<(Element, i32, i32)> {
+        let target = view.as_any() as *const dyn std::any::Any as *const ();
+        self.overlays.iter()
+            .find(|e| {
+                let b = e.element.borrow();
+                std::ptr::eq(b.as_any() as *const dyn std::any::Any as *const (), target)
+            })
+            .map(|e| (Rc::clone(&e.element), e.x, e.y))
     }
 
     /// Closes all `Popup`-mode overlays. `Modal` and `Transparent` overlays are preserved.

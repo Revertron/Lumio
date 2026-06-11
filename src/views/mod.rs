@@ -21,6 +21,7 @@ pub mod notification_stack;
 pub mod tableview;
 pub mod grid;
 pub mod richtext;
+pub mod menubar;
 
 use super::themes::{Typeface, ViewState};
 use super::traits::{View, WeakElement};
@@ -56,6 +57,7 @@ pub use self::notification_stack::NotificationStack;
 pub use self::tableview::{TableView, TableColumn, TableRow, ColumnDef, ColumnWidth, SortDirection};
 pub use self::grid::Grid;
 pub use self::richtext::{RichText, SpanStyle};
+pub use self::menubar::{MenuBar, Menu, MenuItemTag, MenuData};
 
 pub const BUTTON_MIN_WIDTH: i32 = 80;
 pub const BUTTON_MIN_HEIGHT: i32 = 24;

@@ -1,0 +1,21 @@
+<!-- Classic submenu arrow (right-pointing triangle); inverted on the highlighted row -->
+<selector>
+    <item state_hovered="true">
+        <layer-list>
+            <item>
+                <shape type="triangle" p1="50%-2.5,50%-4.5" p2="50%-2.5,50%+3.5" p3="50%+2.5,50%-0.5">
+                    <solid color="@item_highlight_text"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item>
+        <layer-list>
+            <item>
+                <shape type="triangle" p1="50%-2.5,50%-4.5" p2="50%-2.5,50%+3.5" p3="50%+2.5,50%-0.5">
+                    <solid color="@text"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>
