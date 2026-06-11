@@ -8,7 +8,6 @@ use speedy2d::font::{FormattedTextBlock, TextLayout, TextOptions};
 use speedy2d::window::MouseButton;
 
 use crate::assets::get_font_family;
-use crate::common::DEFAULT_TEXT_SIZE;
 use crate::events::EventType;
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
@@ -487,7 +486,7 @@ impl View for ComboBox {
 impl Default for ComboBox {
     fn default() -> Self {
         let rect = rect((0, 0), (120, 24));
-        ComboBox::new(rect, DEFAULT_TEXT_SIZE)
+        ComboBox::new(rect, crate::drawing::current_text_size("text"))
     }
 }
 
@@ -542,7 +541,7 @@ impl ComboDropdown {
             Some(t) => t,
             None => return,
         };
-        let base_size = typeface.font_size.unwrap_or(DEFAULT_TEXT_SIZE);
+        let base_size = typeface.font_size.unwrap_or_else(|| crate::drawing::current_text_size("text"));
         let text_size = base_size * scale as f32;
         if let Some(font) = get_font_family(&typeface.font_name, typeface.font_style) {
             let mut cached = self.cached_texts.borrow_mut();

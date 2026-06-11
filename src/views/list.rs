@@ -35,7 +35,7 @@ impl List {
             state: RefCell::new(FieldsMain::with_rect(rect, Dimension::Min, Dimension::Min)),
             items: RefCell::new(vec![]),
             texts: RefCell::new(vec![]),
-            text_size: DEFAULT_TEXT_SIZE,
+            text_size: crate::drawing::current_text_size("text"),
             scroll_y: RefCell::new(0),
             selected: RefCell::new(None)
         }

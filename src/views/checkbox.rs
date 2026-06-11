@@ -8,7 +8,6 @@ use speedy2d::window::MouseButton;
 
 use crate::assets::get_font_family;
 use crate::events::EventType;
-use crate::common::DEFAULT_TEXT_SIZE;
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::view_base::{HasMainFields, ViewBasics};
 use crate::traits::{Element, View, WeakElement};
@@ -405,6 +404,6 @@ impl View for CheckBox {
 impl Default for CheckBox {
     fn default() -> Self {
         let rect = rect((0, 0), (60, 24));
-        CheckBox::new(rect, "", DEFAULT_TEXT_SIZE)
+        CheckBox::new(rect, "", crate::drawing::current_text_size("text"))
     }
 }

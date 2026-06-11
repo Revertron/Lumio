@@ -1733,7 +1733,7 @@ impl View for Memo {
 impl Default for Memo {
     fn default() -> Self {
         let rect = rect((0, 0), (60, 24));
-        Memo::new(rect, "", 48_f32)
+        Memo::new(rect, "", crate::drawing::current_text_size("text"))
     }
 }
 

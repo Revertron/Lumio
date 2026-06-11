@@ -1423,7 +1423,7 @@ fn resolve_color(style: &SpanStyle, link_color: u32, default_color: u32) -> u32 
 impl Default for RichText {
     fn default() -> Self {
         let r = rect((0, 0), (200, 40));
-        RichText::new(r, 18_f32)
+        RichText::new(r, crate::drawing::current_text_size("text"))
     }
 }
 

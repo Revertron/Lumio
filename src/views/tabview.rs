@@ -7,7 +7,6 @@ use speedy2d::font::{FormattedTextBlock, TextLayout, TextOptions};
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
 
 use crate::assets::get_font_family;
-use crate::common::DEFAULT_TEXT_SIZE;
 use crate::events::EventType;
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Container, Element, View, WeakElement};
@@ -88,7 +87,7 @@ impl TabView {
         let typeface = self.state.borrow().font_manager.get();
         if let Some(typeface) = typeface {
             if let Some(font) = get_font_family(&typeface.font_name, typeface.font_style) {
-                let base_size = typeface.font_size.unwrap_or(DEFAULT_TEXT_SIZE);
+                let base_size = typeface.font_size.unwrap_or_else(|| crate::drawing::current_text_size("text"));
                 let size = base_size * scale as f32;
                 for tab in self.tabs.iter_mut() {
                     if tab.cached_title.is_none() {

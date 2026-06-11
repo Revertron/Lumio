@@ -7,7 +7,6 @@ use speedy2d::font::{TextLayout, TextOptions};
 use speedy2d::window::MouseButton;
 
 use crate::assets::get_font_family;
-use crate::common::DEFAULT_TEXT_SIZE;
 use crate::events::EventType;
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Container, Element, View, WeakElement};
@@ -111,9 +110,10 @@ impl MenuBar {
     fn layout_titles(&self, typeface: &Typeface, scale: f64) {
         let menus = self.menus.borrow();
         let mut cached = self.cached_titles.borrow_mut();
-        let base_size = typeface.font_size.unwrap_or(DEFAULT_TEXT_SIZE);
-        // Same reduced size as the dropdown items.
-        let text_size = (base_size - crate::views::popupmenu::MENU_FONT_REDUCTION).max(8.0) * scale as f32;
+        // Same resolution as the dropdown items: explicit size wins,
+        // otherwise the palette's "menu" typeface role decides.
+        let base_size = typeface.font_size.unwrap_or_else(|| crate::drawing::current_text_size("menu"));
+        let text_size = base_size * scale as f32;
         if let Some(font) = get_font_family(&typeface.font_name, typeface.font_style) {
             for (i, menu) in menus.iter().enumerate() {
                 if cached[i].is_none() {
@@ -255,7 +255,7 @@ impl View for MenuBar {
         let text_h = self.cached_titles.borrow().iter().flatten()
             .map(|b| b.height().ceil() as i32)
             .max()
-            .unwrap_or((DEFAULT_TEXT_SIZE * scale as f32).ceil() as i32);
+            .unwrap_or((crate::drawing::current_text_size("menu") * scale as f32).ceil() as i32);
         let bar_h = text_h + 2 * pad_v;
 
         let r = rect((x, y), (x + width, y + bar_h));

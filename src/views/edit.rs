@@ -1775,7 +1775,7 @@ impl Edit {
 impl Default for Edit {
     fn default() -> Self {
         let rect = rect((0, 0), (60, 24));
-        Edit::new(rect, "", 48_f32)
+        Edit::new(rect, "", crate::drawing::current_text_size("text"))
     }
 }
 

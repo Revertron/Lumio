@@ -87,7 +87,7 @@ fn resolve_primary(name: &str, style: FontStyle) -> Option<Font> {
         .or_else(|| {
             // Last-resort fallback for the default typeface so a freshly
             // bootstrapped app always renders text.
-            if name == "NotoSans" {
+            if name == crate::themes::default_font_name() || name == "NotoSans" {
                 try_system("sans-serif", style)
             } else {
                 None

@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+﻿use std::cell::RefCell;
 use std::cmp::max;
 use std::collections::HashMap;
 
@@ -8,7 +8,6 @@ use speedy2d::window::MouseButton;
 
 use crate::assets::get_font_family;
 use crate::events::EventType;
-use crate::common::DEFAULT_TEXT_SIZE;
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
@@ -375,6 +374,6 @@ impl View for Button {
 impl Default for Button {
     fn default() -> Self {
         let rect = rect((0, 0), (60, 24));
-        Button::new(rect, "", DEFAULT_TEXT_SIZE)
+        Button::new(rect, "", crate::drawing::current_text_size("button"))
     }
 }

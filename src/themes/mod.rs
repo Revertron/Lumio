@@ -131,9 +131,21 @@ pub struct Typeface {
     pub font_size: Option<f32>
 }
 
+/// The standard UI font of the current OS. Resolved through the system font
+/// source at load time, so nothing needs to be bundled with the app.
+pub fn default_font_name() -> &'static str {
+    #[cfg(target_os = "windows")]
+    { "Segoe UI" }
+    #[cfg(target_os = "macos")]
+    { "Helvetica Neue" }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    // Generic family — fontconfig resolves it to the distro's default sans.
+    { "sans-serif" }
+}
+
 impl Default for Typeface {
     fn default() -> Self {
-        Typeface { font_name: String::from("NotoSans"), font_style: FontStyle::Regular, font_size: None }
+        Typeface { font_name: String::from(default_font_name()), font_style: FontStyle::Regular, font_size: None }
     }
 }
 

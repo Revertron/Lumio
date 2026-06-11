@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+﻿use std::cell::RefCell;
 use std::cmp::max;
 use std::collections::HashMap;
 
@@ -8,7 +8,6 @@ use speedy2d::window::MouseButton;
 
 use crate::assets::get_font_family;
 use crate::events::EventType;
-use crate::common::DEFAULT_TEXT_SIZE;
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::view_base::{HasMainFields, ViewBasics};
 use crate::traits::{Element, View, WeakElement};
@@ -463,6 +462,6 @@ impl View for RadioButton {
 impl Default for RadioButton {
     fn default() -> Self {
         let rect = rect((0, 0), (60, 24));
-        RadioButton::new(rect, "", DEFAULT_TEXT_SIZE)
+        RadioButton::new(rect, "", crate::drawing::current_text_size("text"))
     }
 }

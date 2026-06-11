@@ -7,7 +7,6 @@ use speedy2d::font::{FormattedTextBlock, TextLayout, TextOptions};
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
 
 use crate::assets::get_font_family;
-use crate::common::DEFAULT_TEXT_SIZE;
 use crate::events::EventType;
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Container, Element, View, WeakElement};
@@ -252,9 +251,9 @@ impl TableView {
         // visually overflow into adjacent rows, and standard table semantics
         // truncate rather than wrap.
         let mut row_views: Vec<Element> = Vec::with_capacity(cells.len());
-        let font_size_str = format!("{}", DEFAULT_TEXT_SIZE as i32);
+        let font_size_str = format!("{}", crate::drawing::current_text_size("text") as i32);
         for text in &cells {
-            let mut lbl = Label::new(rect((0, 0), (0, 0)), text, DEFAULT_TEXT_SIZE);
+            let mut lbl = Label::new(rect((0, 0), (0, 0)), text, crate::drawing::current_text_size("text"));
             lbl.set_padding(0, DEFAULT_CELL_PAD_H, DEFAULT_CELL_PAD_H, 0);
             lbl.set_single_line(true);
             // Push the font size through Label's `set_any` so it routes through
@@ -284,7 +283,7 @@ impl TableView {
 
     pub fn set_cell(&self, row: usize, col: usize, cell: Element) {
         if let Some(r) = self.rows.borrow_mut().get_mut(row) {
-            while r.len() <= col { r.push(std::rc::Rc::new(RefCell::new(Label::new(rect((0,0),(0,0)), "", DEFAULT_TEXT_SIZE)))); }
+            while r.len() <= col { r.push(std::rc::Rc::new(RefCell::new(Label::new(rect((0,0),(0,0)), "", crate::drawing::current_text_size("text"))))); }
             r[col] = cell;
         }
         self.needs_relayout.set(true);
@@ -444,7 +443,7 @@ impl TableView {
 
     fn relayout_rows(&self, scale: f64, font: &Typeface) {
         let n = self.row_count.get();
-        let base_size = font.font_size.unwrap_or(DEFAULT_TEXT_SIZE);
+        let base_size = font.font_size.unwrap_or_else(|| crate::drawing::current_text_size("text"));
         let line_h = (base_size * scale as f32).ceil() as i32;
         let row_h = line_h + (DEFAULT_ROW_PAD_V as f64 * scale).round() as i32 * 2;
         self.row_height_px.set(row_h);
@@ -490,7 +489,7 @@ impl TableView {
 
     fn rebuild_header_blocks(&self, scale: f64, font: &Typeface) {
         let cols = self.columns.borrow();
-        let base_size = font.font_size.unwrap_or(DEFAULT_TEXT_SIZE);
+        let base_size = font.font_size.unwrap_or_else(|| crate::drawing::current_text_size("text"));
         let size = base_size * scale as f32;
         let mut header_blocks = self.header_blocks.borrow_mut();
         header_blocks.clear();
@@ -525,7 +524,7 @@ impl TableView {
             self.header_height_px.set((dip as f64 * scale).round() as i32);
             return;
         }
-        let base = font.font_size.unwrap_or(DEFAULT_TEXT_SIZE);
+        let base = font.font_size.unwrap_or_else(|| crate::drawing::current_text_size("text"));
         let line = (base * scale as f32).ceil() as i32;
         let pad = (DEFAULT_HEADER_PAD_V as f64 * scale).round() as i32 * 2;
         self.header_height_px.set(line + pad);

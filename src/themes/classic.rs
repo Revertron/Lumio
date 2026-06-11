@@ -56,8 +56,13 @@ impl<'h> Classic<'h> {
 
     /// The default typeface of the currently active palette. Convenience for
     /// app startup (`UI::from_xml`), where no theme instance exists yet.
+    /// The size is stripped: a root typeface with an explicit size would
+    /// cascade into every view and shadow the palette's per-role font sizes
+    /// ("button", "menu", ...).
     pub fn typeface() -> Typeface {
-        crate::drawing::current_typeface("default")
+        let mut typeface = crate::drawing::current_typeface("default");
+        typeface.font_size = None;
+        typeface
     }
 
     pub fn new(graphics: &'h mut Graphics2D, drawable_registry: &'h DrawableRegistry, palette: &'h Palette, image_cache: &'h mut ImageCache, width: i32, height: i32, scale: f64) -> Self {

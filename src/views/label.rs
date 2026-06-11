@@ -1069,7 +1069,7 @@ impl View for Label {
 impl Default for Label {
     fn default() -> Self {
         let rect = rect((0, 0), (60, 24));
-        Label::new(rect, "", 48_f32)
+        Label::new(rect, "", crate::drawing::current_text_size("label"))
     }
 }
 

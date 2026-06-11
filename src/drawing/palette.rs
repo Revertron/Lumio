@@ -54,6 +54,13 @@ pub fn current_typeface(role: &str) -> Typeface {
     CURRENT.with(|current| current.borrow().typeface(role))
 }
 
+/// The font size (dips) of a typeface role in the currently active palette.
+/// Views use this as the fallback when neither they nor an ancestor set an
+/// explicit `font_size`.
+pub fn current_text_size(role: &str) -> f32 {
+    current_typeface(role).font_size.unwrap_or(crate::common::DEFAULT_TEXT_SIZE)
+}
+
 impl Palette {
     /// The palette of the Classic (Win95-style) theme.
     pub fn classic() -> Self {
@@ -132,10 +139,16 @@ impl Palette {
 
     /// Typeface roles shared by both built-in palettes. Unknown roles fall
     /// back to "default", so themes only need to override the roles they
-    /// care about.
+    /// care about. Every role carries the font size for its kind of view;
+    /// the OS UI font is used for all of them (see `default_font_name`).
     fn default_typefaces() -> HashMap<String, Typeface> {
+        let sized = |size: f32| Typeface { font_size: Some(size), ..Typeface::default() };
         HashMap::from([
-            ("default".to_string(), Typeface::default()),
+            ("default".to_string(), sized(14.0)),
+            ("text".to_string(), sized(14.0)),
+            ("label".to_string(), sized(14.0)),
+            ("button".to_string(), sized(14.0)),
+            ("menu".to_string(), sized(13.0)),
         ])
     }
 

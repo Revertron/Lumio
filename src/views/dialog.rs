@@ -7,7 +7,6 @@ use speedy2d::font::{FormattedTextBlock, TextAlignment, TextLayout, TextOptions}
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
 
 use crate::assets::{get_asset, get_font_family};
-use crate::common::DEFAULT_TEXT_SIZE;
 use crate::events::EventType;
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
@@ -104,7 +103,7 @@ impl Dialog {
             side,
             is_default,
         });
-        let btn = Button::new(rect((0, 0), (60, 24)), text, DEFAULT_TEXT_SIZE);
+        let btn = Button::new(rect((0, 0), (60, 24)), text, crate::drawing::current_text_size("button"));
         let element: Element = Rc::new(RefCell::new(btn));
         self.button_views.push(element);
     }
@@ -132,7 +131,7 @@ impl Dialog {
             return;
         }
         if let Some(font) = get_font_family(&typeface.font_name, typeface.font_style) {
-            let base_size = typeface.font_size.unwrap_or(DEFAULT_TEXT_SIZE);
+            let base_size = typeface.font_size.unwrap_or_else(|| crate::drawing::current_text_size("text"));
             let size = base_size * scale as f32;
             let options = TextOptions::new().with_wrap_to_width(max_width as f32, TextAlignment::Left);
             let block = font.layout_text(&msg, size, options);

@@ -7,7 +7,6 @@ use speedy2d::font::{TextLayout, TextOptions};
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
 
 use crate::assets::{get_asset, get_font_family};
-use crate::common::DEFAULT_TEXT_SIZE;
 use crate::events::EventType;
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
@@ -27,8 +26,6 @@ const ITEM_PADDING_RIGHT: i32 = 12;
 const ARROW_AREA: i32 = 16;
 /// Horizontal overlap of a submenu over its parent menu (dips).
 const SUBMENU_OVERLAP: i32 = 2;
-/// Menu text is rendered this many points smaller than the inherited size.
-pub(crate) const MENU_FONT_REDUCTION: f32 = 2.0;
 
 /// Data for a single menu item.
 #[derive(Clone)]
@@ -178,9 +175,10 @@ impl PopupMenu {
     fn layout_texts(&self, typeface: &Typeface, scale: f64) {
         let items = self.items.borrow();
         let mut cached = self.cached_texts.borrow_mut();
-        let base_size = typeface.font_size.unwrap_or(DEFAULT_TEXT_SIZE);
-        // Menu text runs a couple of points smaller than regular content.
-        let text_size = (base_size - MENU_FONT_REDUCTION).max(8.0) * scale as f32;
+        // Explicit (own or inherited) size wins; otherwise the palette's
+        // "menu" typeface role decides.
+        let base_size = typeface.font_size.unwrap_or_else(|| crate::drawing::current_text_size("menu"));
+        let text_size = base_size * scale as f32;
         if let Some(font) = get_font_family(&typeface.font_name, typeface.font_style) {
             for (i, item) in items.iter().enumerate() {
                 if cached[i].is_none() {
