@@ -54,9 +54,10 @@ All contained within the two views.
 
 ### 3. Missing everyday widgets
 
-- **MenuBar** with dropdown menus and submenus — the single biggest missing
-  desktop widget. PopupMenu exists but has no submenus and no keyboard
-  navigation; fix both as part of this work.
+- **MenuBar** with dropdown menus and submenus — DONE 2026-06: `<MenuBar>` /
+  `<Menu>` / `<MenuItem>` XML tags (nested `<Menu>` = submenu), Click event
+  with `clicked_item()`; PopupMenu gained submenus, keyboard navigation and
+  owner routing as part of this work.
 - **Slider** and a numeric **SpinEdit/Stepper** (the "spinner" already pending
   in the Alfis migration notes).
 - **TreeView** — expand/collapse hierarchy; can reuse RecyclerView's
