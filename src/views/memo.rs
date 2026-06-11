@@ -370,9 +370,9 @@ impl Memo {
                 let available_width = (width - padding.left - padding.right).max(1) as f32;
                 let options = TextOptions::new().with_wrap_to_width(available_width, TextAlignment::Left);
                 let text_str = if state.text.is_empty() { " " } else { &state.text };
+                // text_size is dips, like an explicit font_size — both scale.
                 let base_size = typeface.font_size
-                    .map(|dip| dip * scale as f32)
-                    .unwrap_or(state.text_size);
+                    .unwrap_or(state.text_size) * scale as f32;
                 let text = font.layout_text(text_str, base_size, options);
 
                 // Build line_offsets: start char index of each visual line
@@ -425,8 +425,7 @@ impl Memo {
                 let available_width = (state.main.rect.width() - padding.left - padding.right).max(1) as f32;
                 let options = TextOptions::new().with_wrap_to_width(available_width, TextAlignment::Left);
                 let base_size = typeface.font_size
-                    .map(|dip| dip * state.main.scale as f32)
-                    .unwrap_or(state.text_size);
+                    .unwrap_or(state.text_size) * state.main.scale as f32;
                 return Some(font.layout_text(&placeholder, base_size, options));
             }
         }
@@ -444,8 +443,7 @@ impl Memo {
                 let options = TextOptions::new();
                 let scale = self.state.borrow().main.scale;
                 let base_size = typeface.font_size
-                    .map(|dip| dip * scale as f32)
-                    .unwrap_or(self.state.borrow().text_size);
+                    .unwrap_or(self.state.borrow().text_size) * scale as f32;
                 let text = font.layout_text("W", base_size, options);
                 self.state.borrow_mut().line_height = text.height();
             }

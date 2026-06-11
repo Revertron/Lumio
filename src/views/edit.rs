@@ -529,9 +529,9 @@ impl Edit {
         if let Some(typeface) = typeface {
             if let Some(font) = get_font_family(&typeface.font_name, typeface.font_style) {
                 let options = TextOptions::new();
+                // text_size is dips, like an explicit font_size — both scale.
                 let base_size = typeface.font_size
-                    .map(|dip| dip * scale as f32)
-                    .unwrap_or(self.state.borrow().text_size);
+                    .unwrap_or(self.state.borrow().text_size) * scale as f32;
                 // Password fields render bullets; one per char keeps all the
                 // glyph-based geometry (caret, selection, hit tests) valid.
                 let display = if *self.password.borrow() {
@@ -557,8 +557,7 @@ impl Edit {
                 let options = TextOptions::new();
                 let scale = self.state.borrow().main.scale;
                 let base_size = typeface.font_size
-                    .map(|dip| dip * scale as f32)
-                    .unwrap_or(self.state.borrow().text_size);
+                    .unwrap_or(self.state.borrow().text_size) * scale as f32;
                 return Some(font.layout_text(&placeholder, base_size, options));
             }
         }
@@ -665,8 +664,7 @@ impl Edit {
                 let options = TextOptions::new();
                 let scale = self.state.borrow().main.scale;
                 let base_size = typeface.font_size
-                    .map(|dip| dip * scale as f32)
-                    .unwrap_or(self.state.borrow().text_size);
+                    .unwrap_or(self.state.borrow().text_size) * scale as f32;
                 let text = font.layout_text("W", base_size, options);
                 self.state.borrow_mut().line_height = text.height();
             }

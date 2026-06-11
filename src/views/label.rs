@@ -317,9 +317,9 @@ impl Label {
         let scale = state.main.scale;
         let padding = &state.main.padding;
         let pad_h = (padding.left as f64 * scale).round() as i32 + (padding.right as f64 * scale).round() as i32;
+        // text_size is dips, like an explicit font_size — both scale.
         let base_size = typeface.font_size
-            .map(|dip| dip * scale as f32)
-            .unwrap_or(state.text_size);
+            .unwrap_or(state.text_size) * scale as f32;
         // Reserve icon space using a font-height estimate so wrap-to-width
         // accounts for icons before the text is laid out.
         let has_left = !self.left_icon_path.borrow().is_empty();
@@ -664,8 +664,7 @@ impl View for Label {
         let typeface = self.get_typeface(typeface);
         self.state.borrow_mut().main.font_manager.set(Some(typeface.clone()));
         let base_size = typeface.font_size
-            .map(|dip| dip * scale as f32)
-            .unwrap_or(self.state.borrow().text_size);
+            .unwrap_or(self.state.borrow().text_size) * scale as f32;
         let has_left = !self.left_icon_path.borrow().is_empty();
         let has_right = !self.right_icon_path.borrow().is_empty();
         let est_icon = base_size.ceil() as i32;

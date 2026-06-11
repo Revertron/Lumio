@@ -304,10 +304,10 @@ impl RichText {
         let base_tf = self.get_typeface(&Typeface::default());
         let font_name = base_tf.font_name.clone();
         let base_style = base_tf.font_style;
+        // text_size is dips, like an explicit font_size — both scale.
         let base_px = base_tf
             .font_size
-            .map(|dip| dip * scale_f)
-            .unwrap_or(self.state.borrow().text_size);
+            .unwrap_or(self.state.borrow().text_size) * scale_f;
 
         // Metrics for blank lines (consecutive breaks) and as a fallback.
         let (base_ascent, base_descmag) =
