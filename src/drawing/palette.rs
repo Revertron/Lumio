@@ -69,6 +69,8 @@ impl Palette {
             ("selection".to_string(), 0xFF000080),
             ("item_highlight".to_string(), 0xFF0000C0),
             ("item_highlight_text".to_string(), 0xFFFFFFFF),
+            ("menu_highlight".to_string(), 0xFFBAB6AE),
+            ("menu_highlight_text".to_string(), 0xFF000000),
             ("table_selection".to_string(), 0xFFCCE0F5),
             ("table_separator".to_string(), 0xFFD0D0D0),
             ("progress_fill".to_string(), 0xFF000080),
@@ -99,6 +101,8 @@ impl Palette {
             ("selection".to_string(), 0xFF264F78),
             ("item_highlight".to_string(), 0xFF3060A8),
             ("item_highlight_text".to_string(), 0xFFFFFFFF),
+            ("menu_highlight".to_string(), 0xFF505050),
+            ("menu_highlight_text".to_string(), 0xFFE0E0E0),
             ("table_selection".to_string(), 0xFF2A4D6E),
             ("table_separator".to_string(), 0xFF454545),
             ("progress_fill".to_string(), 0xFF2D7DD2),
@@ -122,6 +126,7 @@ impl Palette {
             ("checkbox.box_size".to_string(), 16.0),
             ("radio.box_size".to_string(), 16.0),
             ("radio.left_inset".to_string(), 4.0),
+            ("menu.min_width".to_string(), 120.0),
         ])
     }
 

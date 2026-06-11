@@ -112,7 +112,8 @@ impl MenuBar {
         let menus = self.menus.borrow();
         let mut cached = self.cached_titles.borrow_mut();
         let base_size = typeface.font_size.unwrap_or(DEFAULT_TEXT_SIZE);
-        let text_size = base_size * scale as f32;
+        // Same reduced size as the dropdown items.
+        let text_size = (base_size - crate::views::popupmenu::MENU_FONT_REDUCTION).max(8.0) * scale as f32;
         if let Some(font) = get_font_family(&typeface.font_name, typeface.font_style) {
             for (i, menu) in menus.iter().enumerate() {
                 if cached[i].is_none() {
@@ -217,8 +218,9 @@ impl MenuBar {
     }
 
     /// Clears stale open state — the popup may have been dismissed by a
-    /// click outside or closed itself.
-    fn sync_open(&self, ui: &UI) {
+    /// click outside or closed itself. Returns true when state was cleared,
+    /// so callers can request a redraw to drop the title highlight.
+    fn sync_open(&self, ui: &UI) -> bool {
         let stale = match &*self.open_popup.borrow() {
             Some(el) => !ui.overlay_exists(el),
             None => false,
@@ -226,6 +228,7 @@ impl MenuBar {
         if stale {
             self.menu_closed();
         }
+        stale
     }
 }
 
@@ -286,8 +289,8 @@ impl View for MenuBar {
             let w = block.width().ceil() as i32 + 2 * pad_h;
             let cell = rect((x, r.min.y), (x + w, r.max.y));
             let text_color = if open == Some(i) || (open.is_none() && hovered == Some(i)) {
-                theme.draw_rect(cell, theme.color("item_highlight"));
-                theme.color("item_highlight_text")
+                theme.draw_rect(cell, theme.color("menu_highlight"));
+                theme.color("menu_highlight_text")
             } else {
                 theme.color("text")
             };
@@ -463,8 +466,16 @@ impl View for MenuBar {
         false
     }
 
+    fn update(&mut self, ui: &mut UI) -> bool {
+        // Drop the title highlight as soon as the menu chain is dismissed by
+        // a click outside (the bar never sees that click).
+        self.sync_open(ui)
+    }
+
     fn on_mouse_move(&self, ui: &mut UI, position: Vector2<i32>) -> bool {
-        self.sync_open(ui);
+        // Redraw when stale open state is cleared (menu chain dismissed by a
+        // click outside) so the title highlight goes away.
+        let cleared = self.sync_open(ui);
         let hit = self.hit_title(position.x, position.y);
         let old = *self.hovered.borrow();
         *self.hovered.borrow_mut() = hit;
@@ -478,7 +489,7 @@ impl View for MenuBar {
             self.open_menu(ui, i, false);
             return true;
         }
-        old != hit
+        cleared || old != hit
     }
 
     fn on_mouse_button_down(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {

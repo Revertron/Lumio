@@ -22,10 +22,13 @@ const SEPARATOR_HEIGHT: i32 = 3;
 const ICON_TEXT_GAP: i32 = 6;
 const ITEM_PADDING_LEFT: i32 = 6;
 const ITEM_PADDING_RIGHT: i32 = 12;
-/// Width reserved at the right edge for the submenu arrow (dips).
+/// Width always reserved at the right edge for the submenu arrow (and,
+/// later, accelerator text) — Windows menus keep this column too (dips).
 const ARROW_AREA: i32 = 16;
 /// Horizontal overlap of a submenu over its parent menu (dips).
 const SUBMENU_OVERLAP: i32 = 2;
+/// Menu text is rendered this many points smaller than the inherited size.
+pub(crate) const MENU_FONT_REDUCTION: f32 = 2.0;
 
 /// Data for a single menu item.
 #[derive(Clone)]
@@ -176,7 +179,8 @@ impl PopupMenu {
         let items = self.items.borrow();
         let mut cached = self.cached_texts.borrow_mut();
         let base_size = typeface.font_size.unwrap_or(DEFAULT_TEXT_SIZE);
-        let text_size = base_size * scale as f32;
+        // Menu text runs a couple of points smaller than regular content.
+        let text_size = (base_size - MENU_FONT_REDUCTION).max(8.0) * scale as f32;
         if let Some(font) = get_font_family(&typeface.font_name, typeface.font_style) {
             for (i, item) in items.iter().enumerate() {
                 if cached[i].is_none() {
@@ -229,10 +233,6 @@ impl PopupMenu {
             y += if item.separator { sep_h } else { item_h };
         }
         y
-    }
-
-    fn has_submenu_items(&self) -> bool {
-        self.items.borrow().iter().any(|i| !i.children.is_empty())
     }
 
     /// Moves the keyboard selection by `dir` (+1/-1), skipping separators
@@ -437,9 +437,10 @@ impl View for PopupMenu {
         }
 
         let sep_h = (SEPARATOR_HEIGHT as f64 * scale).round() as i32;
-        let arrow_w = if self.has_submenu_items() { (ARROW_AREA as f64 * scale).round() as i32 } else { 0 };
+        let arrow_w = (ARROW_AREA as f64 * scale).round() as i32;
+        let min_w = (crate::drawing::current_dimension("menu.min_width") as f64 * scale).round() as i32;
 
-        let content_w = pad_left + icon_size + gap + max_text_w + arrow_w + pad_right;
+        let content_w = (pad_left + icon_size + gap + max_text_w + arrow_w + pad_right).max(min_w);
         let content_h: i32 = self.items.borrow().iter()
             .map(|item| if item.separator { sep_h } else { item_h })
             .sum();
@@ -504,8 +505,8 @@ impl View for PopupMenu {
 
             // Highlight hovered item
             let text_color = if hovered == Some(i) {
-                theme.draw_rect(item_rect, theme.color("item_highlight"));
-                theme.color("item_highlight_text")
+                theme.draw_rect(item_rect, theme.color("menu_highlight"));
+                theme.color("menu_highlight_text")
             } else {
                 theme.color("text")
             };
@@ -615,9 +616,10 @@ impl View for PopupMenu {
         }
 
         let sep_h = (SEPARATOR_HEIGHT as f64 * scale).round() as i32;
-        let arrow_w = if self.has_submenu_items() { (ARROW_AREA as f64 * scale).round() as i32 } else { 0 };
+        let arrow_w = (ARROW_AREA as f64 * scale).round() as i32;
+        let min_w = (crate::drawing::current_dimension("menu.min_width") as f64 * scale).round() as i32;
 
-        let w = pad_left + icon_size + gap + max_text_w + arrow_w + pad_right;
+        let w = (pad_left + icon_size + gap + max_text_w + arrow_w + pad_right).max(min_w);
         let h: i32 = self.items.borrow().iter()
             .map(|item| if item.separator { sep_h } else { item_h })
             .sum();
