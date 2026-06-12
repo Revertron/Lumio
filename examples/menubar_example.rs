@@ -23,7 +23,7 @@ impl AssetsProvider for Provider {
     }
 }
 
-fn menu_clicked(ui: &mut UI, view: &dyn View) -> bool {
+fn menu_clicked(ui: &mut UI, view: &dyn View, _data: &EventData) -> bool {
     let clicked = view.as_any().downcast_ref::<MenuBar>()
         .and_then(|bar| bar.clicked_item());
     if let Some(id) = clicked {

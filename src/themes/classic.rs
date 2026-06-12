@@ -1,19 +1,19 @@
 use std::cmp::{max, min};
 use std::collections::{HashMap, VecDeque};
 use std::io::Cursor;
-use speedy2d::color::Color;
-use speedy2d::dimen::Vector2;
-use speedy2d::font::FormattedTextBlock;
-use speedy2d::dimen::UVec2;
-use speedy2d::image::{ImageDataType, ImageHandle, ImageSmoothingMode};
+
 use speedy2d::Graphics2D;
+use speedy2d::color::Color;
+use speedy2d::dimen::{UVec2, Vector2};
+use speedy2d::font::FormattedTextBlock;
+use speedy2d::image::{ImageDataType, ImageHandle, ImageSmoothingMode};
 use speedy2d::shape::Rectangle;
+
+use super::super::drawing::{Drawable, DrawableRegistry, DrawingEngine, Palette};
 use super::super::styles::selector::{DrawState, MainSelector};
 use super::super::themes::{Theme, Typeface, ViewState};
-use super::super::types::Rect;
 use super::super::types;
-use super::super::types::rect;
-use super::super::drawing::{Drawable, DrawableRegistry, DrawingEngine, Palette};
+use super::super::types::{Rect, rect};
 
 /// Cache for GPU image handles, keyed by the raw pointer of the source byte slice.
 pub type ImageCache = HashMap<usize, ImageHandle>;
@@ -29,7 +29,7 @@ pub struct Classic<'h> {
     opacity_stack: Vec<f32>,
     drawable_registry: &'h DrawableRegistry,
     palette: &'h Palette,
-    image_cache: &'h mut ImageCache,
+    image_cache: &'h mut ImageCache
 }
 
 #[allow(dead_code)]
@@ -65,7 +65,15 @@ impl<'h> Classic<'h> {
         typeface
     }
 
-    pub fn new(graphics: &'h mut Graphics2D, drawable_registry: &'h DrawableRegistry, palette: &'h Palette, image_cache: &'h mut ImageCache, width: i32, height: i32, scale: f64) -> Self {
+    pub fn new(
+        graphics: &'h mut Graphics2D,
+        drawable_registry: &'h DrawableRegistry,
+        palette: &'h Palette,
+        image_cache: &'h mut ImageCache,
+        width: i32,
+        height: i32,
+        scale: f64
+    ) -> Self {
         let current_clip = rect((0, 0), (width, height));
         Classic {
             graphics,
@@ -77,7 +85,7 @@ impl<'h> Classic<'h> {
             opacity_stack: Vec::new(),
             drawable_registry,
             palette,
-            image_cache,
+            image_cache
         }
     }
 }
@@ -161,10 +169,7 @@ impl<'h> Theme for Classic<'h> {
     }
 
     fn draw_text_cropped(&mut self, x: f32, y: f32, crop: Rect<i32>, color: u32, text: &FormattedTextBlock) {
-        let crop = Rectangle::from_tuples(
-            (crop.min.x as f32, crop.min.y as f32),
-            (crop.max.x as f32, crop.max.y as f32),
-        );
+        let crop = Rectangle::from_tuples((crop.min.x as f32, crop.min.y as f32), (crop.max.x as f32, crop.max.y as f32));
         let color = self.color_argb(color);
         self.graphics.draw_text_cropped((x, y), crop, color, text);
     }
@@ -223,7 +228,6 @@ impl<'h> Theme for Classic<'h> {
         }
     }
 
-
     fn push_opacity(&mut self, opacity: f32) {
         let current = self.current_opacity();
         self.opacity_stack.push(current * opacity);
@@ -256,10 +260,7 @@ impl<'h> Theme for Classic<'h> {
             }
         }
         if let Some(handle) = self.image_cache.get(&cache_key) {
-            let speedy_rect = Rectangle::from_tuples(
-                (rect.min.x as f32, rect.min.y as f32),
-                (rect.max.x as f32, rect.max.y as f32),
-            );
+            let speedy_rect = Rectangle::from_tuples((rect.min.x as f32, rect.min.y as f32), (rect.max.x as f32, rect.max.y as f32));
             let a = ((tint_argb >> 24) & 0xFF) as f32 / 255.0;
             let r = ((tint_argb >> 16) & 0xFF) as f32 / 255.0;
             let g = ((tint_argb >> 8) & 0xFF) as f32 / 255.0;
@@ -276,7 +277,7 @@ impl<'h> Theme for Classic<'h> {
                 ImageDataType::RGBA,
                 ImageSmoothingMode::Linear,
                 UVec2::new(size.0, size.1),
-                rgba,
+                rgba
             ) {
                 Ok(handle) => {
                     self.image_cache.insert(key, handle);
@@ -288,10 +289,7 @@ impl<'h> Theme for Classic<'h> {
             }
         }
         if let Some(handle) = self.image_cache.get(&key) {
-            let speedy_rect = Rectangle::from_tuples(
-                (rect.min.x as f32, rect.min.y as f32),
-                (rect.max.x as f32, rect.max.y as f32),
-            );
+            let speedy_rect = Rectangle::from_tuples((rect.min.x as f32, rect.min.y as f32), (rect.max.x as f32, rect.max.y as f32));
             let a = ((tint_argb >> 24) & 0xFF) as f32 / 255.0;
             let r = ((tint_argb >> 16) & 0xFF) as f32 / 255.0;
             let g = ((tint_argb >> 8) & 0xFF) as f32 / 255.0;

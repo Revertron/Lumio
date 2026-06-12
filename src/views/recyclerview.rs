@@ -5,7 +5,7 @@ use std::rc::Rc;
 use downcast_rs::{impl_downcast, Downcast};
 use speedy2d::dimen::Vector2;
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
-use super::super::events::EventType;
+use super::super::events::{EventCallback, EventData, EventType};
 use super::super::themes::{Theme, Typeface, ViewState};
 use super::super::traits::{Element, View, WeakElement};
 use super::super::types::{Point, Rect, rect};
@@ -1215,8 +1215,16 @@ impl View for RecyclerView {
         self.base_set_border_color(color);
     }
 
-    fn on_event(&mut self, _event: EventType, _func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {
-        // TODO: implement
+    fn on_event(&mut self, event: EventType, func: EventCallback) {
+        self.base_on_event(event, func);
+    }
+
+    fn has_listener(&self, event: EventType) -> bool {
+        self.base_has_listener(event)
+    }
+
+    fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool {
+        self.base_fire_event(ui, event, data)
     }
 
     fn click(&self, _ui: &mut UI) -> bool {

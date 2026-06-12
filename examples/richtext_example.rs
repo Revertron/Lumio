@@ -52,7 +52,7 @@ fn main() {
     // Wire link clicks: each RichText reports the clicked href via clicked_href().
     for id in ["rt1", "rt2", "rt3", "rt4"] {
         if let Some(el) = ui.get_view(id) {
-            el.borrow_mut().on_event(EventType::Click, Box::new(|ui, view| {
+            el.borrow_mut().on_event(EventType::Click, Box::new(|ui, view, _data| {
                 let href = view.as_any().downcast_ref::<RichText>().and_then(|rt| rt.clicked_href());
                 if let Some(status) = ui.get_view("status")
                     && let Some(label) = status.borrow_mut().downcast_mut::<Label>()

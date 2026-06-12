@@ -29,7 +29,7 @@ fn main() {
     let ui = UI::from_xml(layout, WIDTH, HEIGHT, Classic::typeface(), 1.0).unwrap();
 
     if let Some(b) = ui.get_view("btn_toggle") {
-        b.borrow_mut().on_event(EventType::Click, Box::new(|ui, _| {
+        b.borrow_mut().on_event(EventType::Click, Box::new(|ui, _, _data| {
             if let Some(edit) = ui.get_view("edit_error") {
                 if let Some(e) = edit.borrow_mut().downcast_mut::<Edit>() {
                     e.set_error(!e.is_error());
@@ -41,7 +41,7 @@ fn main() {
 
     // Right-icon click on the search field clears its text.
     if let Some(e) = ui.get_view("edit_right") {
-        e.borrow_mut().on_event(EventType::RightIconClick, Box::new(|_ui, view| {
+        e.borrow_mut().on_event(EventType::RightIconClick, Box::new(|_ui, view, _data| {
             if let Some(edit) = view.as_any().downcast_ref::<Edit>() {
                 edit.set_text("");
             }
@@ -50,7 +50,7 @@ fn main() {
     }
 
     if let Some(l) = ui.get_view("link1") {
-        l.borrow_mut().on_event(EventType::Click, Box::new(|ui, _view| {
+        l.borrow_mut().on_event(EventType::Click, Box::new(|ui, _view, _data| {
             if let Some(status) = ui.get_view("link_status") {
                 if let Some(label) = status.borrow_mut().downcast_mut::<Label>() {
                     label.set_text("Link clicked!");
@@ -62,7 +62,7 @@ fn main() {
 
     // Left-icon click on the read-only field copies its content to clipboard.
     if let Some(e) = ui.get_view("edit_ro") {
-        e.borrow_mut().on_event(EventType::LeftIconClick, Box::new(|_ui, view| {
+        e.borrow_mut().on_event(EventType::LeftIconClick, Box::new(|_ui, view, _data| {
             if let Some(edit) = view.as_any().downcast_ref::<Edit>() {
                 if let Ok(mut cb) = arboard::Clipboard::new() {
                     let _ = cb.set_text(edit.get_text());

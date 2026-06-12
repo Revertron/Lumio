@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::cmp::max;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use speedy2d::dimen::Vector2;
@@ -8,7 +7,7 @@ use speedy2d::font::{FormattedTextBlock, TextLayout, TextOptions};
 use speedy2d::window::MouseButton;
 
 use crate::assets::get_font_family;
-use crate::events::EventType;
+use crate::events::{EventCallback, EventData, EventType};
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
@@ -56,7 +55,6 @@ impl ComboBox {
                 single_line: true,
                 cached_text: None,
                 font: FontSelector::new(),
-                listeners: HashMap::new(),
             }),
             items: RefCell::new(Vec::new()),
             selected: RefCell::new(None),
@@ -70,8 +68,8 @@ impl ComboBox {
         self.items.borrow_mut().push(text.to_owned());
     }
 
-    pub fn on_change(&mut self, func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {
-        self.state.borrow_mut().listeners.insert(EventType::SelectionChanged, func);
+    pub fn on_change(&mut self, func: EventCallback) {
+        self.base_on_event(EventType::SelectionChanged, func);
     }
 
     pub fn get_selected_index(&self) -> Option<usize> {
@@ -414,8 +412,16 @@ impl View for ComboBox {
         self.base_set_visibility(visibility);
     }
 
-    fn on_event(&mut self, event: EventType, func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {
-        self.state.borrow_mut().listeners.insert(event, func);
+    fn on_event(&mut self, event: EventType, func: EventCallback) {
+        self.base_on_event(event, func);
+    }
+
+    fn has_listener(&self, event: EventType) -> bool {
+        self.base_has_listener(event)
+    }
+
+    fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool {
+        self.base_fire_event(ui, event, data)
     }
 
     fn click(&self, ui: &mut UI) -> bool {
@@ -435,11 +441,7 @@ impl View for ComboBox {
                 self.set_display_text(&text);
                 *self.dropdown_id.borrow_mut() = None;
 
-                let listener = self.state.borrow_mut().listeners.remove(&EventType::SelectionChanged);
-                if let Some(mut handler) = listener {
-                    handler(ui, self as &dyn View);
-                    self.state.borrow_mut().listeners.insert(EventType::SelectionChanged, handler);
-                }
+                self.base_fire_event(ui, EventType::SelectionChanged, &EventData::Selected(index));
                 return true;
             }
         }
@@ -766,7 +768,17 @@ impl View for ComboDropdown {
         self.base_set_border_color(color);
     }
 
-    fn on_event(&mut self, _event: EventType, _func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {}
+    fn on_event(&mut self, event: EventType, func: EventCallback) {
+        self.base_on_event(event, func);
+    }
+
+    fn has_listener(&self, event: EventType) -> bool {
+        self.base_has_listener(event)
+    }
+
+    fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool {
+        self.base_fire_event(ui, event, data)
+    }
 
     fn click(&self, _ui: &mut UI) -> bool { false }
 

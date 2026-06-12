@@ -1,7 +1,8 @@
-pub use crate::ui::{UI, PopupMode, PopupDirection};
+pub use crate::ui::{UI, PopupMode, PopupDirection, WindowRequest};
 pub use crate::win::{Win, WinEvent};
 pub use crate::traits::{View, Container, Element};
-pub use crate::events::EventType;
+pub use crate::events::{EventCallback, EventData, EventType};
+pub use crate::shortcut::Shortcut;
 pub use crate::assets::{AssetsProvider, set_provider, set_font_fallbacks};
 pub use crate::themes::{Theme, Classic, Typeface, FontStyle};
 pub use crate::drawing::Palette;

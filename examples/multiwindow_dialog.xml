@@ -1,0 +1,9 @@
+<Frame id="dialog_root" width="max" height="max" direction="vertical" padding="16">
+    <Label id="prompt" text="Enter your name:" width="max"/>
+    <Edit id="name_edit" width="max" margin_top="8"/>
+    <Frame id="dialog_buttons" width="max" height="min" direction="horizontal" margin_top="16">
+        <Button id="ok_btn" text="OK"/>
+        <Button id="cancel_btn" text="Cancel" margin_left="8"/>
+        <Button id="nested_btn" text="Nested modal..." margin_left="16"/>
+    </Frame>
+</Frame>

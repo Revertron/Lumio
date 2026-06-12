@@ -1,5 +1,4 @@
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use speedy2d::dimen::Vector2;
@@ -7,7 +6,7 @@ use speedy2d::font::{TextLayout, TextOptions};
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
 
 use crate::assets::{get_asset, get_font_family};
-use crate::events::EventType;
+use crate::events::{EventCallback, EventData, EventType};
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
@@ -45,7 +44,6 @@ pub struct PopupMenu {
     cached_texts: RefCell<Vec<Option<speedy2d::font::FormattedTextBlock>>>,
     hovered: RefCell<Option<usize>>,
     pressed: RefCell<Option<usize>>,
-    listeners: RefCell<HashMap<EventType, Box<dyn FnMut(&mut UI, &dyn View) -> bool>>>,
     /// The view (a MenuBar, or the root PopupMenu of a context-menu chain)
     /// that is notified when a leaf item is activated anywhere in the chain.
     owner: RefCell<Option<WeakElement>>,
@@ -78,7 +76,6 @@ impl PopupMenu {
             cached_texts: RefCell::new(Vec::new()),
             hovered: RefCell::new(None),
             pressed: RefCell::new(None),
-            listeners: RefCell::new(HashMap::new()),
             owner: RefCell::new(None),
             is_submenu: Cell::new(false),
             submenu_open: RefCell::new(None),
@@ -692,19 +689,21 @@ impl View for PopupMenu {
         self.base_set_visibility(visibility);
     }
 
-    fn on_event(&mut self, event: EventType, func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {
-        self.listeners.borrow_mut().insert(event, func);
+    fn on_event(&mut self, event: EventType, func: EventCallback) {
+        self.base_on_event(event, func);
+    }
+
+    fn has_listener(&self, event: EventType) -> bool {
+        self.base_has_listener(event)
+    }
+
+    fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool {
+        self.base_fire_event(ui, event, data)
     }
 
     fn click(&self, ui: &mut UI) -> bool {
         if !self.base_is_enabled() { return false; }
-        let listener = self.listeners.borrow_mut().remove(&EventType::Click);
-        if let Some(mut click) = listener {
-            let result = click(ui, self as &dyn View);
-            self.listeners.borrow_mut().insert(EventType::Click, click);
-            return result;
-        }
-        false
+        self.base_fire_event(ui, EventType::Click, &EventData::None)
     }
 
     fn on_mouse_move(&self, ui: &mut UI, position: Vector2<i32>) -> bool {

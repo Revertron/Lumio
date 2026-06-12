@@ -5,7 +5,7 @@ use std::str::FromStr;
 use speedy2d::dimen::Vector2;
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
 
-use crate::events::EventType;
+use crate::events::{EventCallback, EventData, EventType};
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Container, Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
@@ -516,8 +516,16 @@ impl View for SplitPanel {
         Some(self as &mut dyn Container)
     }
 
-    fn on_event(&mut self, _event: EventType, _func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {
-        // No events for SplitPanel itself
+    fn on_event(&mut self, event: EventType, func: EventCallback) {
+        self.base_on_event(event, func);
+    }
+
+    fn has_listener(&self, event: EventType) -> bool {
+        self.base_has_listener(event)
+    }
+
+    fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool {
+        self.base_fire_event(ui, event, data)
     }
 
     fn click(&self, _ui: &mut UI) -> bool {

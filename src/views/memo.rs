@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::cmp::{max, min};
-use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::Instant;
 use speedy2d::dimen::Vector2;
@@ -8,7 +7,7 @@ use speedy2d::font::{TextAlignment, TextLayout, TextOptions};
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, MouseScrollDistance, VirtualKeyCode};
 
 use crate::assets::get_font_family;
-use crate::events::EventType;
+use crate::events::{EventCallback, EventData, EventType};
 use crate::common::{delete_char, delete_range, insert_str, InputFilter, TextEditOp, TextSnapshot, UNDO_LIMIT};
 use crate::views::{Borders, Gravity};
 use crate::views::popupmenu::PopupMenu;
@@ -79,8 +78,7 @@ impl Memo {
             line_height: 0f32,
             single_line: false,
             cached_text: None,
-            font: FontSelector::new(),
-            listeners: HashMap::new()
+            font: FontSelector::new()
         };
         fields.main.padding = Borders::with_padding(4);
         Memo {
@@ -888,10 +886,7 @@ impl Memo {
     }
 
     fn fire_text_changed(&self, ui: &mut UI) {
-        if let Some(mut handler) = self.state.borrow_mut().listeners.remove(&EventType::TextChanged) {
-            handler(ui, self as &dyn View);
-            self.state.borrow_mut().listeners.insert(EventType::TextChanged, handler);
-        }
+        self.base_fire_event(ui, EventType::TextChanged, &EventData::None);
     }
 
     fn insert_text_at_caret(&self, ui: &mut UI, s: &str) -> bool {
@@ -958,7 +953,7 @@ impl Memo {
         menu.add_item("select_all", "", "Select All");
 
         let memo_id = self.get_id();
-        menu.on_event(EventType::Click, Box::new(move |ui: &mut UI, view: &dyn View| {
+        menu.on_event(EventType::Click, Box::new(move |ui: &mut UI, view: &dyn View, _data: &EventData| {
             let menu = view.as_any().downcast_ref::<PopupMenu>().unwrap();
             let index = menu.get_hovered_index();
             if let Some(index) = index {
@@ -1382,18 +1377,21 @@ impl View for Memo {
         self.base_set_visibility(visibility);
     }
 
-    fn on_event(&mut self, event: EventType, func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {
-        self.state.borrow_mut().listeners.insert(event, func);
+    fn on_event(&mut self, event: EventType, func: EventCallback) {
+        self.base_on_event(event, func);
+    }
+
+    fn has_listener(&self, event: EventType) -> bool {
+        self.base_has_listener(event)
+    }
+
+    fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool {
+        self.base_fire_event(ui, event, data)
     }
 
     fn click(&self, ui: &mut UI) -> bool {
         if !self.base_is_enabled() { return false; }
-        if let Some(mut click) = self.state.borrow_mut().listeners.remove(&EventType::Click) {
-            let result = click(ui, self as &dyn View);
-            self.state.borrow_mut().listeners.insert(EventType::Click, click);
-            return result;
-        }
-        false
+        self.base_fire_event(ui, EventType::Click, &EventData::None)
     }
 
     fn update(&mut self, ui: &mut UI) -> bool {
@@ -1464,7 +1462,7 @@ impl View for Memo {
 
         if !matches!(button, MouseButton::Left) {
             self.state.borrow_mut().main.state.focused = true;
-            if matches!(button, MouseButton::Right) {
+            if matches!(button, MouseButton::Right) && !ui.context_menu_suppressed() {
                 self.open_context_menu(ui, position.x, position.y);
             }
             return true;

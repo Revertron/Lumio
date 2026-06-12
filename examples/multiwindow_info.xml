@@ -1,0 +1,4 @@
+<Frame id="info_root" width="max" height="max" direction="vertical" padding="16">
+    <Label id="info_label" width="max"/>
+    <Button id="info_ok" text="OK" margin_top="16"/>
+</Frame>

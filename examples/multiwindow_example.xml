@@ -1,0 +1,10 @@
+<Frame id="main" width="max" height="max" direction="vertical" padding="16">
+    <Label id="title" text="Multi-window demo" text_size="22" width="max"/>
+    <Label id="hint" text="Open an application-modal dialog, or a normal extra window." width="max" margin_top="8"/>
+    <Frame id="buttons" width="max" height="min" direction="horizontal" margin_top="16">
+        <Button id="btn_dialog" text="Open modal dialog..."/>
+        <Button id="btn_window" text="Open normal window" margin_left="8"/>
+    </Frame>
+    <Label id="result_label" text="No result yet." width="max" margin_top="24" font_style="Bold"/>
+    <Edit id="main_edit" hint="Try typing here while the modal dialog is open" width="max" margin_top="16"/>
+</Frame>

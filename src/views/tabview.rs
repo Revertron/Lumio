@@ -1,5 +1,4 @@
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use speedy2d::dimen::Vector2;
@@ -7,7 +6,7 @@ use speedy2d::font::{FormattedTextBlock, TextLayout, TextOptions};
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
 
 use crate::assets::get_font_family;
-use crate::events::EventType;
+use crate::events::{EventCallback, EventData, EventType};
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Container, Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
@@ -34,7 +33,6 @@ pub struct TabView {
     tabs: Vec<TabInfo>,
     active_tab: Cell<usize>,
     tab_bar_height: Cell<i32>,
-    listeners: RefCell<HashMap<EventType, Box<dyn FnMut(&mut UI, &dyn View) -> bool>>>,
 }
 
 impl HasMainFields for TabView {
@@ -454,8 +452,16 @@ impl View for TabView {
         Some(self as &mut dyn Container)
     }
 
-    fn on_event(&mut self, event: EventType, func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {
-        self.listeners.borrow_mut().insert(event, func);
+    fn on_event(&mut self, event: EventType, func: EventCallback) {
+        self.base_on_event(event, func);
+    }
+
+    fn has_listener(&self, event: EventType) -> bool {
+        self.base_has_listener(event)
+    }
+
+    fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool {
+        self.base_fire_event(ui, event, data)
     }
 
     fn click(&self, _ui: &mut UI) -> bool {
@@ -495,11 +501,7 @@ impl View for TabView {
                     if i != self.active_tab.get() {
                         self.active_tab.set(i);
                         // Fire SelectionChanged listener
-                        let listener = self.listeners.borrow_mut().remove(&EventType::SelectionChanged);
-                        if let Some(mut callback) = listener {
-                            callback(ui, self as &dyn View);
-                            self.listeners.borrow_mut().insert(EventType::SelectionChanged, callback);
-                        }
+                        self.base_fire_event(ui, EventType::SelectionChanged, &EventData::Selected(i));
                     }
                     return true;
                 }
@@ -582,7 +584,6 @@ impl Default for TabView {
             tabs: Vec::new(),
             active_tab: Cell::new(0),
             tab_bar_height: Cell::new(0),
-            listeners: RefCell::new(HashMap::new()),
         }
     }
 }

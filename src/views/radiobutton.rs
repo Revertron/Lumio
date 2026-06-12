@@ -1,13 +1,12 @@
 ﻿use std::cell::RefCell;
 use std::cmp::max;
-use std::collections::HashMap;
 
 use speedy2d::dimen::Vector2;
 use speedy2d::font::{TextAlignment, TextLayout, TextOptions};
 use speedy2d::window::MouseButton;
 
 use crate::assets::get_font_family;
-use crate::events::EventType;
+use crate::events::{EventCallback, EventData, EventType};
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::view_base::{HasMainFields, ViewBasics};
 use crate::traits::{Element, View, WeakElement};
@@ -48,8 +47,7 @@ impl RadioButton {
                 line_height: 0f32,
                 single_line: true,
                 cached_text: None,
-                font: FontSelector::new(),
-                listeners: HashMap::new()
+                font: FontSelector::new()
             }),
             text_margin: DEFAULT_TEXT_MARGIN,
             group: RefCell::new(String::new()),
@@ -394,8 +392,16 @@ impl View for RadioButton {
         self.base_set_visibility(visibility);
     }
 
-    fn on_event(&mut self, event: EventType, func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {
-        self.state.borrow_mut().listeners.insert(event, func);
+    fn on_event(&mut self, event: EventType, func: EventCallback) {
+        self.base_on_event(event, func);
+    }
+
+    fn has_listener(&self, event: EventType) -> bool {
+        self.base_has_listener(event)
+    }
+
+    fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool {
+        self.base_fire_event(ui, event, data)
     }
 
     fn click(&self, ui: &mut UI) -> bool {
@@ -407,17 +413,9 @@ impl View for RadioButton {
         self.uncheck_siblings_in_group();
         let mut result = false;
         if !was_checked {
-            let listener = self.state.borrow_mut().listeners.remove(&EventType::CheckedChanged);
-            if let Some(mut changed) = listener {
-                result |= changed(ui, self as &dyn View);
-                self.state.borrow_mut().listeners.insert(EventType::CheckedChanged, changed);
-            }
+            result |= self.base_fire_event(ui, EventType::CheckedChanged, &EventData::Checked(true));
         }
-        let listener = self.state.borrow_mut().listeners.remove(&EventType::Click);
-        if let Some(mut click) = listener {
-            result |= click(ui, self as &dyn View);
-            self.state.borrow_mut().listeners.insert(EventType::Click, click);
-        }
+        result |= self.base_fire_event(ui, EventType::Click, &EventData::None);
         result
     }
 

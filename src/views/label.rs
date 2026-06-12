@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
@@ -7,7 +6,7 @@ use speedy2d::dimen::Vector2;
 use speedy2d::font::{TextAlignment, TextLayout, TextOptions};
 use speedy2d::window::{MouseButton, MouseCursorType};
 use crate::assets::{get_asset, get_font_family};
-use crate::events::EventType;
+use crate::events::{EventCallback, EventData, EventType};
 use crate::svg;
 
 use crate::themes::{Theme, Typeface, ViewState};
@@ -99,8 +98,7 @@ impl Label {
                 line_height: 0f32,
                 single_line: false,
                 cached_text: None,
-                font: FontSelector::new(),
-                listeners: HashMap::new()
+                font: FontSelector::new()
             }),
             link: RefCell::new(false),
             link_color: RefCell::new(None),
@@ -237,11 +235,7 @@ impl Label {
     }
 
     fn fire_icon_event(&self, ui: &mut UI, event: EventType) {
-        let handler = self.state.borrow_mut().listeners.remove(&event);
-        if let Some(mut handler) = handler {
-            handler(ui, self as &dyn View);
-            self.state.borrow_mut().listeners.insert(event, handler);
-        }
+        self.base_fire_event(ui, event, &EventData::None);
     }
 
     fn draw_icon(&self, theme: &mut dyn Theme, icon_rect: Rect<i32>, is_left: bool, tint: u32) {
@@ -568,7 +562,7 @@ impl Label {
         menu.add_item("select_all", "", "Select All");
 
         let label_id = self.get_id();
-        menu.on_event(EventType::Click, Box::new(move |ui: &mut UI, view: &dyn View| {
+        menu.on_event(EventType::Click, Box::new(move |ui: &mut UI, view: &dyn View, _data: &EventData| {
             let menu = view.as_any().downcast_ref::<PopupMenu>().unwrap();
             if let Some(index) = menu.get_hovered_index()
                 && let Some(el) = ui.get_view(&label_id)
@@ -942,8 +936,16 @@ impl View for Label {
         self.base_set_visibility(visibility);
     }
 
-    fn on_event(&mut self, event: EventType, func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {
-        self.state.borrow_mut().listeners.insert(event, func);
+    fn on_event(&mut self, event: EventType, func: EventCallback) {
+        self.base_on_event(event, func);
+    }
+
+    fn has_listener(&self, event: EventType) -> bool {
+        self.base_has_listener(event)
+    }
+
+    fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool {
+        self.base_fire_event(ui, event, data)
     }
 
     fn click(&self, ui: &mut UI) -> bool {
@@ -979,6 +981,7 @@ impl View for Label {
         if matches!(button, MouseButton::Right) {
             if *self.selectable.borrow()
                 && self.state.borrow().main.rect.hit((position.x, position.y))
+                && !ui.context_menu_suppressed()
             {
                 self.open_context_menu(ui, position.x, position.y);
                 return true;
@@ -1074,12 +1077,6 @@ impl Default for Label {
 
 impl Label {
     fn fire_click(&self, ui: &mut UI) -> bool {
-        let handler = self.state.borrow_mut().listeners.remove(&EventType::Click);
-        if let Some(mut handler) = handler {
-            let result = handler(ui, self as &dyn View);
-            self.state.borrow_mut().listeners.insert(EventType::Click, handler);
-            return result;
-        }
-        false
+        self.base_fire_event(ui, EventType::Click, &EventData::None)
     }
 }

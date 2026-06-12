@@ -85,7 +85,7 @@ fn main() {
 
     // Wire selection callbacks on both tables — print to stdout.
     if let Some(view) = ui.get_view("domains") {
-        view.borrow_mut().on_event(EventType::Click, Box::new(|ui, _v| {
+        view.borrow_mut().on_event(EventType::Click, Box::new(|ui, _v, _data| {
             if let Some(g) = ui.get_view("domains") {
                 if let Some(table) = g.borrow().downcast_ref::<TableView>() {
                     println!("[domains] selected raw row = {:?}", table.selected_row());
@@ -95,7 +95,7 @@ fn main() {
         }));
     }
     if let Some(view) = ui.get_view("contacts") {
-        view.borrow_mut().on_event(EventType::Click, Box::new(|ui, _v| {
+        view.borrow_mut().on_event(EventType::Click, Box::new(|ui, _v, _data| {
             if let Some(g) = ui.get_view("contacts") {
                 if let Some(table) = g.borrow().downcast_ref::<TableView>() {
                     println!("[contacts] selected raw row = {:?}", table.selected_row());

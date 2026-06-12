@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use speedy2d::dimen::Vector2;
@@ -7,7 +6,7 @@ use speedy2d::font::{TextLayout, TextOptions};
 use speedy2d::window::MouseButton;
 
 use crate::assets::get_font_family;
-use crate::events::EventType;
+use crate::events::{EventCallback, EventData, EventType};
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Container, Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
@@ -42,8 +41,6 @@ pub struct MenuBar {
     open_index: RefCell<Option<usize>>,
     open_popup: RefCell<Option<Element>>,
     clicked_item: RefCell<Option<String>>,
-    #[allow(clippy::type_complexity)]
-    listeners: RefCell<HashMap<EventType, Box<dyn FnMut(&mut UI, &dyn View) -> bool>>>,
 }
 
 impl HasMainFields for MenuBar {
@@ -67,7 +64,6 @@ impl MenuBar {
             open_index: RefCell::new(None),
             open_popup: RefCell::new(None),
             clicked_item: RefCell::new(None),
-            listeners: RefCell::new(HashMap::new()),
         }
     }
 
@@ -449,21 +445,23 @@ impl View for MenuBar {
         Some(self)
     }
 
-    fn on_event(&mut self, event: EventType, func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {
-        self.listeners.borrow_mut().insert(event, func);
+    fn on_event(&mut self, event: EventType, func: EventCallback) {
+        self.base_on_event(event, func);
+    }
+
+    fn has_listener(&self, event: EventType) -> bool {
+        self.base_has_listener(event)
+    }
+
+    fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool {
+        self.base_fire_event(ui, event, data)
     }
 
     fn click(&self, ui: &mut UI) -> bool {
         if !self.base_is_enabled() {
             return false;
         }
-        let listener = self.listeners.borrow_mut().remove(&EventType::Click);
-        if let Some(mut click) = listener {
-            let result = click(ui, self as &dyn View);
-            self.listeners.borrow_mut().insert(EventType::Click, click);
-            return result;
-        }
-        false
+        self.base_fire_event(ui, EventType::Click, &EventData::None)
     }
 
     fn update(&mut self, ui: &mut UI) -> bool {
@@ -596,7 +594,9 @@ impl View for Menu {
     fn get_id(&self) -> String { self.base_get_id() }
     fn as_container(&self) -> Option<&dyn Container> { Some(self) }
     fn as_container_mut(&mut self) -> Option<&mut dyn Container> { Some(self) }
-    fn on_event(&mut self, _event: EventType, _func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {}
+    fn on_event(&mut self, event: EventType, func: EventCallback) { self.base_on_event(event, func); }
+    fn has_listener(&self, event: EventType) -> bool { self.base_has_listener(event) }
+    fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool { self.base_fire_event(ui, event, data) }
     fn click(&self, _ui: &mut UI) -> bool { false }
 }
 
@@ -711,7 +711,9 @@ impl View for MenuItemTag {
     fn set_scale(&mut self, s: f64) { self.base_set_scale(s); }
     fn set_id(&mut self, id: &str) { self.base_set_id(id); }
     fn get_id(&self) -> String { self.base_get_id() }
-    fn on_event(&mut self, _event: EventType, _func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {}
+    fn on_event(&mut self, event: EventType, func: EventCallback) { self.base_on_event(event, func); }
+    fn has_listener(&self, event: EventType) -> bool { self.base_has_listener(event) }
+    fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool { self.base_fire_event(ui, event, data) }
     fn click(&self, _ui: &mut UI) -> bool { false }
 }
 

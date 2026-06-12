@@ -1,13 +1,12 @@
 ﻿use std::cell::RefCell;
 use std::cmp::max;
-use std::collections::HashMap;
 
 use speedy2d::dimen::Vector2;
 use speedy2d::font::{TextAlignment, TextLayout, TextOptions};
 use speedy2d::window::MouseButton;
 
 use crate::assets::get_font_family;
-use crate::events::EventType;
+use crate::events::{EventCallback, EventData, EventType};
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
@@ -45,8 +44,7 @@ impl Button {
                 line_height: 0f32,
                 single_line: true,
                 cached_text: None,
-                font: FontSelector::new(),
-                listeners: HashMap::new()
+                font: FontSelector::new()
             })
         }
     }
@@ -315,19 +313,21 @@ impl View for Button {
         self.base_set_visibility(visibility);
     }
 
-    fn on_event(&mut self, event: EventType, func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {
-        self.state.borrow_mut().listeners.insert(event, func);
+    fn on_event(&mut self, event: EventType, func: EventCallback) {
+        self.base_on_event(event, func);
+    }
+
+    fn has_listener(&self, event: EventType) -> bool {
+        self.base_has_listener(event)
+    }
+
+    fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool {
+        self.base_fire_event(ui, event, data)
     }
 
     fn click(&self, ui: &mut UI) -> bool {
         if !self.base_is_enabled() { return false; }
-        let listener = self.state.borrow_mut().listeners.remove(&EventType::Click);
-        if let Some(mut click) = listener {
-            let result = click(ui, self as &dyn View);
-            self.state.borrow_mut().listeners.insert(EventType::Click, click);
-            return result;
-        }
-        false
+        self.base_fire_event(ui, EventType::Click, &EventData::None)
     }
 
     fn on_mouse_move(&self, _ui: &mut UI, position: Vector2<i32>) -> bool {

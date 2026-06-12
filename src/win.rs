@@ -1,8 +1,10 @@
 use std::marker::PhantomData;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use speedy2d::dimen::Vector2;
 use speedy2d::Graphics2D;
-use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, MouseScrollDistance, UserEventSender, VirtualKeyCode, WindowHandler, WindowHelper, WindowStartupInfo};
+use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, MouseScrollDistance, UserEventSender, VirtualKeyCode, WindowCreationOptions, WindowHandler, WindowHelper, WindowPosition, WindowSize, WindowStartupInfo};
 use crate::drawing::{DrawableRegistry, Palette};
 use super::ui::UI;
 use super::themes::*;
@@ -17,15 +19,29 @@ pub struct Win<T> {
     height: u32,
     mouse_pos: Vector2<i32>,
     mod_state: ModifiersState,
-    sender: UserEventSender<WinEvent>,
     /// Last cursor shape pushed to the OS, so we only call `set_cursor` on a
     /// real transition (avoids per-move churn).
     last_cursor: Option<MouseCursorType>,
+    /// Cleared on drop so this window's update ticker thread stops.
+    alive: Arc<AtomicBool>,
+    /// Child windows close on Esc instead of terminating the app.
+    is_child: bool,
     t: PhantomData<T>
 }
 
 impl<T> Win<T> {
-    pub fn new(ui: UI, sender: UserEventSender<WinEvent>) -> Self {
+    /// The sender parameter is unused since the update ticker switched to a
+    /// per-window sender created in `on_start`; kept for API compatibility.
+    pub fn new(ui: UI, _sender: UserEventSender<WinEvent>) -> Self {
+        Self::build(ui, false)
+    }
+
+    /// A handler for a child window (opened via [`UI::open_window`]).
+    pub fn new_child(ui: UI) -> Self {
+        Self::build(ui, true)
+    }
+
+    fn build(ui: UI, is_child: bool) -> Self {
         Win {
             ui,
             drawable_registry: DrawableRegistry::new(),
@@ -35,9 +51,10 @@ impl<T> Win<T> {
             height: 0,
             mouse_pos: Vector2::new(-1, -1),
             mod_state: ModifiersState::default(),
-            sender,
             last_cursor: None,
-            t: PhantomData::default()
+            alive: Arc::new(AtomicBool::new(true)),
+            is_child,
+            t: PhantomData
         }
     }
 
@@ -48,7 +65,13 @@ impl<T> Win<T> {
     }
 }
 
-impl<T> WindowHandler<T> for Win<T> {
+impl<T> Drop for Win<T> {
+    fn drop(&mut self) {
+        self.alive.store(false, Ordering::Relaxed);
+    }
+}
+
+impl<T: From<WinEvent> + Send + 'static> WindowHandler<T> for Win<T> {
     fn on_start(&mut self, helper: &mut WindowHelper<T>, info: WindowStartupInfo) {
         println!("on_start");
         self.width = info.viewport_size_pixels().x;
@@ -56,12 +79,16 @@ impl<T> WindowHandler<T> for Win<T> {
         self.ui.layout(self.width, self.height, info.scale_factor());
         helper.request_redraw();
 
-        let user_event_sender = self.sender.clone();
+        // Per-window sender: its events come back to this window's handler.
+        let user_event_sender = helper.create_user_event_sender();
+        let alive = Arc::clone(&self.alive);
 
         std::thread::spawn(move || {
-            loop {
-                // Send a message every 16ms
-                user_event_sender.send_event(WinEvent::Update).unwrap();
+            // Send an update tick every 16ms until the window is gone.
+            while alive.load(Ordering::Relaxed) {
+                if user_event_sender.send_event(T::from(WinEvent::Update)).is_err() {
+                    break;
+                }
                 std::thread::sleep(Duration::from_millis(15));
             }
         });
@@ -71,6 +98,27 @@ impl<T> WindowHandler<T> for Win<T> {
     fn on_user_event(&mut self, helper: &mut WindowHelper<T>, _event: T) {
         if self.ui.update() {
             helper.request_redraw();
+        }
+
+        for request in self.ui.take_window_requests() {
+            let mut win = Win::<T>::new_child(request.ui);
+            // The new window starts with the palette this window uses now.
+            win.palette = self.palette.clone();
+
+            let size = WindowSize::ScaledPixels(
+                Vector2::new(request.width as f32, request.height as f32));
+            // Child windows open centered over the window that opened them.
+            let options = WindowCreationOptions::new_windowed(size, Some(WindowPosition::CenterOnParent));
+
+            if request.modal {
+                helper.create_modal_window(&request.title, options, Box::new(win));
+            } else {
+                helper.create_window(&request.title, options, Box::new(win));
+            }
+        }
+
+        if self.ui.take_close_request() {
+            helper.close_window();
         }
     }
 
@@ -136,7 +184,24 @@ impl<T> WindowHandler<T> for Win<T> {
 
     fn on_key_down(&mut self, helper: &mut WindowHelper<T>, virtual_key_code: Option<VirtualKeyCode>, scancode: KeyScancode) {
         println!("KeyCode: {:?}, scancode: {:?} down", virtual_key_code, scancode);
-        if self.ui.on_key_down(virtual_key_code, scancode, self.mod_state.clone()) {
+        let consumed = self.ui.on_key_down(virtual_key_code, scancode, self.mod_state.clone());
+        // Escape policy runs AFTER dispatch so a dialog or view consuming Esc
+        // (e.g. a cancel button) is not followed by closing/terminating here.
+        if !consumed && virtual_key_code == Some(VirtualKeyCode::Escape) {
+            if self.ui.has_dismissable_popups() {
+                self.ui.close_all_popups();
+                helper.request_redraw();
+                return;
+            }
+            if self.is_child {
+                // Esc closes a child window; only the main window exits the app.
+                helper.close_window();
+            } else {
+                helper.terminate_loop();
+            }
+            return;
+        }
+        if consumed {
             helper.request_redraw();
         }
     }
@@ -148,16 +213,8 @@ impl<T> WindowHandler<T> for Win<T> {
         }
     }
 
-    fn on_keyboard_char(&mut self,helper: &mut WindowHelper<T>, unicode_codepoint: char) {
+    fn on_keyboard_char(&mut self, helper: &mut WindowHelper<T>, unicode_codepoint: char) {
         println!("Codepoint {:?}", unicode_codepoint);
-        if unicode_codepoint == 27 as char {
-            if self.ui.has_popups() {
-                self.ui.close_all_popups();
-                helper.request_redraw();
-                return;
-            }
-            helper.terminate_loop();
-        }
         if self.ui.on_key_char(unicode_codepoint, self.mod_state.clone()) {
             helper.request_redraw();
         }

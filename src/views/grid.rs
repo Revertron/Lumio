@@ -8,12 +8,11 @@
 //! columns, V/H scrollbars), use `TableView`.
 
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
 
 use speedy2d::dimen::Vector2;
 use speedy2d::window::MouseButton;
 
-use crate::events::EventType;
+use crate::events::{EventCallback, EventData, EventType};
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Container, Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
@@ -37,7 +36,6 @@ pub struct Grid {
     row_heights: RefCell<Vec<i32>>,
     /// Cumulative row-top offsets in physical pixels, len = rows + 1.
     row_offsets: RefCell<Vec<i32>>,
-    listeners: RefCell<HashMap<EventType, Box<dyn FnMut(&mut UI, &dyn View) -> bool>>>,
     needs_relayout: Cell<bool>,
 }
 
@@ -56,7 +54,6 @@ impl Grid {
             cells: RefCell::new(Vec::new()),
             row_heights: RefCell::new(Vec::new()),
             row_offsets: RefCell::new(vec![0]),
-            listeners: RefCell::new(HashMap::new()),
             needs_relayout: Cell::new(false),
         }
     }
@@ -187,11 +184,7 @@ impl Grid {
     }
 
     fn fire_click(&self, ui: &mut UI) {
-        let listener = self.listeners.borrow_mut().remove(&EventType::Click);
-        if let Some(mut cb) = listener {
-            cb(ui, self as &dyn View);
-            self.listeners.borrow_mut().insert(EventType::Click, cb);
-        }
+        self.base_fire_event(ui, EventType::Click, &EventData::None);
     }
 }
 
@@ -321,8 +314,16 @@ impl View for Grid {
     fn as_container(&self) -> Option<&dyn Container> { Some(self) }
     fn as_container_mut(&mut self) -> Option<&mut dyn Container> { Some(self) }
 
-    fn on_event(&mut self, event: EventType, func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {
-        self.listeners.borrow_mut().insert(event, func);
+    fn on_event(&mut self, event: EventType, func: EventCallback) {
+        self.base_on_event(event, func);
+    }
+
+    fn has_listener(&self, event: EventType) -> bool {
+        self.base_has_listener(event)
+    }
+
+    fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool {
+        self.base_fire_event(ui, event, data)
     }
 
     fn click(&self, ui: &mut UI) -> bool {

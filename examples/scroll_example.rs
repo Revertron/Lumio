@@ -40,7 +40,7 @@ fn main() {
     let ui = UI::from_xml(layout, WIDTH, HEIGHT, Classic::typeface(), 1.0).unwrap();
 
     if let Some(button) = ui.get_view("scroll_top") {
-        button.borrow_mut().on_event(EventType::Click, Box::new(|ui, _view| {
+        button.borrow_mut().on_event(EventType::Click, Box::new(|ui, _view, _data| {
             if let Some(sv) = ui.get_view("scroll_v") {
                 if let Some(scroll) = sv.borrow().downcast_ref::<ScrollView>() {
                     scroll.scroll_to_start();
@@ -51,7 +51,7 @@ fn main() {
     }
 
     if let Some(button) = ui.get_view("scroll_bottom") {
-        button.borrow_mut().on_event(EventType::Click, Box::new(|ui, _view| {
+        button.borrow_mut().on_event(EventType::Click, Box::new(|ui, _view, _data| {
             if let Some(sv) = ui.get_view("scroll_v") {
                 if let Some(scroll) = sv.borrow().downcast_ref::<ScrollView>() {
                     scroll.scroll_to_end();

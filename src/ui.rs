@@ -10,13 +10,15 @@ use speedy2d::dimen::Vector2;
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, MouseScrollDistance, VirtualKeyCode};
 
 use super::containers::Frame;
+use super::events::{EventData, EventType};
+use super::shortcut::Shortcut;
 use super::themes::Theme;
 use super::traits::{Element, View};
 use super::types::Point;
 use super::themes::Typeface;
 
 use super::views::{Button, Edit, Label, CheckBox, RadioButton, ComboBox, ScrollView, ProgressBar, TabView, List, RecyclerView, ImageButton, ImageView, PopupMenu, Dialog, Separator, SplitPanel, StatusBar, Memo, NotificationStack, TableView, TableColumn, TableRow, Grid, RichText, MenuBar, Menu, MenuItemTag};
-use super::views::Dimension;
+use super::views::{Dimension, Visibility};
 use std::time::Duration;
 
 /// Controls how a popup interacts with the rest of the UI.
@@ -54,6 +56,11 @@ struct PopupEntry {
 
 const TOOLTIP_DELAY_MS: u128 = 700;
 const TOOLTIP_ID: &str = "__tooltip__";
+/// Two left clicks within this window (and within `DOUBLE_CLICK_DISTANCE`
+/// of each other, on the same view) fire a `DoubleClick` event. Matches the
+/// threshold `Edit` uses internally for word selection.
+const DOUBLE_CLICK_MS: u128 = 400;
+const DOUBLE_CLICK_DISTANCE: i32 = 4;
 
 struct TooltipPopup {
     element: Element,
@@ -92,6 +99,43 @@ pub struct UI {
     /// layout XML before the view's own attributes (own attributes win).
     /// Registered from `<Style name="..." .../>` elements or [`UI::add_style`].
     styles: HashMap<String, Vec<(String, String)>>,
+    /// Id of the view that currently holds focus, as observed by the last
+    /// `sync_focus()` sweep. Drives `FocusGained`/`FocusLost` events.
+    focus_owner: Option<String>,
+    /// Id of the deepest view under the cursor with a hover listener, as
+    /// observed by the last `sync_hover()`. Drives `HoverEnter`/`HoverExit`.
+    hover_owner: Option<String>,
+    /// Time, position and DoubleClick-listener target of the last left
+    /// mouse-button press, for central double-click detection.
+    last_click: Option<(Instant, Vector2<i32>, Option<String>)>,
+    /// True while dispatching a right-click whose `ContextMenu` listener
+    /// returned true: built-in context menus (Edit, Memo, Label, RichText)
+    /// check it and stay closed, and the click-missed-overlays popup
+    /// dismissal is skipped so a menu the handler opened survives.
+    context_menu_suppressed: bool,
+    /// Application-wide keyboard accelerators, dispatched when a key-down
+    /// was not consumed by the focused view / overlays.
+    shortcuts: HashMap<Shortcut, Box<dyn FnMut(&mut UI) -> bool>>,
+    /// New OS windows queued via [`UI::open_window`]; drained by the window
+    /// handler on the next update tick.
+    window_requests: Vec<WindowRequest>,
+    /// Set by [`UI::close_window`]; the window handler closes this UI's
+    /// window when it sees the flag.
+    close_requested: bool,
+}
+
+/// A request to open a new OS window, queued via [`UI::open_window`] and
+/// applied by the window handler on the next update tick.
+pub struct WindowRequest {
+    pub title: String,
+    /// Inner window size in device-independent pixels.
+    pub width: u32,
+    pub height: u32,
+    /// The fully built UI for the new window, with event handlers wired.
+    pub ui: UI,
+    /// Application-modal: until this window closes, all other windows ignore
+    /// mouse/keyboard/close input, and clicking them refocuses this window.
+    pub modal: bool,
 }
 
 #[allow(dead_code)]
@@ -106,6 +150,13 @@ impl UI {
             requested_cursor: None,
             pending_palette: None,
             styles: HashMap::new(),
+            focus_owner: None,
+            hover_owner: None,
+            last_click: None,
+            context_menu_suppressed: false,
+            shortcuts: HashMap::new(),
+            window_requests: Vec::new(),
+            close_requested: false,
         };
         ui.register::<Label>("Label");
         ui.register::<Button>("Button");
@@ -412,6 +463,13 @@ impl UI {
         !self.overlays.is_empty()
     }
 
+    /// Returns true if any overlay would be dismissed by Escape or by a click
+    /// outside it (`PopupMode::Popup`). Transparent overlays (notification
+    /// stack) and modal dialogs do not count.
+    pub fn has_dismissable_popups(&self) -> bool {
+        self.overlays.iter().any(|e| e.mode == PopupMode::Popup)
+    }
+
     /// Lazily ensures the notification stack overlay exists, returning a clone of its Element.
     fn ensure_notification_stack(&mut self) -> Element {
         if let Some(el) = &self.notification_stack {
@@ -529,6 +587,9 @@ impl UI {
         if let Some(root) = root {
             redraw |= root.borrow_mut().update(self);
         }
+        // Catch focus changes made programmatically or via Frame::focus_next/prev
+        // (paths that never pass through an input dispatch).
+        redraw |= self.sync_focus();
         // Update tooltip
         redraw |= self.update_tooltip();
         redraw
@@ -740,37 +801,96 @@ impl UI {
         self.overlays.iter().any(|e| e.mode == PopupMode::Modal)
     }
 
-    /// Walks the view tree to find the deepest view under (x, y) that has a tooltip.
-    /// Coordinates are in absolute window space.
-    fn hit_test_tooltip(element: &Element, x: i32, y: i32, offset_x: i32, offset_y: i32) -> Option<(String, String)> {
+    /// Detects focus changes since the last sweep and fires `FocusLost` /
+    /// `FocusGained` on the affected views. Focus is mutated from many places
+    /// without `&mut UI` access (mouse clicks, `Frame::focus_next/prev`,
+    /// programmatic `set_focused`), so instead of threading UI through all of
+    /// them the change is observed here, after each input dispatch and on the
+    /// update tick. Only leaf views set their own `state.focused` (a `Frame`
+    /// reports focus computed from its children, never its own state), so the
+    /// sweep finds exactly the focused leaf. Returns true if focus changed.
+    fn sync_focus(&mut self) -> bool {
+        let focused = self.find_with(&|v| v.get_state().map(|s| s.focused).unwrap_or(false));
+        let new_id = focused.first().map(|el| el.borrow().get_id());
+        if new_id == self.focus_owner {
+            return false;
+        }
+        // Update the owner BEFORE firing so a handler that re-focuses
+        // converges on the next sweep instead of recursing.
+        let old = std::mem::replace(&mut self.focus_owner, new_id);
+        if let Some(old_id) = old {
+            // The view may have been removed since it had focus — skip then.
+            let el = self.get_view(&old_id);
+            if let Some(el) = el {
+                el.borrow().fire_event(self, EventType::FocusLost, &EventData::None);
+            }
+        }
+        if let Some(el) = focused.into_iter().next() {
+            el.borrow().fire_event(self, EventType::FocusGained, &EventData::None);
+        }
+        true
+    }
+
+    /// Walks the view tree to find the deepest visible view under (x, y) that
+    /// matches `pred`. `x`/`y` are absolute window coordinates; child rects are
+    /// parent-relative, so the parent's absolute origin accumulates through
+    /// `offset_x`/`offset_y`. Children are visited in reverse order (topmost
+    /// first), matching the mouse dispatch order.
+    fn hit_test_element(element: &Element, x: i32, y: i32, offset_x: i32, offset_y: i32,
+                        pred: &dyn Fn(&dyn View) -> bool) -> Option<Element> {
         let view = element.borrow();
+        if view.get_visibility() != Visibility::Visible {
+            return None;
+        }
         let rect = view.get_rect();
         let abs_x = rect.min.x + offset_x;
         let abs_y = rect.min.y + offset_y;
-        let abs_max_x = rect.max.x + offset_x;
-        let abs_max_y = rect.max.y + offset_y;
-
-        if x < abs_x || x >= abs_max_x || y < abs_y || y >= abs_max_y {
+        if x < abs_x || x >= rect.max.x + offset_x || y < abs_y || y >= rect.max.y + offset_y {
             return None;
         }
 
         // Check children first (deepest match wins)
         if let Some(container) = view.as_container() {
             for child in container.get_views().iter().rev() {
-                if let Some(result) = Self::hit_test_tooltip(child, x, y, abs_x, abs_y) {
-                    return Some(result);
+                if let Some(found) = Self::hit_test_element(child, x, y, abs_x, abs_y, pred) {
+                    return Some(found);
                 }
             }
         }
 
-        // Then check this view
-        if let Some(tooltip) = view.get_tooltip() {
-            if !tooltip.is_empty() {
-                return Some((view.get_id(), tooltip));
+        if pred(&*view) {
+            return Some(Rc::clone(element));
+        }
+        None
+    }
+
+    /// Hit test honoring overlay semantics: the topmost non-Transparent
+    /// overlay containing the point confines the search to itself; Transparent
+    /// overlays (e.g. the notification stack) are searched but fall through
+    /// when nothing matches; when a non-Transparent overlay exists and the
+    /// point is in none of them, the root is NOT searched (the click would
+    /// dismiss the popup / be blocked by the modal).
+    fn hit_test_listener(&self, x: i32, y: i32, pred: &dyn Fn(&dyn View) -> bool) -> Option<Element> {
+        let mut blocked = false;
+        for entry in self.overlays.iter().rev() {
+            let found = Self::hit_test_element(&entry.element, x, y, entry.x, entry.y, pred);
+            if found.is_some() {
+                return found;
+            }
+            if entry.mode != PopupMode::Transparent {
+                blocked = true;
+                // Point inside this overlay but no match — confined, stop.
+                let rect = entry.element.borrow().get_rect();
+                if x >= rect.min.x + entry.x && x < rect.max.x + entry.x
+                    && y >= rect.min.y + entry.y && y < rect.max.y + entry.y {
+                    return None;
+                }
             }
         }
-
-        None
+        if blocked {
+            return None;
+        }
+        self.root.as_ref().and_then(|root| Self::hit_test_element(root, x, y, 0, 0, pred))
     }
 
     fn update_tooltip(&mut self) -> bool {
@@ -781,7 +901,11 @@ impl UI {
         }
 
         let hit = self.root.as_ref().and_then(|root| {
-            Self::hit_test_tooltip(root, self.mouse_pos.x, self.mouse_pos.y, 0, 0)
+            Self::hit_test_element(root, self.mouse_pos.x, self.mouse_pos.y, 0, 0,
+                &|v| v.get_tooltip().map(|t| !t.is_empty()).unwrap_or(false))
+        }).map(|el| {
+            let view = el.borrow();
+            (view.get_id(), view.get_tooltip().unwrap_or_default())
         });
 
         match hit {
@@ -880,6 +1004,12 @@ impl UI {
         // Re-evaluate the cursor from scratch each move: views over a link
         // re-request `Pointer` during dispatch; anything left is the default.
         self.requested_cursor = None;
+        let mut redraw = self.dispatch_mouse_move(position);
+        redraw |= self.sync_hover();
+        redraw
+    }
+
+    fn dispatch_mouse_move(&mut self, position: Vector2<i32>) -> bool {
         // Dispatch to overlays first (reverse order = topmost first)
         let entries: Vec<(Element, i32, i32)> = self.overlays.iter().rev()
             .map(|e| (Rc::clone(&e.element), e.x, e.y))
@@ -898,6 +1028,36 @@ impl UI {
             None => false,
             Some(root) => root.borrow().on_mouse_move(self, position),
         }
+    }
+
+    /// Detects which view with a hover listener is under the cursor and fires
+    /// `HoverExit` / `HoverEnter` on ownership changes. Tracked centrally
+    /// because `Frame` dispatches moves to all children and views update their
+    /// visual `hovered` state at their own transition points — one tracker
+    /// covers every view (including containers) with zero per-view code.
+    /// Note: the mouse leaving the window fires no event (no leave
+    /// notification from the window system), and a popup opening over the
+    /// hovered view defers `HoverExit` to the next mouse move.
+    fn sync_hover(&mut self) -> bool {
+        let target = self.hit_test_listener(self.mouse_pos.x, self.mouse_pos.y,
+            &|v| v.is_enabled() && (v.has_listener(EventType::HoverEnter) || v.has_listener(EventType::HoverExit)));
+        let new_id = target.as_ref().map(|el| el.borrow().get_id());
+        if new_id == self.hover_owner {
+            return false;
+        }
+        let old = std::mem::replace(&mut self.hover_owner, new_id);
+        let mut redraw = false;
+        if let Some(old_id) = old {
+            let el = self.get_view(&old_id);
+            if let Some(el) = el {
+                redraw |= el.borrow().fire_event(self, EventType::HoverExit, &EventData::None);
+            }
+        }
+        if let Some(el) = target {
+            let data = EventData::Position { x: self.mouse_pos.x, y: self.mouse_pos.y };
+            redraw |= el.borrow().fire_event(self, EventType::HoverEnter, &data);
+        }
+        redraw
     }
 
     /// Requests a cursor shape for the current `on_mouse_move` dispatch. Called
@@ -930,8 +1090,121 @@ impl UI {
         self.pending_palette.take()
     }
 
+    /// Queues a new OS window with its own UI. Safe to call from event
+    /// handlers; the window opens on the next update tick (within ~16 ms).
+    pub fn open_window(&mut self, request: WindowRequest) {
+        self.window_requests.push(request);
+    }
+
+    pub fn take_window_requests(&mut self) -> Vec<WindowRequest> {
+        std::mem::take(&mut self.window_requests)
+    }
+
+    /// Requests closing this UI's window. Safe to call from event handlers.
+    /// Closing the main window exits the application.
+    pub fn close_window(&mut self) {
+        self.close_requested = true;
+    }
+
+    pub fn take_close_request(&mut self) -> bool {
+        std::mem::replace(&mut self.close_requested, false)
+    }
+
     pub fn on_mouse_button_down(&mut self, position: Vector2<i32>, button: MouseButton) -> bool {
         self.dismiss_tooltip();
+        // Double-click bookkeeping (left button only). The target is the
+        // deepest view under the cursor with a DoubleClick listener; the
+        // event fires only when both clicks land on the same target.
+        let dc_target = self.hit_test_listener(position.x, position.y,
+            &|v| v.is_enabled() && v.has_listener(EventType::DoubleClick))
+            .map(|el| el.borrow().get_id());
+        let is_double = matches!(button, MouseButton::Left)
+            && dc_target.is_some()
+            && self.last_click.as_ref().is_some_and(|(t, p, id)|
+                t.elapsed().as_millis() < DOUBLE_CLICK_MS
+                && (p.x - position.x).abs() <= DOUBLE_CLICK_DISTANCE
+                && (p.y - position.y).abs() <= DOUBLE_CLICK_DISTANCE
+                && *id == dc_target);
+        // Reset after a double so a triple click fires exactly one event.
+        self.last_click = if is_double || !matches!(button, MouseButton::Left) {
+            None
+        } else {
+            Some((Instant::now(), position, dc_target.clone()))
+        };
+        // ContextMenu fires BEFORE dispatch so a consuming handler can
+        // suppress the built-in menus that open during dispatch.
+        if matches!(button, MouseButton::Right) {
+            let target = self.hit_test_listener(position.x, position.y,
+                &|v| v.is_enabled() && v.has_listener(EventType::ContextMenu));
+            if let Some(el) = target {
+                let data = EventData::Position { x: position.x, y: position.y };
+                self.context_menu_suppressed = el.borrow().fire_event(self, EventType::ContextMenu, &data);
+            }
+        }
+        let mut redraw = self.dispatch_mouse_button_down(position, button);
+        self.context_menu_suppressed = false;
+        if is_double {
+            // Fire after dispatch: focus/press behavior is already applied.
+            if let Some(id) = dc_target {
+                let el = self.get_view(&id);
+                if let Some(el) = el {
+                    let data = EventData::Position { x: position.x, y: position.y };
+                    redraw |= el.borrow().fire_event(self, EventType::DoubleClick, &data);
+                }
+            }
+        }
+        redraw |= self.sync_focus();
+        redraw
+    }
+
+    /// True while dispatching a right-click whose `ContextMenu` listener
+    /// consumed the event. Views with built-in context menus check this
+    /// before opening them.
+    pub fn context_menu_suppressed(&self) -> bool {
+        self.context_menu_suppressed
+    }
+
+    /// Registers an application-wide keyboard accelerator from a string like
+    /// `"Ctrl+Shift+S"`, `"F5"` or `"Alt+Enter"` (see [`Shortcut`]).
+    /// Shortcuts fire only when the key-down was not consumed by the focused
+    /// view or an overlay (local context wins over global accelerators), and
+    /// never while a modal dialog is open. Re-registering the same shortcut
+    /// replaces the handler. Prints an error and ignores unparsable strings.
+    pub fn add_shortcut(&mut self, accel: &str, handler: Box<dyn FnMut(&mut UI) -> bool>) {
+        match accel.parse::<Shortcut>() {
+            Ok(shortcut) => self.add_shortcut_keys(shortcut, handler),
+            Err(e) => eprintln!("Bad shortcut: {}", e),
+        }
+    }
+
+    /// Registers an application-wide keyboard accelerator from a typed
+    /// [`Shortcut`]. See [`UI::add_shortcut`] for dispatch semantics.
+    pub fn add_shortcut_keys(&mut self, shortcut: Shortcut, handler: Box<dyn FnMut(&mut UI) -> bool>) {
+        self.shortcuts.insert(shortcut, handler);
+    }
+
+    /// Removes the accelerator registered for the given string, if any.
+    pub fn remove_shortcut(&mut self, accel: &str) {
+        if let Ok(shortcut) = accel.parse::<Shortcut>() {
+            self.shortcuts.remove(&shortcut);
+        }
+    }
+
+    /// Fires the handler registered for this key/modifier combination. The
+    /// handler runs with its entry taken out of the registry (so a shortcut
+    /// cannot recursively fire itself) and is put back afterwards unless the
+    /// handler registered a replacement.
+    fn fire_shortcut(&mut self, code: VirtualKeyCode, modifiers: &ModifiersState) -> bool {
+        let shortcut = Shortcut::from_state(code, modifiers);
+        if let Some(mut handler) = self.shortcuts.remove(&shortcut) {
+            let result = handler(self);
+            self.shortcuts.entry(shortcut).or_insert(handler);
+            return result;
+        }
+        false
+    }
+
+    fn dispatch_mouse_button_down(&mut self, position: Vector2<i32>, button: MouseButton) -> bool {
         // Dispatch to overlays first
         let entries: Vec<(Element, i32, i32)> = self.overlays.iter().rev()
             .map(|e| (Rc::clone(&e.element), e.x, e.y))
@@ -944,7 +1217,9 @@ impl UI {
         }
         // Click missed all overlays — dismiss Popup-mode overlays only.
         // Transparent overlays (e.g. notification stack) let the click fall through.
-        if self.overlays.iter().any(|e| e.mode == PopupMode::Popup) {
+        // Skipped when a ContextMenu handler consumed this right-click, so a
+        // menu the handler just opened is not immediately dismissed.
+        if !self.context_menu_suppressed && self.overlays.iter().any(|e| e.mode == PopupMode::Popup) {
             self.close_all_popups();
             return true;
         }
@@ -996,6 +1271,41 @@ impl UI {
     }
 
     pub fn on_key_down(&mut self, virtual_key_code: Option<VirtualKeyCode>, scancode: KeyScancode, modifiers: ModifiersState) -> bool {
+        // A user KeyDown listener on the focused view runs BEFORE built-in
+        // handling, so apps can intercept keys the view would otherwise
+        // consume; returning false falls through to normal behavior.
+        // Skipped under a modal overlay: the focus owner belongs to the
+        // blocked root tree there.
+        if !self.has_modal_overlay() {
+            let focused = match &self.focus_owner {
+                Some(id) => self.get_view(id),
+                None => None,
+            };
+            if let Some(el) = focused {
+                let has = el.borrow().has_listener(EventType::KeyDown);
+                if has {
+                    let data = EventData::Key { code: virtual_key_code, modifiers: modifiers.clone() };
+                    if el.borrow().fire_event(self, EventType::KeyDown, &data) {
+                        self.sync_focus();
+                        return true;
+                    }
+                }
+            }
+        }
+        let mut consumed = self.dispatch_key_down(virtual_key_code, scancode, modifiers.clone());
+        // Global shortcuts are a fallback: anything the focused view or an
+        // overlay consumed (e.g. Ctrl+Z in an Edit) keeps priority. Blocked
+        // while a modal dialog is open.
+        if !consumed && !self.has_modal_overlay() {
+            if let Some(code) = virtual_key_code {
+                consumed = self.fire_shortcut(code, &modifiers);
+            }
+        }
+        self.sync_focus();
+        consumed
+    }
+
+    fn dispatch_key_down(&mut self, virtual_key_code: Option<VirtualKeyCode>, scancode: KeyScancode, modifiers: ModifiersState) -> bool {
         // Dispatch to overlays first (reverse order)
         let elements: Vec<Element> = self.overlays.iter().rev()
             .map(|e| Rc::clone(&e.element))
@@ -1035,6 +1345,12 @@ impl UI {
     }
 
     pub fn on_key_char(&mut self, unicode_codepoint: char, modifiers: ModifiersState) -> bool {
+        let consumed = self.dispatch_key_char(unicode_codepoint, modifiers);
+        self.sync_focus();
+        consumed
+    }
+
+    fn dispatch_key_char(&mut self, unicode_codepoint: char, modifiers: ModifiersState) -> bool {
         let elements: Vec<Element> = self.overlays.iter().rev()
             .map(|e| Rc::clone(&e.element))
             .collect();

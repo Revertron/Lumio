@@ -38,7 +38,7 @@ fn main() {
 
     // "Toggle Enable" — toggles enabled state on target views
     if let Some(btn) = ui.get_view("btn_toggle_enable") {
-        btn.borrow_mut().on_event(EventType::Click, Box::new(|ui, _view| {
+        btn.borrow_mut().on_event(EventType::Click, Box::new(|ui, _view, _data| {
             let ids = ["target_btn", "target_cb", "target_edit", "target_rb1", "target_rb2"];
             let mut new_enabled = true;
             // Read current state from the first target
@@ -63,7 +63,7 @@ fn main() {
 
     // "Hide" — sets target views to Hidden (still occupy layout space)
     if let Some(btn) = ui.get_view("btn_hide") {
-        btn.borrow_mut().on_event(EventType::Click, Box::new(|ui, _view| {
+        btn.borrow_mut().on_event(EventType::Click, Box::new(|ui, _view, _data| {
             let ids = ["target_btn", "target_cb", "target_edit", "target_rb1", "target_rb2"];
             for id in &ids {
                 if let Some(v) = ui.get_view(id) {
@@ -81,7 +81,7 @@ fn main() {
 
     // "Gone" — sets target views to Gone (no layout space)
     if let Some(btn) = ui.get_view("btn_gone") {
-        btn.borrow_mut().on_event(EventType::Click, Box::new(|ui, _view| {
+        btn.borrow_mut().on_event(EventType::Click, Box::new(|ui, _view, _data| {
             let ids = ["target_btn", "target_cb", "target_edit", "target_rb1", "target_rb2"];
             for id in &ids {
                 if let Some(v) = ui.get_view(id) {
@@ -101,7 +101,7 @@ fn main() {
 
     // "Show" — sets target views back to Visible
     if let Some(btn) = ui.get_view("btn_show") {
-        btn.borrow_mut().on_event(EventType::Click, Box::new(|ui, _view| {
+        btn.borrow_mut().on_event(EventType::Click, Box::new(|ui, _view, _data| {
             let ids = ["target_btn", "target_cb", "target_edit", "target_rb1", "target_rb2"];
             for id in &ids {
                 if let Some(v) = ui.get_view(id) {
@@ -120,7 +120,7 @@ fn main() {
 
     // Target button click — proves it only fires when enabled & visible
     if let Some(btn) = ui.get_view("target_btn") {
-        btn.borrow_mut().on_event(EventType::Click, Box::new(|ui, _view| {
+        btn.borrow_mut().on_event(EventType::Click, Box::new(|ui, _view, _data| {
             if let Some(label) = ui.get_view("status_label") {
                 if let Some(l) = label.borrow_mut().downcast_mut::<Label>() {
                     l.set_text("Target Button was clicked!");
@@ -132,7 +132,7 @@ fn main() {
 
     // Disabled button click — should never fire
     if let Some(btn) = ui.get_view("disabled_btn") {
-        btn.borrow_mut().on_event(EventType::Click, Box::new(|_ui, _view| {
+        btn.borrow_mut().on_event(EventType::Click, Box::new(|_ui, _view, _data| {
             println!("BUG: disabled button was clicked!");
             true
         }));

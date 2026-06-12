@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use speedy2d::dimen::Vector2;
@@ -7,7 +6,7 @@ use speedy2d::font::{FormattedTextBlock, TextAlignment, TextLayout, TextOptions}
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
 
 use crate::assets::{get_asset, get_font_family};
-use crate::events::EventType;
+use crate::events::{EventCallback, EventData, EventType};
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
@@ -37,6 +36,8 @@ pub struct DialogButton {
     pub text: String,
     pub side: ButtonSide,
     pub is_default: bool,
+    /// Pressed when the user hits Escape (see [`Dialog::set_cancel_button`]).
+    pub is_cancel: bool,
 }
 
 pub struct Dialog {
@@ -51,7 +52,6 @@ pub struct Dialog {
     buttons: Vec<DialogButton>,
     button_views: Vec<Element>,
     pressed_button: RefCell<Option<String>>,
-    listeners: RefCell<HashMap<EventType, Box<dyn FnMut(&mut UI, &dyn View) -> bool>>>,
 }
 
 impl HasMainFields for Dialog {
@@ -78,7 +78,6 @@ impl Dialog {
             buttons: Vec::new(),
             button_views: Vec::new(),
             pressed_button: RefCell::new(None),
-            listeners: RefCell::new(HashMap::new()),
         }
     }
 
@@ -102,10 +101,20 @@ impl Dialog {
             text: text.to_owned(),
             side,
             is_default,
+            is_cancel: false,
         });
         let btn = Button::new(rect((0, 0), (60, 24)), text, crate::drawing::current_text_size("button"));
         let element: Element = Rc::new(RefCell::new(btn));
         self.button_views.push(element);
+    }
+
+    /// Marks the button with the given id as the cancel button: pressing
+    /// Escape presses it (firing the dialog's Click handler) instead of just
+    /// closing the dialog. Clears the flag from any other button.
+    pub fn set_cancel_button(&mut self, id: &str) {
+        for b in self.buttons.iter_mut() {
+            b.is_cancel = b.id == id;
+        }
     }
 
     /// Returns the id of the button that was clicked.
@@ -200,6 +209,27 @@ impl Dialog {
             return true;
         }
         false
+    }
+
+    /// Press the button flagged `is_default`, if any.
+    fn click_default_button(&self, ui: &mut UI) -> bool {
+        if let Some(idx) = self.buttons.iter().position(|b| b.is_default) {
+            *self.pressed_button.borrow_mut() = Some(self.buttons[idx].id.clone());
+            self.click(ui);
+            return true;
+        }
+        false
+    }
+
+    /// Press the button flagged `is_cancel`; with none set, just close.
+    fn click_cancel_button(&self, ui: &mut UI) -> bool {
+        if let Some(idx) = self.buttons.iter().position(|b| b.is_cancel) {
+            *self.pressed_button.borrow_mut() = Some(self.buttons[idx].id.clone());
+            self.click(ui);
+        } else {
+            self.close(ui);
+        }
+        true
     }
 }
 
@@ -528,19 +558,21 @@ impl View for Dialog {
         self.base_set_visibility(visibility);
     }
 
-    fn on_event(&mut self, event: EventType, func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {
-        self.listeners.borrow_mut().insert(event, func);
+    fn on_event(&mut self, event: EventType, func: EventCallback) {
+        self.base_on_event(event, func);
+    }
+
+    fn has_listener(&self, event: EventType) -> bool {
+        self.base_has_listener(event)
+    }
+
+    fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool {
+        self.base_fire_event(ui, event, data)
     }
 
     fn click(&self, ui: &mut UI) -> bool {
         if !self.base_is_enabled() { return false; }
-        let listener = self.listeners.borrow_mut().remove(&EventType::Click);
-        if let Some(mut click) = listener {
-            let result = click(ui, self as &dyn View);
-            self.listeners.borrow_mut().insert(EventType::Click, click);
-            return result;
-        }
-        false
+        self.base_fire_event(ui, EventType::Click, &EventData::None)
     }
 
     fn on_mouse_move(&self, _ui: &mut UI, position: Vector2<i32>) -> bool {
@@ -608,7 +640,12 @@ impl View for Dialog {
                 true
             }
             Some(VirtualKeyCode::Return) | Some(VirtualKeyCode::NumpadEnter) => {
-                self.click_focused_button(ui)
+                // Focused button wins; with no button focused, Enter means
+                // the default button.
+                self.click_focused_button(ui) || self.click_default_button(ui)
+            }
+            Some(VirtualKeyCode::Escape) => {
+                self.click_cancel_button(ui)
             }
             _ => false,
         }

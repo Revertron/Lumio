@@ -5,7 +5,7 @@ use std::rc::Rc;
 use include_dir::{Dir, include_dir};
 use speedy2d::dimen::Vector2;
 use speedy2d::Window;
-use speedy2d::window::{WindowCreationOptions, WindowPosition, WindowSize};
+use speedy2d::window::{VirtualKeyCode, WindowCreationOptions, WindowPosition, WindowSize};
 
 use lumio::prelude::*;
 
@@ -121,7 +121,7 @@ fn main() {
     }
 
     if let Some(button) = ui.get_view("btn3") {
-        button.borrow_mut().on_event(EventType::Click, Box::new(|ui, _view| {
+        button.borrow_mut().on_event(EventType::Click, Box::new(|ui, _view, _data| {
             let menu_element = ui.create("PopupMenu");
             {
                 let mut menu = menu_element.borrow_mut();
@@ -129,7 +129,7 @@ fn main() {
                 popup.add_item("cut", "icons/cut.png", "Cut");
                 popup.add_item("copy", "icons/copy.png", "Copy");
                 popup.add_item("paste", "icons/paste.png", "Paste");
-                popup.on_event(EventType::Click, Box::new(|_ui, view| {
+                popup.on_event(EventType::Click, Box::new(|_ui, view, _data| {
                     let popup = view.as_any().downcast_ref::<PopupMenu>().unwrap();
                     if let Some(index) = popup.get_hovered_index() {
                         println!("Selected item: {}", index);
@@ -144,7 +144,7 @@ fn main() {
     }
 
     if let Some(button) = ui.get_view("btn9") {
-        button.borrow_mut().on_event(EventType::Click, Box::new(|ui, _view| {
+        button.borrow_mut().on_event(EventType::Click, Box::new(|ui, _view, _data| {
             let dlg: Element = Rc::new(RefCell::new(Dialog::new()));
             {
                 let mut d = dlg.borrow_mut();
@@ -154,7 +154,10 @@ fn main() {
                 dialog.add_button("yes", "Yes", ButtonSide::Right, true);
                 dialog.add_button("no", "No", ButtonSide::Right, false);
                 dialog.add_button("help", "Help", ButtonSide::Left, false);
-                dialog.on_event(EventType::Click, Box::new(|ui, view| {
+                // Esc now presses "No" instead of just closing the dialog;
+                // Enter presses the focused (or default) button.
+                dialog.set_cancel_button("no");
+                dialog.on_event(EventType::Click, Box::new(|ui, view, _data| {
                     let d = view.as_any().downcast_ref::<Dialog>().unwrap();
                     println!("Pressed: {:?}", d.get_pressed_button());
                     d.close(ui);
@@ -169,7 +172,7 @@ fn main() {
     }
 
     if let Some(check) = ui.get_view("dark_mode") {
-        check.borrow_mut().on_event(EventType::CheckedChanged, Box::new(|ui, view| {
+        check.borrow_mut().on_event(EventType::CheckedChanged, Box::new(|ui, view, _data| {
             let dark = view.as_any().downcast_ref::<CheckBox>().map(|c| c.is_checked()).unwrap_or(false);
             ui.set_palette(if dark { Palette::dark() } else { Palette::classic() });
             true
@@ -177,11 +180,103 @@ fn main() {
     }
 
     if let Some(image) = ui.get_view("my_image") {
-        image.borrow_mut().on_event(EventType::Click, Box::new(|_ui, _view| {
+        image.borrow_mut().on_event(EventType::Click, Box::new(|_ui, _view, _data| {
             println!("Image clicked!");
             true
         }));
     }
+
+    // --- Event-system demos: focus, hover, double-click, key-down, context menu ---
+
+    if let Some(edit) = ui.get_view("edit1") {
+        let mut edit = edit.borrow_mut();
+        // Validate-on-blur: an empty edit1 shows the error underline.
+        edit.on_event(EventType::FocusLost, Box::new(|_ui, view, _data| {
+            let edit = view.as_any().downcast_ref::<Edit>().unwrap();
+            let empty = edit.get_text().is_empty();
+            edit.set_error(empty);
+            println!("edit1 lost focus (empty = {})", empty);
+            true
+        }));
+        edit.on_event(EventType::FocusGained, Box::new(|_ui, view, _data| {
+            let edit = view.as_any().downcast_ref::<Edit>().unwrap();
+            edit.set_error(false);
+            println!("edit1 gained focus");
+            true
+        }));
+        // KeyDown runs before the Edit's own handling: F2 is intercepted
+        // (returns true), everything else falls through and types normally.
+        edit.on_event(EventType::KeyDown, Box::new(|_ui, _view, data| {
+            if let EventData::Key { code, modifiers } = data {
+                println!("edit1 key: {:?} (ctrl = {})", code, modifiers.ctrl());
+                if *code == Some(VirtualKeyCode::F2) {
+                    println!("F2 intercepted by the KeyDown listener");
+                    return true;
+                }
+            }
+            false
+        }));
+        // Returning true suppresses the built-in Cut/Copy/Paste menu.
+        edit.on_event(EventType::ContextMenu, Box::new(|ui, _view, data| {
+            let menu_element = ui.create("PopupMenu");
+            {
+                let mut menu = menu_element.borrow_mut();
+                let popup = menu.downcast_mut::<PopupMenu>().unwrap();
+                popup.add_item("custom1", "", "Custom menu");
+                popup.add_item("custom2", "", "replacing the built-in one");
+            }
+            if let EventData::Position { x, y } = data {
+                ui.show_popup(menu_element, *x, *y, PopupDirection::BottomRight, PopupMode::Popup);
+            }
+            true
+        }));
+    }
+
+    if let Some(button) = ui.get_view("btn1") {
+        let mut button = button.borrow_mut();
+        button.on_event(EventType::HoverEnter, Box::new(|ui, _view, _data| {
+            set_status(ui, "Hovering Button 1");
+            true
+        }));
+        button.on_event(EventType::HoverExit, Box::new(|ui, _view, _data| {
+            set_status(ui, "Ready");
+            true
+        }));
+    }
+
+    if let Some(label) = ui.get_view("label1") {
+        label.borrow_mut().on_event(EventType::DoubleClick, Box::new(|_ui, _view, data| {
+            println!("label1 double-clicked at {:?}", data);
+            true
+        }));
+    }
+
+    // A view without any built-in context menu gets one via the event.
+    if let Some(button) = ui.get_view("btn2") {
+        button.borrow_mut().on_event(EventType::ContextMenu, Box::new(|ui, _view, data| {
+            let menu_element = ui.create("PopupMenu");
+            {
+                let mut menu = menu_element.borrow_mut();
+                let popup = menu.downcast_mut::<PopupMenu>().unwrap();
+                popup.add_item("action_a", "", "Button 2 action A");
+                popup.add_item("action_b", "", "Button 2 action B");
+            }
+            if let EventData::Position { x, y } = data {
+                ui.show_popup(menu_element, *x, *y, PopupDirection::BottomRight, PopupMode::Popup);
+            }
+            true
+        }));
+    }
+
+    // Global accelerators: fire when the focused view did not consume the key.
+    ui.add_shortcut("Ctrl+Shift+S", Box::new(|_ui| {
+        println!("Ctrl+Shift+S shortcut fired");
+        true
+    }));
+    ui.add_shortcut("F5", Box::new(|_ui| {
+        println!("F5 shortcut fired");
+        true
+    }));
 
     ui.on_start(Box::new(on_start));
 
@@ -193,7 +288,7 @@ fn main() {
     window.run_loop(win);
 }
 
-fn button1_click(ui: &mut UI, view: &dyn View) -> bool {
+fn button1_click(ui: &mut UI, view: &dyn View, _data: &EventData) -> bool {
     let mut checked = false;
     if let Some(checkbox) = ui.get_view("checkbox1") {
         if let Some(ch) = checkbox.borrow_mut().downcast_mut::<CheckBox>() {
@@ -214,7 +309,7 @@ fn button1_click(ui: &mut UI, view: &dyn View) -> bool {
     true
 }
 
-fn button2_click(ui: &mut UI, _view: &dyn View) -> bool {
+fn button2_click(ui: &mut UI, _view: &dyn View, _data: &EventData) -> bool {
     let mut buf = Vec::new();
     for i in 1..=20 {
         buf.push(format!("New item {}", i));
@@ -222,6 +317,14 @@ fn button2_click(ui: &mut UI, _view: &dyn View) -> bool {
     // Set items for list
     set_items_for_list1(ui, buf);
     true
+}
+
+fn set_status(ui: &mut UI, text: &str) {
+    if let Some(sb) = ui.get_view("statusbar") {
+        if let Some(statusbar) = sb.borrow_mut().downcast_mut::<StatusBar>() {
+            statusbar.set_section_text("status", text);
+        }
+    }
 }
 
 fn set_items_for_list1(ui: &mut UI, buf: Vec<String>) {

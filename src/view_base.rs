@@ -1,8 +1,10 @@
 use std::cell::RefCell;
+use crate::events::{EventCallback, EventData, EventType};
 use crate::styles::selector::{DrawState, MainSelector};
 use crate::themes::{FontStyle, Typeface, ViewState};
-use crate::traits::{Element, WeakElement};
+use crate::traits::{Element, View, WeakElement};
 use crate::types::Rect;
+use crate::ui::UI;
 use crate::views::{Borders, Dimension, Dock, FieldsMain, Gravity, LayoutParams, Visibility};
 
 /// Manages font/typeface inheritance and manipulation
@@ -256,6 +258,33 @@ pub trait ViewBasics: HasMainFields {
 
     fn base_set_gravity(&self, gravity: Gravity) {
         self.main_fields().borrow_mut().gravity = gravity;
+    }
+
+    fn base_on_event(&self, event: EventType, func: EventCallback) {
+        self.main_fields().borrow_mut().listeners.insert(event, func);
+    }
+
+    fn base_has_listener(&self, event: EventType) -> bool {
+        self.main_fields().borrow().listeners.contains_key(&event)
+    }
+
+    /// Fires the listener registered for `event`, if any. The handler runs
+    /// with the listener taken out of the map (so an event cannot recursively
+    /// fire itself) and is put back afterwards unless the handler registered
+    /// a replacement. The handler must NOT `borrow_mut` this view (the caller
+    /// may hold an immutable borrow of the element); it mutates the view via
+    /// the `&dyn View` argument and `&self` setters.
+    fn base_fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool
+        where Self: View + Sized
+    {
+        let handler = self.main_fields().borrow_mut().listeners.remove(&event);
+        if let Some(mut handler) = handler {
+            let result = handler(ui, self as &dyn View, data);
+            self.main_fields().borrow_mut().listeners.entry(event).or_insert(handler);
+            result
+        } else {
+            false
+        }
     }
 
     fn base_get_layout_params(&self) -> LayoutParams {

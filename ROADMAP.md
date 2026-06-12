@@ -65,20 +65,28 @@ All contained within the two views.
 - **Tri-state CheckBox** (indeterminate).
 - **Editable / filtering ComboBox** (type-to-filter, autocomplete).
 
-### 4. Event-system gaps
+### 4. Event-system gaps — DONE
 
-Add to `EventType`:
+Implemented 2026-06: listeners centralized in `FieldsMain` (every view,
+including Frame, accepts `on_event`), callbacks now receive a universal
+`&EventData` payload (`Checked`/`Selected`/`Position`/`Key`).
 
-- `FocusGained` / `FocusLost` (validate-on-blur).
-- `HoverEnter` / `HoverExit`.
-- `DoubleClick` — detection already exists inside Edit; promote it.
-- `KeyDown` exposure to user code.
-- Trait-level `ContextMenu` event (right-click is currently swallowed by
-  Edit's hardcoded menu).
+- `FocusGained` / `FocusLost` — DONE: deferred `sync_focus()` sweep in UI,
+  catches mouse, keyboard and programmatic focus changes.
+- `HoverEnter` / `HoverExit` — DONE: central hit-test tracking in UI.
+- `DoubleClick` — DONE: central detection (400 ms / 4 px / same view);
+  Edit's internal word-select stays independent.
+- `KeyDown` — DONE: fires on the focused view before built-in handling;
+  returning true intercepts the key.
+- `ContextMenu` — DONE: fires before dispatch; a consuming handler
+  suppresses the built-in Edit/Memo/Label/RichText menus.
 
-Plus **keyboard accelerators**: a UI-level shortcut registry
-(`ui.add_shortcut(Ctrl+S, handler)`) and Enter/Esc default-button handling
-in Dialog.
+Keyboard accelerators — DONE: `ui.add_shortcut("Ctrl+Shift+S", handler)`
+(string or typed `Shortcut`), dispatched as a fallback after the focused
+view; blocked under modal dialogs. Dialog: Enter presses the focused/default
+button, Esc presses the cancel button (`set_cancel_button`) or closes; the
+window-level Esc policy moved from `on_keyboard_char` to after-dispatch
+`on_key_down`.
 
 ### 5. Documentation
 

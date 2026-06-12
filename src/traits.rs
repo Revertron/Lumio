@@ -3,7 +3,7 @@ use std::rc::{Rc, Weak};
 use downcast_rs::Downcast;
 use speedy2d::dimen::Vector2;
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
-use super::events::EventType;
+use super::events::{EventCallback, EventData, EventType};
 use super::ui::UI;
 use super::themes::{Theme, ViewState};
 use super::types::{Rect, Point};
@@ -151,7 +151,17 @@ pub trait View: Downcast {
     fn wants_raw_content(&self) -> bool { false }
 
     // Events and listeners
-    fn on_event(&mut self, event: EventType, func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>);
+    fn on_event(&mut self, event: EventType, func: EventCallback);
+    /// Whether a listener is registered for `event`.
+    #[allow(unused_variables)]
+    fn has_listener(&self, event: EventType) -> bool { false }
+    /// Fires the listener registered for `event`, if any; returns the
+    /// handler's result (`false` when no listener is registered).
+    /// INVARIANT: the dispatcher may hold this element's immutable `borrow()`
+    /// while the handler runs — handlers must NOT `borrow_mut` the firing
+    /// view; they mutate it via the `&dyn View` argument and `&self` setters.
+    #[allow(unused_variables)]
+    fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool { false }
     fn click(&self, ui: &mut UI) -> bool;
     #[allow(unused_variables)]
     fn update(&mut self, ui: &mut UI) -> bool { false }

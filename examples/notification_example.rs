@@ -75,7 +75,7 @@ fn make_toast(message: &str, bg: u32, border: u32) -> Element {
         b.set_width(Dimension::Dip(28));
         b.set_height(Dimension::Dip(28));
         b.set_margin(0, 8, 0, 0);
-        b.on_event(EventType::Click, Box::new(|ui, view| {
+        b.on_event(EventType::Click, Box::new(|ui, view, _data| {
             ui.dismiss_notification_for(view);
             true
         }));
@@ -106,37 +106,37 @@ fn main() {
     let ui = UI::from_xml(layout, WIDTH, HEIGHT, Classic::typeface(), 1.0).unwrap();
 
     if let Some(b) = ui.get_view("btn_info") {
-        b.borrow_mut().on_event(EventType::Click, Box::new(|ui, _| {
+        b.borrow_mut().on_event(EventType::Click, Box::new(|ui, _, _data| {
             push_toast(ui, "Heads up: this is an info notification.", COLOR_INFO, BORDER_INFO, Some(Duration::from_secs(4)));
             true
         }));
     }
     if let Some(b) = ui.get_view("btn_warn") {
-        b.borrow_mut().on_event(EventType::Click, Box::new(|ui, _| {
+        b.borrow_mut().on_event(EventType::Click, Box::new(|ui, _, _data| {
             push_toast(ui, "Warning: something might be off here.", COLOR_WARN, BORDER_WARN, Some(Duration::from_secs(5)));
             true
         }));
     }
     if let Some(b) = ui.get_view("btn_error") {
-        b.borrow_mut().on_event(EventType::Click, Box::new(|ui, _| {
+        b.borrow_mut().on_event(EventType::Click, Box::new(|ui, _, _data| {
             push_toast(ui, "Error: that didn't work — please retry.", COLOR_ERROR, BORDER_ERROR, Some(Duration::from_secs(6)));
             true
         }));
     }
     if let Some(b) = ui.get_view("btn_success") {
-        b.borrow_mut().on_event(EventType::Click, Box::new(|ui, _| {
+        b.borrow_mut().on_event(EventType::Click, Box::new(|ui, _, _data| {
             push_toast(ui, "Success: action completed.", COLOR_SUCCESS, BORDER_SUCCESS, Some(Duration::from_secs(3)));
             true
         }));
     }
     if let Some(b) = ui.get_view("btn_persist") {
-        b.borrow_mut().on_event(EventType::Click, Box::new(|ui, _| {
+        b.borrow_mut().on_event(EventType::Click, Box::new(|ui, _, _data| {
             push_toast(ui, "I won't auto-dismiss — click my X.", COLOR_INFO, BORDER_INFO, None);
             true
         }));
     }
     if let Some(b) = ui.get_view("btn_burst") {
-        b.borrow_mut().on_event(EventType::Click, Box::new(|ui, _| {
+        b.borrow_mut().on_event(EventType::Click, Box::new(|ui, _, _data| {
             for i in 1..=5 {
                 push_toast(ui, &format!("Burst notification #{}", i), COLOR_INFO, BORDER_INFO, Some(Duration::from_secs(2 + i)));
             }
@@ -144,13 +144,13 @@ fn main() {
         }));
     }
     if let Some(b) = ui.get_view("btn_clear") {
-        b.borrow_mut().on_event(EventType::Click, Box::new(|ui, _| {
+        b.borrow_mut().on_event(EventType::Click, Box::new(|ui, _, _data| {
             ui.dismiss_all_notifications();
             true
         }));
     }
     if let Some(b) = ui.get_view("btn_bg") {
-        b.borrow_mut().on_event(EventType::Click, Box::new(|ui, _| {
+        b.borrow_mut().on_event(EventType::Click, Box::new(|ui, _, _data| {
             BG_CLICKS.with(|c| c.set(c.get() + 1));
             let n = BG_CLICKS.with(|c| c.get());
             if let Some(label) = ui.get_view("count") {

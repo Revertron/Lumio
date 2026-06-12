@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 
@@ -8,7 +7,7 @@ use speedy2d::dimen::Vector2;
 use speedy2d::window::MouseButton;
 
 use crate::assets::get_asset;
-use crate::events::EventType;
+use crate::events::{EventCallback, EventData, EventType};
 use crate::svg;
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
@@ -32,7 +31,6 @@ pub struct ImageView {
     /// the tint's alpha — designed for monochrome icons whose shape lives
     /// in the alpha channel.
     tint: RefCell<Option<u32>>,
-    listeners: RefCell<HashMap<EventType, Box<dyn FnMut(&mut UI, &dyn View) -> bool>>>,
 }
 
 fn path_size_key(path: &str, w: u32, h: u32, tint: Option<u32>) -> u64 {
@@ -383,19 +381,21 @@ impl View for ImageView {
         self.base_set_visibility(visibility);
     }
 
-    fn on_event(&mut self, event: EventType, func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {
-        self.listeners.borrow_mut().insert(event, func);
+    fn on_event(&mut self, event: EventType, func: EventCallback) {
+        self.base_on_event(event, func);
+    }
+
+    fn has_listener(&self, event: EventType) -> bool {
+        self.base_has_listener(event)
+    }
+
+    fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool {
+        self.base_fire_event(ui, event, data)
     }
 
     fn click(&self, ui: &mut UI) -> bool {
         if !self.base_is_enabled() { return false; }
-        let listener = self.listeners.borrow_mut().remove(&EventType::Click);
-        if let Some(mut click) = listener {
-            let result = click(ui, self as &dyn View);
-            self.listeners.borrow_mut().insert(EventType::Click, click);
-            return result;
-        }
-        false
+        self.base_fire_event(ui, EventType::Click, &EventData::None)
     }
 
     fn on_mouse_move(&self, ui: &mut UI, position: Vector2<i32>) -> bool {
@@ -405,11 +405,8 @@ impl View for ImageView {
         let changed = self.state.borrow().state != old_state;
         // Fire MouseMove listener if hovered
         if hit {
-            let listener = self.listeners.borrow_mut().remove(&EventType::MouseMove);
-            if let Some(mut func) = listener {
-                func(ui, self as &dyn View);
-                self.listeners.borrow_mut().insert(EventType::MouseMove, func);
-            }
+            let pos = ui.get_mouse_pos();
+            self.base_fire_event(ui, EventType::MouseMove, &EventData::Position { x: pos.x, y: pos.y });
         }
         changed
     }
@@ -455,7 +452,6 @@ impl Default for ImageView {
             image_is_svg: RefCell::new(false),
             rasterized: RefCell::new(None),
             tint: RefCell::new(None),
-            listeners: RefCell::new(HashMap::new()),
         }
     }
 }

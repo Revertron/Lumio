@@ -1,0 +1,16 @@
+max_width = 140
+use_small_heuristics = "Max"
+
+use_field_init_shorthand = true
+unstable_features = true
+combine_control_expr = false
+condense_wildcard_suffixes = true
+error_on_line_overflow = true
+error_on_unformatted = true
+format_strings = false
+imports_layout = "HorizontalVertical"
+imports_granularity = "Module"
+group_imports = "StdExternalCrate"
+wrap_comments = false
+trailing_comma = "Never"
+brace_style = "SameLineWhere"

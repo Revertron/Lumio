@@ -33,7 +33,7 @@ fn main() {
     for id in ["chip1", "chip2"] {
         if let Some(el) = ui.get_view(id) {
             let id_owned = id.to_string();
-            el.borrow_mut().on_event(EventType::RightIconClick, Box::new(move |ui, _| {
+            el.borrow_mut().on_event(EventType::RightIconClick, Box::new(move |ui, _, _data| {
                 ui.remove_view(&id_owned);
                 if let Some(status) = ui.get_view("status") {
                     if let Some(s) = status.borrow_mut().downcast_mut::<Label>() {
@@ -47,7 +47,7 @@ fn main() {
     // chip3 — hide via Visibility::Gone (stays in the tree, just collapsed).
     // Useful when you want to bring it back later via `show()`.
     if let Some(el) = ui.get_view("chip3") {
-        el.borrow_mut().on_event(EventType::RightIconClick, Box::new(|ui, view| {
+        el.borrow_mut().on_event(EventType::RightIconClick, Box::new(|ui, view, _data| {
             if let Some(label) = view.as_any().downcast_ref::<Label>() {
                 label.hide();
             }
@@ -61,7 +61,7 @@ fn main() {
     }
 
     if let Some(el) = ui.get_view("tag_locked") {
-        el.borrow_mut().on_event(EventType::LeftIconClick, Box::new(|ui, _| {
+        el.borrow_mut().on_event(EventType::LeftIconClick, Box::new(|ui, _, _data| {
             if let Some(status) = ui.get_view("status") {
                 if let Some(label) = status.borrow_mut().downcast_mut::<Label>() {
                     label.set_text("Lock icon clicked");
@@ -72,7 +72,7 @@ fn main() {
     }
 
     if let Some(el) = ui.get_view("link_red") {
-        el.borrow_mut().on_event(EventType::Click, Box::new(|ui, _| {
+        el.borrow_mut().on_event(EventType::Click, Box::new(|ui, _, _data| {
             if let Some(status) = ui.get_view("status") {
                 if let Some(label) = status.borrow_mut().downcast_mut::<Label>() {
                     label.set_text("Red link clicked");

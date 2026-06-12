@@ -1,13 +1,12 @@
 use std::cell::{Cell, RefCell};
 use std::cmp::min;
-use std::collections::HashMap;
 
 use speedy2d::dimen::Vector2;
 use speedy2d::font::{FormattedTextBlock, TextLayout, TextOptions};
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
 
 use crate::assets::get_font_family;
-use crate::events::EventType;
+use crate::events::{EventCallback, EventData, EventType};
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Container, Element, View, WeakElement};
 use crate::types::{Point, Rect, point, rect};
@@ -143,8 +142,6 @@ pub struct TableView {
     header_press: Cell<Option<usize>>,
     header_hover: Cell<Option<usize>>,
 
-    listeners: RefCell<HashMap<EventType, Box<dyn FnMut(&mut UI, &dyn View) -> bool>>>,
-
     needs_relayout: Cell<bool>,
 }
 
@@ -187,7 +184,6 @@ impl TableView {
             drag_anchor_scroll: Cell::new(0),
             header_press: Cell::new(None),
             header_hover: Cell::new(None),
-            listeners: RefCell::new(HashMap::new()),
             needs_relayout: Cell::new(false),
         }
     }
@@ -739,11 +735,7 @@ impl TableView {
     }
 
     fn fire_click(&self, ui: &mut UI) {
-        let listener = self.listeners.borrow_mut().remove(&EventType::Click);
-        if let Some(mut cb) = listener {
-            cb(ui, self as &dyn View);
-            self.listeners.borrow_mut().insert(EventType::Click, cb);
-        }
+        self.base_fire_event(ui, EventType::Click, &EventData::None);
     }
 
     fn ensure_visible_display(&self, display_idx: usize) {
@@ -1117,8 +1109,16 @@ impl View for TableView {
     fn as_container(&self) -> Option<&dyn Container> { Some(self) }
     fn as_container_mut(&mut self) -> Option<&mut dyn Container> { Some(self) }
 
-    fn on_event(&mut self, event: EventType, func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {
-        self.listeners.borrow_mut().insert(event, func);
+    fn on_event(&mut self, event: EventType, func: EventCallback) {
+        self.base_on_event(event, func);
+    }
+
+    fn has_listener(&self, event: EventType) -> bool {
+        self.base_has_listener(event)
+    }
+
+    fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool {
+        self.base_fire_event(ui, event, data)
     }
 
     fn click(&self, ui: &mut UI) -> bool {
@@ -1532,7 +1532,9 @@ impl View for TableColumn {
     fn set_scale(&mut self, s: f64) { self.base_set_scale(s); }
     fn set_id(&mut self, id: &str) { self.base_set_id(id); }
     fn get_id(&self) -> String { self.base_get_id() }
-    fn on_event(&mut self, _event: EventType, _func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {}
+    fn on_event(&mut self, event: EventType, func: EventCallback) { self.base_on_event(event, func); }
+    fn has_listener(&self, event: EventType) -> bool { self.base_has_listener(event) }
+    fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool { self.base_fire_event(ui, event, data) }
     fn click(&self, _ui: &mut UI) -> bool { false }
 }
 
@@ -1587,7 +1589,9 @@ impl View for TableRow {
     fn get_id(&self) -> String { self.base_get_id() }
     fn as_container(&self) -> Option<&dyn Container> { Some(self) }
     fn as_container_mut(&mut self) -> Option<&mut dyn Container> { Some(self) }
-    fn on_event(&mut self, _event: EventType, _func: Box<dyn FnMut(&mut UI, &dyn View) -> bool>) {}
+    fn on_event(&mut self, event: EventType, func: EventCallback) { self.base_on_event(event, func); }
+    fn has_listener(&self, event: EventType) -> bool { self.base_has_listener(event) }
+    fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool { self.base_fire_event(ui, event, data) }
     fn click(&self, _ui: &mut UI) -> bool { false }
 }
 

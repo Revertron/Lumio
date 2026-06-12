@@ -24,14 +24,13 @@ pub mod richtext;
 pub mod menubar;
 
 use super::themes::{Typeface, ViewState};
-use super::traits::{View, WeakElement};
+use super::traits::WeakElement;
 use super::types::Rect;
 use speedy2d::font::FormattedTextBlock;
 use std::collections::HashMap;
 use std::str::FromStr;
 use super::common::random_string;
-use super::events::EventType;
-use super::ui::UI;
+use super::events::{EventCallback, EventType};
 use super::styles::selector::{MainSelector, FontSelector};
 use super::view_base::FontManager;
 pub use self::label::Label;
@@ -81,7 +80,8 @@ pub struct FieldsMain {
     pub font_manager: FontManager,
     pub tooltip: Option<String>,
     pub gravity: Gravity,
-    pub layout_params: LayoutParams
+    pub layout_params: LayoutParams,
+    pub listeners: HashMap<EventType, EventCallback>
 }
 
 impl FieldsMain {
@@ -106,7 +106,8 @@ impl FieldsMain {
             font_manager: FontManager::new(),
             tooltip: None,
             gravity: Gravity::default(),
-            layout_params: LayoutParams::default()
+            layout_params: LayoutParams::default(),
+            listeners: HashMap::new()
         }
     }
 
@@ -134,8 +135,7 @@ pub struct FieldsTexted {
     pub line_height: f32,
     pub single_line: bool,
     pub cached_text: Option<FormattedTextBlock>,
-    pub font: FontSelector,
-    pub listeners: HashMap<EventType, Box<dyn FnMut(&mut UI, &dyn View) -> bool>>
+    pub font: FontSelector
 }
 
 /// Represents padding (inner spaces) or margin (outer spaces) of any element.

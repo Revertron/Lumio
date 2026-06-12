@@ -226,7 +226,7 @@ fn main() {
 
     // Attach button click (placeholder)
     if let Some(btn) = ui.get_view("btn_attach") {
-        btn.borrow_mut().on_event(EventType::Click, Box::new(|_ui, _view| {
+        btn.borrow_mut().on_event(EventType::Click, Box::new(|_ui, _view, _data| {
             println!("Attach clicked");
             true
         }));
@@ -287,7 +287,7 @@ fn load_chat(ui: &mut UI, contact_name: &str) {
     }
 }
 
-fn on_send_click(ui: &mut UI, _view: &dyn View) -> bool {
+fn on_send_click(ui: &mut UI, _view: &dyn View, _data: &EventData) -> bool {
     // Read the message from the input field
     let text = {
         if let Some(edit) = ui.get_view("message_input") {
