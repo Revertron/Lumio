@@ -11,7 +11,6 @@ const HEIGHT: u32 = 420;
 const TITLE: &str = "Multi-window Demo";
 
 const MAIN_XML: &str = include_str!("multiwindow_example.xml");
-const DIALOG_XML: &str = include_str!("multiwindow_dialog.xml");
 const INFO_XML: &str = include_str!("multiwindow_info.xml");
 
 fn main() {
@@ -49,23 +48,30 @@ fn wire_main(ui: &mut UI) {
     }
 }
 
-/// Opens an application-modal dialog asking for a name. The result is
-/// written into the main window's `result_label`.
+/// Opens an application-modal input dialog asking for a name, using the
+/// `Dialog` builder. The result is written into the main window's
+/// `result_label`. Compare this with the hand-rolled `build_info_ui` below to
+/// see how much window/button boilerplate the builder removes.
 fn open_name_dialog(ui: &mut UI) {
-    // Captured into the OK handler below: cross-window view access works
+    // Captured into the result handler below: cross-window view access works
     // because all windows run on the same (event loop) thread.
     let result_label = ui.get_view("result_label");
 
-    let dlg = UI::from_xml(DIALOG_XML, 420, 170, Classic::typeface(), 1.0).unwrap();
-
-    if let Some(b) = dlg.get_view("ok_btn") {
-        b.borrow_mut().on_event(EventType::Click, Box::new(move |dlg_ui, _, _| {
-            let mut name = String::new();
-            if let Some(edit) = dlg_ui.get_view("name_edit") {
-                if let Some(e) = edit.borrow_mut().downcast_mut::<Edit>() {
-                    name = e.get_text();
-                }
+    Dialog::new("Enter your name")
+        .message("Enter your name:")
+        .input("name_edit", "")
+        .button("OK")
+        .button("Cancel")
+        .default_button("OK")
+        .cancel_button("Cancel")
+        .on_result(move |dlg_ui, pressed| {
+            if pressed != "OK" {
+                return;
             }
+            let mut name = dlg_ui
+                .get_view("name_edit")
+                .and_then(|e| e.borrow().downcast_ref::<Edit>().map(|e| e.get_text()))
+                .unwrap_or_default();
             if name.is_empty() {
                 name = "stranger".to_string();
             }
@@ -74,41 +80,8 @@ fn open_name_dialog(ui: &mut UI) {
                     l.set_text(&format!("Hello, {}!", name));
                 }
             }
-            dlg_ui.close_window();
-            true
-        }));
-    }
-
-    if let Some(b) = dlg.get_view("cancel_btn") {
-        b.borrow_mut().on_event(EventType::Click, Box::new(|dlg_ui, _, _| {
-            dlg_ui.close_window();
-            true
-        }));
-    }
-
-    // Modal windows stack: this one blocks the dialog (and the main window)
-    // until dismissed.
-    if let Some(b) = dlg.get_view("nested_btn") {
-        b.borrow_mut().on_event(EventType::Click, Box::new(|dlg_ui, _, _| {
-            let info = build_info_ui("A second modal on top of the first.\nOnly this window accepts input now.");
-            dlg_ui.open_window(WindowRequest {
-                title: "Nested modal".to_string(),
-                width: 380,
-                height: 160,
-                ui: info,
-                modal: true,
-            });
-            true
-        }));
-    }
-
-    ui.open_window(WindowRequest {
-        title: "Enter your name".to_string(),
-        width: 420,
-        height: 170,
-        ui: dlg,
-        modal: true,
-    });
+        })
+        .show(ui);
 }
 
 fn build_info_ui(message: &str) -> UI {

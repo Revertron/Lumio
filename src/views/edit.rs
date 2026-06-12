@@ -1058,7 +1058,13 @@ impl View for Edit {
     }
 
     fn layout_content(&mut self, x: i32, y: i32, width: i32, height: i32, typeface: &Typeface, scale: f64) -> Rect<i32> {
-        if self.state.borrow().cached_text.is_none() {
+        // Recompute the cached text when it's missing OR when the scale changed
+        // (rendered font size = text_size * scale). Without the scale check a
+        // view laid out once at one scale keeps stale, wrongly-sized glyphs —
+        // e.g. a dialog measured at scale 1.0 before its window opens at the
+        // display scale would render the Edit text half-size.
+        let stale_scale = self.state.borrow().main.scale != scale;
+        if self.state.borrow().cached_text.is_none() || stale_scale {
             let typeface = self.get_typeface(typeface);
             self.state.borrow_mut().main.font_manager.set(Some(typeface));
             self.base_set_scale(scale);

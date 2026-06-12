@@ -17,7 +17,7 @@ use super::traits::{Element, View};
 use super::types::Point;
 use super::themes::Typeface;
 
-use super::views::{Button, Edit, Label, CheckBox, RadioButton, ComboBox, ScrollView, ProgressBar, TabView, List, RecyclerView, ImageButton, ImageView, PopupMenu, Dialog, Separator, SplitPanel, StatusBar, Memo, NotificationStack, TableView, TableColumn, TableRow, Grid, RichText, MenuBar, Menu, MenuItemTag};
+use super::views::{Button, Edit, Label, CheckBox, RadioButton, ComboBox, ScrollView, ProgressBar, TabView, List, RecyclerView, ImageButton, ImageView, PopupMenu, Separator, SplitPanel, StatusBar, Memo, NotificationStack, TableView, TableColumn, TableRow, Grid, RichText, MenuBar, Menu, MenuItemTag};
 use super::views::{Dimension, Visibility};
 use std::time::Duration;
 
@@ -172,7 +172,6 @@ impl UI {
         ui.register::<ImageButton>("ImageButton");
         ui.register::<ImageView>("ImageView");
         ui.register::<PopupMenu>("PopupMenu");
-        ui.register::<Dialog>("Dialog");
         ui.register::<Separator>("Separator");
         ui.register::<SplitPanel>("SplitPanel");
         ui.register::<StatusBar>("StatusBar");
@@ -1108,6 +1107,54 @@ impl UI {
 
     pub fn take_close_request(&mut self) -> bool {
         std::mem::replace(&mut self.close_requested, false)
+    }
+
+    /// Opens a modal message dialog with a single "OK" button. Convenience
+    /// wrapper over [`crate::dialog::Dialog`].
+    pub fn show_message(&mut self, title: &str, message: &str) {
+        crate::dialog::Dialog::new(title)
+            .message(message)
+            .button("OK")
+            .default_button("OK")
+            .cancel_button("OK")
+            .show(self);
+    }
+
+    /// Opens a modal confirmation dialog with "OK" and "Cancel" buttons. The
+    /// callback receives `true` when OK was pressed, `false` on Cancel/Esc.
+    pub fn show_confirm(&mut self, title: &str, message: &str, mut on_result: impl FnMut(&mut UI, bool) + 'static) {
+        crate::dialog::Dialog::new(title)
+            .message(message)
+            .button("OK")
+            .button("Cancel")
+            .default_button("OK")
+            .cancel_button("Cancel")
+            .on_result(move |ui, pressed| on_result(ui, pressed == "OK"))
+            .show(self);
+    }
+
+    /// Opens a modal text-input dialog with "OK" and "Cancel" buttons. The
+    /// callback receives `Some(text)` when OK was pressed, `None` on Cancel/Esc.
+    pub fn show_input(&mut self, title: &str, prompt: &str, initial: &str, mut on_result: impl FnMut(&mut UI, Option<String>) + 'static) {
+        const INPUT_ID: &str = "dialog_input";
+        crate::dialog::Dialog::new(title)
+            .message(prompt)
+            .input(INPUT_ID, initial)
+            .button("OK")
+            .button("Cancel")
+            .default_button("OK")
+            .cancel_button("Cancel")
+            .on_result(move |ui, pressed| {
+                if pressed == "OK" {
+                    let text = ui.get_view(INPUT_ID)
+                        .and_then(|e| e.borrow().downcast_ref::<Edit>().map(|e| e.get_text()))
+                        .unwrap_or_default();
+                    on_result(ui, Some(text));
+                } else {
+                    on_result(ui, None);
+                }
+            })
+            .show(self);
     }
 
     pub fn on_mouse_button_down(&mut self, position: Vector2<i32>, button: MouseButton) -> bool {

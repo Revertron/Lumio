@@ -1,7 +1,5 @@
 #![windows_subsystem = "windows"]
 
-use std::cell::RefCell;
-use std::rc::Rc;
 use include_dir::{Dir, include_dir};
 use speedy2d::dimen::Vector2;
 use speedy2d::Window;
@@ -145,28 +143,18 @@ fn main() {
 
     if let Some(button) = ui.get_view("btn9") {
         button.borrow_mut().on_event(EventType::Click, Box::new(|ui, _view, _data| {
-            let dlg: Element = Rc::new(RefCell::new(Dialog::new()));
-            {
-                let mut d = dlg.borrow_mut();
-                let dialog = d.downcast_mut::<Dialog>().unwrap();
-                dialog.set_icon("icons/warning.png");
-                dialog.set_message("Are you sure you want to delete this file?");
-                dialog.add_button("yes", "Yes", ButtonSide::Right, true);
-                dialog.add_button("no", "No", ButtonSide::Right, false);
-                dialog.add_button("help", "Help", ButtonSide::Left, false);
-                // Esc now presses "No" instead of just closing the dialog;
-                // Enter presses the focused (or default) button.
-                dialog.set_cancel_button("no");
-                dialog.on_event(EventType::Click, Box::new(|ui, view, _data| {
-                    let d = view.as_any().downcast_ref::<Dialog>().unwrap();
-                    println!("Pressed: {:?}", d.get_pressed_button());
-                    d.close(ui);
-                    true
-                }));
-            }
-            let cx = (ui.get_width() / 2) as i32;
-            let cy = (ui.get_height() / 2) as i32;
-            ui.show_popup(dlg, cx, cy, PopupDirection::Center, PopupMode::Modal);
+            // The dialog is a real modal window now; Enter presses "Yes",
+            // Esc presses "No", and the result arrives in `on_result`.
+            Dialog::new("Delete file")
+                .icon("icons/alert-circle-outline.svg")
+                .message("Are you sure you want to delete this file?")
+                .button("Yes")
+                .button("No")
+                .button_id("help", "Help", ButtonSide::Left)
+                .default_button("Yes")
+                .cancel_button("No")
+                .on_result(|_ui, pressed| println!("Pressed: {}", pressed))
+                .show(ui);
             true
         }));
     }
