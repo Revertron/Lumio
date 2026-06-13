@@ -1,7 +1,8 @@
 # Lumio Evolution Roadmap
 
 A tiered plan for evolving Lumio from its current state (26 view types, 3 layout
-engines, one theme, single window) into a complete desktop GUI toolkit.
+engines, one theme with light/dark palettes, multi-window) into a complete
+desktop GUI toolkit.
 
 ## Current state
 
@@ -14,7 +15,8 @@ The gaps cluster into five areas:
 - **Theming is hardcoded** — one Win95-style theme, colors baked in as constants.
 - **Text input lacks table-stakes features** — no undo/redo, no password masking.
 - **Standard widgets missing** — MenuBar, Slider, TreeView, SpinEdit.
-- **Platform integration is thin** — no native dialogs, no IME, single window.
+- **Platform integration is thin** — no native OS file dialogs, no IME
+  (multi-window and in-app modal dialogs now done — see items 6 and Tier 3).
 - **Developer experience** — no docs, no XML includes, no hot reload, no tests.
 
 ---
@@ -33,10 +35,14 @@ typography) instead of a code module; the `Theme` trait shrinks to primitive
 drawing + resource lookup. Dark mode becomes a palette swap, new themes are
 XML-only, and `style=` / `@token` references become available in layout XML.
 
-- Runtime theme switching: `ui.set_theme()` + full relayout/redraw.
-- Pulls rogue hardcoded view colors (selection blue, placeholder gray, tooltip
-  yellow, TableView selection) into themed tokens.
-- Add a visible **focus indicator** (currently focus has no visual at all).
+- Runtime theme switching — DONE: `ui.set_palette(..)` swaps the palette and
+  triggers a full relayout/redraw (themes are palette-driven, so a palette swap
+  *is* a theme switch; there is one `Theme` impl).
+- Rogue hardcoded view colors (selection blue, placeholder gray, tooltip yellow,
+  TableView selection) pulled into palette tokens — DONE (`selection`,
+  `text_hint`, `tooltip_back`, `outline`, … in `src/drawing/palette.rs`).
+- Visible **focus indicator** — DONE: focus-state drawables + a `focus` palette
+  token.
 
 ### 2. Edit/Memo maturity — DONE
 
@@ -101,10 +107,13 @@ Gates everything else; cheap and high leverage:
 
 ## Tier 2 — Platform integration & polish
 
-### 6. Native dialogs and window control
+### 6. Native dialogs and window control — PARTIALLY DONE
 
-- File open/save and message boxes via the `rfd` crate (small, cross-platform,
-  the ecosystem standard) rather than hand-rolling.
+- In-app message/confirm/input dialogs — DONE 2026-06-12: `UI::show_message` /
+  `show_confirm` / `show_input` plus the `crate::dialog::Dialog` builder, built
+  on the multi-window support (auto-sized modal child window, Enter/Esc wired).
+- Native OS file open/save dialogs via the `rfd` crate (small, cross-platform,
+  the ecosystem standard) — still pending.
 - Window title/icon/min-size/fullscreen setters on `WindowHelper` — speedy2d is
   already vendored (cursor support), so the pattern is established.
 
@@ -154,8 +163,11 @@ Each deserves its own design discussion before committing.
   priority, this moves to Tier 1.)
 - **Accessibility via AccessKit** — the Rust ecosystem standard (egui, Bevy).
   Map the view tree to an accessibility tree. Significant but well-trodden.
-- **Multi-window** — `Win` wraps exactly one UI. Requires rework of the event
-  loop and the thread-local asset/font caches.
+- **Multi-window** — DONE 2026-06-12. `UI::open_window(WindowRequest{.., modal})`
+  / `UI::close_window()`; the vendored speedy2d was migrated to winit 0.30
+  `run_app` (`ApplicationHandler`), `WindowHelper::create_window` /
+  `create_modal_window` / `close_window`; per-window GL `make_current`, an
+  app-modal stack, and close-main-exits-app. Example `examples/multiwindow_example.rs`.
 - **i18n** — `@string/key` resolution in XML attributes against a locale table.
 - **Data binding / reactive models** — `{field}` expressions in XML with
   observable models. A big philosophical shift from the current imperative
