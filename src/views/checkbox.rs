@@ -161,7 +161,7 @@ impl View for CheckBox {
         let (new_width, _new_height) = self.calculate_size(max_width, max_height, scale);
         let single_line = self.state.borrow().single_line;
         self.layout_text(new_width, single_line, scale);
-        let (width, height) = self.calculate_full_size(scale);
+        let (width, height) = self.calculate_bounded_size(width, height, scale);
         let rect = rect((x, y), (x + width, y + height));
         self.set_rect(rect);
         rect

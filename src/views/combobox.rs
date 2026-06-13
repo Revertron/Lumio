@@ -243,7 +243,7 @@ impl View for ComboBox {
         let max_height = height.max(BUTTON_MIN_HEIGHT) - vertical;
         let (new_width, _new_height) = self.calculate_size(max_width, max_height, scale);
         self.layout_text(new_width, scale);
-        let (width, height) = self.calculate_full_size(scale);
+        let (width, height) = self.calculate_bounded_size(width, height, scale);
         let rect = rect((x, y), (x + width, y + height));
         self.set_rect(rect);
         rect

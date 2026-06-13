@@ -90,6 +90,26 @@ pub trait View: Downcast {
         };
         (width, height)
     }
+    /// Resolve the final laid-out size from the view's bounds against the
+    /// available `width`/`height`. `Min` shrinks to the intrinsic content size
+    /// (`calculate_full_size`); `Max`/`Dip`/`Percent` follow `calculate_size`,
+    /// so an explicit width/height (from XML) is honoured. This mirrors what
+    /// `Edit` and `Label` resolve by hand and lets intrinsic-content widgets
+    /// (Button, CheckBox, ComboBox, RadioButton) react to width/height too.
+    fn calculate_bounded_size(&mut self, width: i32, height: i32, scale: f64) -> (i32, i32) {
+        let (b_width, b_height) = self.get_bounds();
+        let (calc_w, calc_h) = self.calculate_size(width, height, scale);
+        let (full_w, full_h) = self.calculate_full_size(scale);
+        let w = match b_width {
+            Dimension::Min => full_w,
+            _ => calc_w,
+        };
+        let h = match b_height {
+            Dimension::Min => full_h,
+            _ => calc_h,
+        };
+        (w, h)
+    }
     fn set_x(&mut self, x: i32) {
         let mut rect = self.get_rect();
         rect.move_to((x, rect.min.y));
