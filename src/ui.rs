@@ -152,6 +152,10 @@ pub struct UI {
     /// Set by [`UI::close_window`]; the window handler closes this UI's
     /// window when it sees the flag.
     close_requested: bool,
+    /// Set by [`UI::request_show`] / [`request_hide`] / [`request_quit`]; the
+    /// window handler applies it (via the `WindowHelper`) on the next tick.
+    /// Used to drive window visibility from a system-tray handler.
+    pending_window_command: Option<WindowCommand>,
     /// Cross-thread task queue, shared with [`UiHandle`]s; drained and
     /// executed at the start of every `update()` tick.
     tasks: Arc<Mutex<VecDeque<UiTask>>>,
@@ -178,6 +182,17 @@ pub struct WindowRequest {
     pub modal: bool,
 }
 
+/// A window-visibility action requested from outside the window handler
+/// (e.g. a system-tray click), queued via [`UI::request_show`] /
+/// [`UI::request_hide`] / [`UI::request_quit`] and applied by the window
+/// handler on the next update tick.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum WindowCommand {
+    Show,
+    Hide,
+    Quit,
+}
+
 #[allow(dead_code)]
 impl UI {
     pub fn new(width: u32, height: u32, typeface: Typeface, scale: f64) -> Self {
@@ -197,6 +212,7 @@ impl UI {
             shortcuts: HashMap::new(),
             window_requests: Vec::new(),
             close_requested: false,
+            pending_window_command: None,
             tasks: Arc::new(Mutex::new(VecDeque::new())),
             deferred_events: Vec::new(),
             on_close: None,
@@ -395,8 +411,13 @@ impl UI {
     }
 
     /// Registers a closure that runs once when this UI is dropped — for the
-    /// main window that means the window was closed (the X button or Escape).
-    /// Use it for app shutdown work; child/dialog UIs normally don't set it.
+    /// main window that means its event loop ended. Use it for app shutdown
+    /// work; child/dialog UIs normally don't set it.
+    ///
+    /// Note: if the window was created with `with_hide_on_close` (or the
+    /// handler's close-hides policy), the X button / Escape only *hide* the
+    /// window and do not drop the UI, so this fires only on a real terminate
+    /// (e.g. a tray "Quit" → [`UI::request_quit`]).
     pub fn set_on_close(&mut self, func: impl FnOnce() + 'static) {
         self.on_close = Some(Box::new(func));
     }
@@ -1255,6 +1276,27 @@ impl UI {
 
     pub fn take_close_request(&mut self) -> bool {
         std::mem::replace(&mut self.close_requested, false)
+    }
+
+    /// Requests showing (and focusing) this UI's window. Safe to call from any
+    /// thread via [`UiHandle::run_on_ui_thread`]; the window handler shows the
+    /// window on the next update tick. Intended for system-tray actions.
+    pub fn request_show(&mut self) {
+        self.pending_window_command = Some(WindowCommand::Show);
+    }
+
+    /// Requests hiding this UI's window (it keeps running, e.g. in the tray).
+    pub fn request_hide(&mut self) {
+        self.pending_window_command = Some(WindowCommand::Hide);
+    }
+
+    /// Requests terminating the app (closes the main window's event loop).
+    pub fn request_quit(&mut self) {
+        self.pending_window_command = Some(WindowCommand::Quit);
+    }
+
+    pub fn take_window_command(&mut self) -> Option<WindowCommand> {
+        self.pending_window_command.take()
     }
 
     /// Opens a modal message dialog with a single "OK" button. Convenience

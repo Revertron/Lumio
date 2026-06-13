@@ -1,4 +1,4 @@
-pub use crate::ui::{UI, UiHandle, UiTask, PopupMode, PopupDirection, WindowRequest};
+pub use crate::ui::{UI, UiHandle, UiTask, PopupMode, PopupDirection, WindowRequest, WindowCommand};
 pub use crate::win::{Win, WinEvent};
 pub use crate::traits::{View, Container, Element};
 pub use crate::events::{EventCallback, EventData, EventType};

@@ -6,7 +6,7 @@ use speedy2d::dimen::Vector2;
 use speedy2d::Graphics2D;
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, MouseScrollDistance, UserEventSender, VirtualKeyCode, WindowCreationOptions, WindowHandler, WindowHelper, WindowPosition, WindowSize, WindowStartupInfo};
 use crate::drawing::{DrawableRegistry, Palette};
-use super::ui::UI;
+use super::ui::{UI, WindowCommand};
 use super::themes::*;
 use super::themes::ImageCache;
 
@@ -26,6 +26,10 @@ pub struct Win<T> {
     alive: Arc<AtomicBool>,
     /// Child windows close on Esc instead of terminating the app.
     is_child: bool,
+    /// When set on the main window, the close gesture (Esc) hides the window
+    /// instead of terminating the loop — pairs with speedy2d's
+    /// `with_hide_on_close` (which handles the X button) for tray apps.
+    close_hides: bool,
     t: PhantomData<T>
 }
 
@@ -54,8 +58,17 @@ impl<T> Win<T> {
             last_cursor: None,
             alive: Arc::new(AtomicBool::new(true)),
             is_child,
+            close_hides: false,
             t: PhantomData
         }
+    }
+
+    /// When `true`, the close gesture (Esc) on the main window hides it instead
+    /// of terminating the app. Pair with speedy2d's
+    /// [`WindowCreationOptions::with_hide_on_close`] (for the X button) so an
+    /// app can live in the system tray. No effect on child windows.
+    pub fn set_close_hides(&mut self, value: bool) {
+        self.close_hides = value;
     }
 
     /// Choose the palette the window starts with (default: `Palette::classic()`).
@@ -131,6 +144,19 @@ impl<T: From<WinEvent> + Send + 'static> WindowHandler<T> for Win<T> {
 
         if self.ui.take_close_request() {
             helper.close_window();
+        }
+
+        // Window-visibility actions requested from outside the handler (e.g. a
+        // system-tray click marshaled via `run_on_ui_thread`). The closure ran
+        // at the top of `update()` above, so the command is set by now.
+        match self.ui.take_window_command() {
+            Some(WindowCommand::Show) => {
+                helper.set_visible(true);
+                helper.request_redraw();
+            }
+            Some(WindowCommand::Hide) => helper.set_visible(false),
+            Some(WindowCommand::Quit) => helper.terminate_loop(),
+            None => {}
         }
     }
 
@@ -208,6 +234,10 @@ impl<T: From<WinEvent> + Send + 'static> WindowHandler<T> for Win<T> {
             if self.is_child {
                 // Esc closes a child window; only the main window exits the app.
                 helper.close_window();
+            } else if self.close_hides {
+                // Tray app: Esc hides the main window instead of quitting,
+                // matching the X button (speedy2d's `with_hide_on_close`).
+                helper.set_visible(false);
             } else {
                 helper.terminate_loop();
             }
