@@ -956,7 +956,14 @@ impl View for TableView {
                     if cell_x + cell_w < body_clip.min.x || cell_x > body_clip.max.x { continue; }
                     if let Some(cell) = row_cells.get(c) {
                         let cell_origin = Point { x: cell_x, y: row_top };
+                        // Clip each cell to its own box so long cell content
+                        // (e.g. a single-line Label) can't bleed into the
+                        // neighbouring column or over the row separator.
+                        let cell_clip = rect((cell_x, row_top), (cell_x + cell_w, row_top + row_h));
+                        theme.push_clip();
+                        theme.clip_rect(cell_clip);
                         cell.borrow().paint(cell_origin, theme);
+                        theme.pop_clip();
                     }
                 }
             }
@@ -1003,14 +1010,23 @@ impl View for TableView {
                     HAlign::Center => cell_rect.min.x + (cw - tw) / 2,
                 };
                 let ty = cell_rect.min.y + (header_h - th) / 2;
-                theme.draw_text(tx as f32, ty as f32, theme.color("text"), block);
+                // Crop the title to its cell interior so a long header label
+                // can't spill into the neighbouring column.
+                let crop = rect((cell_rect.min.x + pad_h, cell_rect.min.y), (cell_rect.max.x - pad_h, cell_rect.max.y));
+                theme.draw_text_cropped(tx as f32, ty as f32, crop, theme.color("text"), block);
             }
             if let Some((sc, dir)) = sort
                 && sc == c
             {
                 self.paint_sort_indicator(theme, cell_rect, dir);
             }
-            theme.draw_component("button.body", cell_rect, cell_state);
+            // Header cells inherit the table's `focused` flag via `main_state`,
+            // which makes `button.body` paint a dashed focus rectangle. Keep the
+            // focus *lighten* on `button.back` above, but drop the focus lines
+            // here (same as the scrollbar thumbs).
+            let mut body_state = cell_state;
+            body_state.focused = false;
+            theme.draw_component("button.body", cell_rect, body_state);
         }
         drop(cols); drop(col_offs); drop(header_blocks);
 
