@@ -10,7 +10,7 @@ categories = ["gui", "rendering"]
 [dependencies]
 quick-xml = "0.40.1"
 downcast-rs = "2.0.2"
-speedy2d = { path = "../Speedy2D" }
+speedy2d = { git="https://github.com/Revertron/Speedy2D" }
 image = "0.25.10"
 rand = "0.8.6"
 arboard = "3"
