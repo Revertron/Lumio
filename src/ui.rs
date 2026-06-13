@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::Reader;
+use quick_xml::{Reader, XmlVersion};
 use speedy2d::dimen::Vector2;
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, MouseScrollDistance, VirtualKeyCode};
 
@@ -803,7 +803,7 @@ impl UI {
             .map(|a| {
                 let name = String::from_utf8(a.key.0.to_vec()).unwrap();
                 // Unescape XML entities (&quot;, &amp;, &lt;, ...) in values.
-                let value = match a.unescape_value() {
+                let value = match a.normalized_value(XmlVersion::Implicit1_0) {
                     Ok(value) => value.into_owned(),
                     Err(_) => match a.value {
                         Cow::Borrowed(c) => String::from_utf8(c.to_vec()).unwrap(),
@@ -849,7 +849,7 @@ impl UI {
                 continue;
             }
             // Unescape XML entities (&quot;, &amp;, &lt;, ...) in values.
-            let value = match attr.unescape_value() {
+            let value = match attr.normalized_value(XmlVersion::Implicit1_0) {
                 Ok(value) => value.into_owned(),
                 Err(_) => match attr.value {
                     Cow::Borrowed(c) => String::from_utf8(c.to_vec()).unwrap(),
@@ -875,7 +875,7 @@ impl UI {
             let key = String::from_utf8(attr.key.0.to_vec()).unwrap();
             if key == name {
                 // Unescape XML entities (&quot;, &amp;, &lt;, ...) in values.
-                return Some(match attr.unescape_value() {
+                return Some(match attr.normalized_value(XmlVersion::Implicit1_0) {
                     Ok(value) => value.into_owned(),
                     Err(_) => match attr.value {
                         Cow::Borrowed(c) => String::from_utf8(c.to_vec()).unwrap(),
