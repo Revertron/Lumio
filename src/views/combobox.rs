@@ -68,6 +68,20 @@ impl ComboBox {
         self.items.borrow_mut().push(text.to_owned());
     }
 
+    /// Removes all items and clears the selection and the displayed text.
+    pub fn clear_items(&self) {
+        self.items.borrow_mut().clear();
+        *self.selected.borrow_mut() = None;
+        self.set_display_text("");
+    }
+
+    /// Test hook: stores a pending selection exactly as a dropdown click
+    /// would, so tests can drive the update-tick dispatch path.
+    #[cfg(test)]
+    pub fn simulate_pending_selection(&self, index: usize) {
+        *self.pending_selection.borrow_mut() = Some(index);
+    }
+
     pub fn on_change(&mut self, func: EventCallback) {
         self.base_on_event(EventType::SelectionChanged, func);
     }
@@ -441,7 +455,9 @@ impl View for ComboBox {
                 self.set_display_text(&text);
                 *self.dropdown_id.borrow_mut() = None;
 
-                self.base_fire_event(ui, EventType::SelectionChanged, &EventData::Selected(index));
+                // This view is mutably borrowed by the update tree-walk, so
+                // the event must fire after the walk (handlers use get_view).
+                ui.defer_event(&self.get_id(), EventType::SelectionChanged, EventData::Selected(index));
                 return true;
             }
         }

@@ -1,5 +1,8 @@
 use std::cell::{Cell, RefCell};
 
+use speedy2d::dimen::Vector2;
+use speedy2d::window::MouseButton;
+
 use crate::events::{EventCallback, EventData, EventType};
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::view_base::{HasMainFields, ViewBasics};
@@ -22,6 +25,10 @@ pub struct ProgressBar {
     anim_pos: Cell<f64>,
     /// Animation direction: true = forward, false = backward
     anim_forward: Cell<bool>,
+    /// Tracks press-down so a `Click` listener only fires when the release
+    /// lands on the bar too (drag-off cancels). Bars without a Click
+    /// listener stay transparent to mouse input.
+    pressed: Cell<bool>,
 }
 
 impl HasMainFields for ProgressBar {
@@ -43,6 +50,7 @@ impl ProgressBar {
             indeterminate: Cell::new(false),
             anim_pos: Cell::new(0.0),
             anim_forward: Cell::new(true),
+            pressed: Cell::new(false),
         }
     }
 
@@ -274,7 +282,36 @@ impl View for ProgressBar {
         self.base_fire_event(ui, event, data)
     }
 
-    fn click(&self, _ui: &mut UI) -> bool {
+    fn click(&self, ui: &mut UI) -> bool {
+        if !self.base_is_enabled() { return false; }
+        self.base_fire_event(ui, EventType::Click, &EventData::None)
+    }
+
+    fn on_mouse_button_down(&self, _ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+        if !self.base_is_enabled() || !matches!(button, MouseButton::Left) {
+            return false;
+        }
+        // Only a bar with a Click listener captures the press; plain
+        // progress bars stay transparent to mouse input.
+        if self.base_has_listener(EventType::Click)
+            && self.state.borrow().rect.hit((position.x, position.y))
+        {
+            self.pressed.set(true);
+            return true;
+        }
+        false
+    }
+
+    fn on_mouse_button_up(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+        if !matches!(button, MouseButton::Left) {
+            return false;
+        }
+        let was_pressed = self.pressed.get();
+        self.pressed.set(false);
+        if was_pressed && self.state.borrow().rect.hit((position.x, position.y)) {
+            self.click(ui);
+            return true;
+        }
         false
     }
 

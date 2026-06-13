@@ -1,7 +1,8 @@
 use std::borrow::Cow;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use quick_xml::events::{BytesStart, Event};
@@ -68,6 +69,35 @@ struct TooltipPopup {
     y: i32,
 }
 
+/// A closure queued from any thread, executed on the UI thread with
+/// `&mut UI` at the start of the next update tick (~15 ms latency worst case).
+pub type UiTask = Box<dyn FnOnce(&mut UI) + Send + 'static>;
+
+/// A `Send + Sync + Clone` handle to a UI's task queue. Obtain it via
+/// [`UI::handle`] before the window starts and clone it into worker threads;
+/// queued tasks run on the UI thread, Android's `runOnUiThread` style.
+#[derive(Clone)]
+pub struct UiHandle {
+    tasks: Arc<Mutex<VecDeque<UiTask>>>,
+}
+
+impl UiHandle {
+    /// Queues `f` to run on the UI thread with `&mut UI` at the next update
+    /// tick. Tasks queued from inside a running task execute on the
+    /// following tick. Any executed task requests a redraw.
+    pub fn run_on_ui_thread<F: FnOnce(&mut UI) + Send + 'static>(&self, f: F) {
+        self.tasks.lock().unwrap().push_back(Box::new(f));
+    }
+}
+
+impl Drop for UI {
+    fn drop(&mut self) {
+        if let Some(on_close) = self.on_close.take() {
+            on_close();
+        }
+    }
+}
+
 pub struct UI {
     width: u32,
     height: u32,
@@ -122,6 +152,16 @@ pub struct UI {
     /// Set by [`UI::close_window`]; the window handler closes this UI's
     /// window when it sees the flag.
     close_requested: bool,
+    /// Cross-thread task queue, shared with [`UiHandle`]s; drained and
+    /// executed at the start of every `update()` tick.
+    tasks: Arc<Mutex<VecDeque<UiTask>>>,
+    /// Events queued via [`UI::defer_event`] during the update tree-walk
+    /// (when the firing view is mutably borrowed); fired at the end of
+    /// `update()` once all borrows are released.
+    deferred_events: Vec<(String, EventType, EventData)>,
+    /// Runs once when this UI is dropped (the window handler is dropped on
+    /// window close). Set it on the main window's UI for app shutdown work.
+    on_close: Option<Box<dyn FnOnce()>>,
 }
 
 /// A request to open a new OS window, queued via [`UI::open_window`] and
@@ -157,6 +197,9 @@ impl UI {
             shortcuts: HashMap::new(),
             window_requests: Vec::new(),
             close_requested: false,
+            tasks: Arc::new(Mutex::new(VecDeque::new())),
+            deferred_events: Vec::new(),
+            on_close: None,
         };
         ui.register::<Label>("Label");
         ui.register::<Button>("Button");
@@ -342,6 +385,20 @@ impl UI {
 
     pub fn on_start(&mut self, func: Box<dyn FnMut(&mut UI)>) {
         self.on_start = Some(func);
+    }
+
+    /// Returns a `Send + Sync + Clone` handle for posting closures to this
+    /// UI's thread from workers ([`UiHandle::run_on_ui_thread`]). Obtain it
+    /// before `run_loop` and clone it freely.
+    pub fn handle(&self) -> UiHandle {
+        UiHandle { tasks: Arc::clone(&self.tasks) }
+    }
+
+    /// Registers a closure that runs once when this UI is dropped — for the
+    /// main window that means the window was closed (the X button or Escape).
+    /// Use it for app shutdown work; child/dialog UIs normally don't set it.
+    pub fn set_on_close(&mut self, func: impl FnOnce() + 'static) {
+        self.on_close = Some(Box::new(func));
     }
 
     pub fn layout(&mut self, width: u32, height: u32, scale: f64) {
@@ -566,6 +623,19 @@ impl UI {
 
     pub fn update(&mut self) -> bool {
         let mut redraw = false;
+        // Run tasks posted from other threads via UiHandle. Drain under the
+        // lock, run outside it: a task (or a worker racing us) may queue more
+        // tasks; those run on the next tick.
+        let tasks: Vec<UiTask> = {
+            let mut queue = self.tasks.lock().unwrap();
+            queue.drain(..).collect()
+        };
+        if !tasks.is_empty() {
+            redraw = true;
+        }
+        for task in tasks {
+            task(self);
+        }
         // Process queued removals first; they may flip needs_relayout.
         if self.process_pending_removals() {
             redraw = true;
@@ -586,12 +656,35 @@ impl UI {
         if let Some(root) = root {
             redraw |= root.borrow_mut().update(self);
         }
+        // Fire events deferred from inside the tree walk above (a view's
+        // update() runs under its own borrow_mut, so handlers — which may
+        // call get_view — could not run there). All borrows are free here.
+        // Handlers may defer more events; those fire on the next pass.
+        while !self.deferred_events.is_empty() {
+            let deferred = std::mem::take(&mut self.deferred_events);
+            for (id, event, data) in deferred {
+                if let Some(element) = self.get_view(&id) {
+                    redraw |= element.borrow().fire_event(self, event, &data);
+                }
+            }
+        }
         // Catch focus changes made programmatically or via Frame::focus_next/prev
         // (paths that never pass through an input dispatch).
         redraw |= self.sync_focus();
         // Update tooltip
         redraw |= self.update_tooltip();
         redraw
+    }
+
+    /// Queues an event to fire after the current `update()` tree-walk, once
+    /// the firing view's `borrow_mut` is released. Use this instead of
+    /// `fire_event` when dispatching from inside `View::update` — handlers
+    /// are then free to call `get_view` on any view. The view is resolved by
+    /// id at fire time (views without an id cannot use this).
+    pub fn defer_event(&mut self, view_id: &str, event: EventType, data: EventData) {
+        if !view_id.is_empty() {
+            self.deferred_events.push((view_id.to_owned(), event, data));
+        }
     }
 
     pub fn paint(&self, theme: &mut dyn Theme) {
@@ -709,9 +802,13 @@ impl UI {
             .map(|a| a.unwrap())
             .map(|a| {
                 let name = String::from_utf8(a.key.0.to_vec()).unwrap();
-                let value = match a.value {
-                    Cow::Borrowed(c) => String::from_utf8(c.to_vec()).unwrap(),
-                    Cow::Owned(c) => String::from_utf8(c).unwrap(),
+                // Unescape XML entities (&quot;, &amp;, &lt;, ...) in values.
+                let value = match a.unescape_value() {
+                    Ok(value) => value.into_owned(),
+                    Err(_) => match a.value {
+                        Cow::Borrowed(c) => String::from_utf8(c.to_vec()).unwrap(),
+                        Cow::Owned(c) => String::from_utf8(c).unwrap(),
+                    },
                 };
                 (name, value)
             })
@@ -751,9 +848,13 @@ impl UI {
             if key == "name" {
                 continue;
             }
-            let value = match attr.value {
-                Cow::Borrowed(c) => String::from_utf8(c.to_vec()).unwrap(),
-                Cow::Owned(c) => String::from_utf8(c).unwrap(),
+            // Unescape XML entities (&quot;, &amp;, &lt;, ...) in values.
+            let value = match attr.unescape_value() {
+                Ok(value) => value.into_owned(),
+                Err(_) => match attr.value {
+                    Cow::Borrowed(c) => String::from_utf8(c.to_vec()).unwrap(),
+                    Cow::Owned(c) => String::from_utf8(c).unwrap(),
+                },
             };
             bundle.push((key, value));
         }
@@ -773,9 +874,13 @@ impl UI {
         for attr in e.attributes().flatten() {
             let key = String::from_utf8(attr.key.0.to_vec()).unwrap();
             if key == name {
-                return Some(match attr.value {
-                    Cow::Borrowed(c) => String::from_utf8(c.to_vec()).unwrap(),
-                    Cow::Owned(c) => String::from_utf8(c.to_vec()).unwrap(),
+                // Unescape XML entities (&quot;, &amp;, &lt;, ...) in values.
+                return Some(match attr.unescape_value() {
+                    Ok(value) => value.into_owned(),
+                    Err(_) => match attr.value {
+                        Cow::Borrowed(c) => String::from_utf8(c.to_vec()).unwrap(),
+                        Cow::Owned(c) => String::from_utf8(c.to_vec()).unwrap(),
+                    },
                 });
             }
         }

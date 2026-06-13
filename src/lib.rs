@@ -1,6 +1,10 @@
 #[macro_use]
 extern crate downcast_rs;
 
+// Re-export so downstream apps can use the windowing types without
+// depending on (and version-matching) speedy2d themselves.
+pub use speedy2d;
+
 pub mod common;
 pub mod ui;
 pub mod events;
