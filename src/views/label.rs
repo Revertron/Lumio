@@ -580,7 +580,13 @@ impl Label {
         }));
 
         let element: Element = Rc::new(RefCell::new(menu));
-        ui.show_popup(element, x, y, PopupDirection::BottomRight, PopupMode::Popup);
+        // `x`/`y` arrive in parent-local coords (Frame subtracts its origin when
+        // dispatching), but `show_popup` positions in window coords. Add the
+        // accumulated ancestor origin (`get_absolute_position` - own `rect.min`).
+        let abs = self.get_absolute_position();
+        let rect_min = self.state.borrow().main.rect.min;
+        let (wx, wy) = (x + abs.x - rect_min.x, y + abs.y - rect_min.y);
+        ui.show_popup(element, wx, wy, PopupDirection::BottomRight, PopupMode::Popup);
     }
 }
 

@@ -1,0 +1,23 @@
+<!-- ComboBox focused text-field decoration: selection fill + dashed focus rect -->
+<selector>
+    <item>
+        <layer-list>
+            <!-- Selection background -->
+            <item>
+                <shape type="rect">
+                    <solid color="@selection"/>
+                </shape>
+            </item>
+
+            <!-- Dashed focus rectangle, inset 2px -->
+            <item>
+                <shape type="rect">
+                    <stroke width="1" color="@item_highlight_text" top="2" left="2" right="2" dash_array="2,2"/>
+                    <stroke width="1" color="@item_highlight_text" bottom="2" left="2" right="2" dash_array="2,2"/>
+                    <stroke width="1" color="@item_highlight_text" left="2" top="2" bottom="2" dash_array="2,2"/>
+                    <stroke width="1" color="@item_highlight_text" right="2" top="2" bottom="2" dash_array="2,2"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

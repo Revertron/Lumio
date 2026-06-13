@@ -64,51 +64,52 @@ fn draw_quarter_circle(graphics: &mut Graphics2D, x: f32, y: f32, radius: f32, q
 
 #[allow(unused)]
 pub fn draw_dashed_rectangle(graphics: &mut Graphics2D, x1: f32, y1: f32, x2: f32, y2: f32, dash_len: f32, scale: f32, color: Color) {
-    let mut x = x1;
-    let mut y = y1;
-
-    while x < x2 {
-        let mut end_x = x + dash_len;
-        if end_x > x2 {
-            end_x = x2;
+    // Each side is split into whole-pixel dashes distributed so a dash lands on
+    // BOTH ends of the side: k dashes, k-1 gaps, dash ~= gap ~= dash_len. Dashes
+    // keep a fixed integer length on the pixel grid (so they don't shimmer from
+    // anti-aliasing and look identical on every side) and the leftover length is
+    // spread across the gaps. That keeps all four corners symmetric and free of
+    // leftover stubs regardless of the rectangle's size.
+    let dash = (dash_len.round() as i32).max(1);
+    let cycle = dash * 2; // dash_len drives both dash and gap
+    let mut draw_side = |sx: f32, sy: f32, dx: f32, dy: f32, length: f32| {
+        let total = length.round() as i32;
+        if total <= 0 {
+            return;
         }
-        graphics.draw_line((x, y1), (end_x, y1), scale, color);
-        x = end_x + dash_len;
-    }
-
-    x = x2;
-    y = y1;
-
-    while y < y2 {
-        let mut end_y = y + dash_len;
-        if end_y > y2 {
-            end_y = y2;
+        let mut k = (((total + dash) as f32) / cycle as f32).round() as i32;
+        if k < 1 {
+            k = 1;
         }
-        graphics.draw_line((x2, y), (x2, end_y), scale, color);
-        y = end_y + dash_len;
-    }
-
-    x = x2;
-    y = y2;
-
-    while x > x1 {
-        let mut end_x = x - dash_len;
-        if end_x < x1 {
-            end_x = x1;
+        while k > 1 && total - k * dash < k - 1 {
+            k -= 1;
         }
-        graphics.draw_line((x, y2), (end_x, y2), scale, color);
-        x = end_x - dash_len;
-    }
-
-    x = x1;
-    y = y2;
-
-    while y > y1 {
-        let mut end_y = y - dash_len;
-        if end_y < y1 {
-            end_y = y1;
+        if k <= 1 || total <= dash {
+            graphics.draw_line((sx, sy), (sx + dx * total as f32, sy + dy * total as f32), scale, color);
+            return;
         }
-        graphics.draw_line((x1, y), (x1, end_y), scale, color);
-        y = end_y - dash_len;
-    }
+        let total_gap = total - k * dash;
+        let base_gap = total_gap / (k - 1);
+        let extra = total_gap % (k - 1);
+        let mut pos = 0i32;
+        for i in 0..k {
+            let start = pos as f32;
+            let end = (pos + dash) as f32;
+            graphics.draw_line(
+                (sx + dx * start, sy + dy * start),
+                (sx + dx * end, sy + dy * end),
+                scale,
+                color,
+            );
+            pos += dash;
+            if i < k - 1 {
+                pos += base_gap + if i < extra { 1 } else { 0 };
+            }
+        }
+    };
+
+    draw_side(x1, y1, 1.0, 0.0, x2 - x1); // top
+    draw_side(x1, y2, 1.0, 0.0, x2 - x1); // bottom
+    draw_side(x1, y1, 0.0, 1.0, y2 - y1); // left
+    draw_side(x2, y1, 0.0, 1.0, y2 - y1); // right
 }

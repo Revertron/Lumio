@@ -63,6 +63,18 @@ impl<T> Win<T> {
         crate::drawing::set_current_palette(palette.clone());
         self.palette = palette;
     }
+
+    /// Pushes the cursor shape the UI currently wants to the OS, but only on a
+    /// real transition (avoids per-event churn). Called after moves and after
+    /// button events, since a popup opened/closed by a click changes the
+    /// cursor without generating a mouse move.
+    fn apply_cursor(&mut self, helper: &mut WindowHelper<T>) {
+        let cursor = self.ui.current_cursor();
+        if self.last_cursor != Some(cursor) {
+            helper.set_cursor(cursor);
+            self.last_cursor = Some(cursor);
+        }
+    }
 }
 
 impl<T> Drop for Win<T> {
@@ -152,25 +164,25 @@ impl<T: From<WinEvent> + Send + 'static> WindowHandler<T> for Win<T> {
         let position = Vector2::new(position.x.round() as i32, position.y.round() as i32);
         self.mouse_pos = position;
         let redraw = self.ui.on_mouse_move(position);
-        // Apply the cursor regardless of the redraw flag, only on a transition.
-        let cursor = self.ui.current_cursor();
-        if self.last_cursor != Some(cursor) {
-            helper.set_cursor(cursor);
-            self.last_cursor = Some(cursor);
-        }
+        self.apply_cursor(helper);
         if redraw {
             helper.request_redraw();
         }
     }
 
     fn on_mouse_button_down(&mut self, helper: &mut WindowHelper<T>, button: MouseButton) {
-        if self.ui.on_mouse_button_down(self.mouse_pos, button) {
+        let redraw = self.ui.on_mouse_button_down(self.mouse_pos, button);
+        // A popup opened/closed by the click changes the cursor without a move.
+        self.apply_cursor(helper);
+        if redraw {
             helper.request_redraw();
         }
     }
 
     fn on_mouse_button_up(&mut self, helper: &mut WindowHelper<T>, button: MouseButton) {
-        if self.ui.on_mouse_button_up(self.mouse_pos, button) {
+        let redraw = self.ui.on_mouse_button_up(self.mouse_pos, button);
+        self.apply_cursor(helper);
+        if redraw {
             helper.request_redraw();
         }
     }

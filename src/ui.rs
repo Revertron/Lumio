@@ -953,9 +953,11 @@ impl UI {
             return None;
         }
 
-        // Check children first (deepest match wins)
+        // Check children first (deepest match wins). Uses `hit_test_views` so
+        // containers like `TabView` that only show a subset of their children
+        // (the active tab) are not matched on inactive, off-screen children.
         if let Some(container) = view.as_container() {
-            for child in container.get_views().iter().rev() {
+            for child in container.hit_test_views().iter().rev() {
                 if let Some(found) = Self::hit_test_element(child, x, y, abs_x, abs_y, pred) {
                     return Some(found);
                 }
@@ -1127,11 +1129,52 @@ impl UI {
         if self.has_modal_overlay() {
             return false;
         }
+        // A non-transparent overlay (e.g. a popup menu) under the pointer
+        // visually covers the views beneath it, so the move must not reach the
+        // root — otherwise an Edit below the popup would request the I-beam
+        // cursor. Mirrors the confinement in `hit_test_listener`.
+        if self.pointer_over_opaque_overlay(position) {
+            return false;
+        }
         let root = self.root.clone();
         match root {
             None => false,
             Some(root) => root.borrow().on_mouse_move(self, position),
         }
+    }
+
+    /// True when the pointer lies inside a non-`Transparent` overlay. Such an
+    /// overlay covers the views beneath it, so coordinate-based input must not
+    /// fall through to the root there (used to confine cursor selection;
+    /// `hit_test_listener` applies the same rule for hit testing).
+    fn pointer_over_opaque_overlay(&self, position: Vector2<i32>) -> bool {
+        self.overlays.iter().any(|entry| {
+            if entry.mode == PopupMode::Transparent {
+                return false;
+            }
+            let rect = entry.element.borrow().get_rect();
+            position.x >= rect.min.x + entry.x && position.x < rect.max.x + entry.x
+                && position.y >= rect.min.y + entry.y && position.y < rect.max.y + entry.y
+        })
+    }
+
+    /// Re-evaluates the cursor for `position` when a mouse-button event changed
+    /// the overlay set. Opening or closing a popup changes which view sits
+    /// under the pointer but generates no mouse move, so without this the OS
+    /// cursor lingers until the next move — e.g. the I-beam staying visible
+    /// when a context menu opens over an `Edit`. Returns whether a redraw is
+    /// needed.
+    fn refresh_cursor_if_overlays_changed(&mut self, position: Vector2<i32>, overlays_before: usize) -> bool {
+        if self.overlays.len() == overlays_before {
+            return false;
+        }
+        self.requested_cursor = None;
+        // Over a covering overlay the cursor is the default arrow; elsewhere
+        // re-evaluate it from the views now under the pointer.
+        if self.has_modal_overlay() || self.pointer_over_opaque_overlay(position) {
+            return false;
+        }
+        self.dispatch_mouse_move(position)
     }
 
     /// Detects which view with a hover listener is under the cursor and fires
@@ -1293,6 +1336,7 @@ impl UI {
                 self.context_menu_suppressed = el.borrow().fire_event(self, EventType::ContextMenu, &data);
             }
         }
+        let overlays_before = self.overlays.len();
         let mut redraw = self.dispatch_mouse_button_down(position, button);
         self.context_menu_suppressed = false;
         if is_double {
@@ -1306,6 +1350,7 @@ impl UI {
             }
         }
         redraw |= self.sync_focus();
+        redraw |= self.refresh_cursor_if_overlays_changed(position, overlays_before);
         redraw
     }
 
@@ -1383,6 +1428,13 @@ impl UI {
     }
 
     pub fn on_mouse_button_up(&mut self, position: Vector2<i32>, button: MouseButton) -> bool {
+        let overlays_before = self.overlays.len();
+        let mut redraw = self.dispatch_mouse_button_up(position, button);
+        redraw |= self.refresh_cursor_if_overlays_changed(position, overlays_before);
+        redraw
+    }
+
+    fn dispatch_mouse_button_up(&mut self, position: Vector2<i32>, button: MouseButton) -> bool {
         let entries: Vec<(Element, i32, i32)> = self.overlays.iter().rev()
             .map(|e| (Rc::clone(&e.element), e.x, e.y))
             .collect();

@@ -212,6 +212,14 @@ pub trait Container: View {
     fn get_view_count(&self) -> usize;
     fn get_views(&self) -> Vec<Element> { Vec::new() }
 
+    /// Children exposed to coordinate-based hit testing (DoubleClick,
+    /// ContextMenu, Hover). Defaults to [`get_views`], but a container that
+    /// shows only a subset of its children at a time (e.g. `TabView`) should
+    /// override this to return just the currently interactive ones, so the
+    /// generic hit test in `UI` does not match views that are laid out but
+    /// not on screen.
+    fn hit_test_views(&self) -> Vec<Element> { self.get_views() }
+
     /// Remove the view with the given id from this container's subtree.
     /// Returns true if a view was removed. Default impl does nothing —
     /// containers that own children should override.

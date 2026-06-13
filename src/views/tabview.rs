@@ -131,6 +131,14 @@ impl Container for TabView {
     fn get_views(&self) -> Vec<Element> {
         self.views.clone()
     }
+
+    /// Only the active tab is on screen and interactive, so coordinate-based
+    /// hit testing must see just that one — otherwise events like DoubleClick
+    /// or ContextMenu would match views on inactive tabs, which are laid out
+    /// at the same content rect.
+    fn hit_test_views(&self) -> Vec<Element> {
+        self.views.get(self.active_tab.get()).cloned().into_iter().collect()
+    }
 }
 
 impl View for TabView {

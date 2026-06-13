@@ -270,28 +270,49 @@ impl View for ComboBox {
             (rect.max.x - border, rect.max.y - border),
         );
 
+        let focused = state.main.state.focused;
+
         theme.push_clip();
         theme.clip_rect(rect);
 
         // Step 1: Draw full edit-field area (white background + sunken border)
         theme.draw_component("edit.back", rect, state.main.state);
 
-        // Step 2: Draw selected item text (left-aligned inside edit area)
+        // Step 2: When focused, highlight the text area with the selection colour
+        // and draw the dashed focus rectangle inside it (rather than on the arrow
+        // button — see step 5).
+        if focused {
+            let field_rect = crate::types::rect(
+                (rect.min.x + border, rect.min.y + border),
+                (button_rect.min.x, rect.max.y - border),
+            );
+            theme.draw_component("combo.focus", field_rect, state.main.state);
+        }
+
+        // Step 3: Draw selected item text (left-aligned inside edit area)
         if let Some(text) = &state.cached_text {
             let pad_left = (ITEM_PADDING_LEFT as f64 * scale).round() as f32;
             let x = rect.min.x as f32 + border as f32 + pad_left;
             let y = rect.min.y as f32 + (self.get_rect_height() as f32 - text.height()) / 2.0;
-            let color = theme.get_text_color(state.main.state, state.main.foreground.as_ref());
+            let color = if focused {
+                crate::themes::selection_text_color(theme.color("selection"))
+            } else {
+                theme.get_text_color(state.main.state, state.main.foreground.as_ref())
+            };
             theme.draw_text(x.round(), y.round(), color, text);
         }
 
-        // Step 3: Draw sunken border over entire rect
+        // Step 4: Draw sunken border over entire rect
         theme.draw_component("edit.body", rect, state.main.state);
 
-        // Step 4: Draw raised button with arrow inside the sunken area
-        theme.draw_component("button.back", button_rect, state.main.state);
-        theme.draw_component("combo.arrow", button_rect, state.main.state);
-        theme.draw_component("button.body", button_rect, state.main.state);
+        // Step 5: Draw raised button with arrow inside the sunken area. Clear the
+        // focused flag so the arrow button doesn't draw its own focus rectangle;
+        // focus is shown in the text field above.
+        let mut button_state = state.main.state;
+        button_state.focused = false;
+        theme.draw_component("button.back", button_rect, button_state);
+        theme.draw_component("combo.arrow", button_rect, button_state);
+        theme.draw_component("button.body", button_rect, button_state);
 
         theme.pop_clip();
     }

@@ -62,13 +62,13 @@
                 </shape>
             </item>
 
-            <!-- Focus rectangle: Dashed black, inset by 4px -->
+            <!-- Focus rectangle: dashed, inset by 4px -->
             <item>
                 <shape type="rect">
-                    <!--<stroke width="1" color="#80000000" top="3" left="3" right="4"/>-->
-                    <stroke width="1" color="@border_light" bottom="6" left="6" right="6"/>
-                    <!--<stroke width="1" color="#80000000" left="3" top="3" bottom="4"/>-->
-                    <!--<stroke width="1" color="#80000000" right="4" top="3" bottom="4"/>-->
+                    <stroke width="1" color="@focus" top="4" left="4" right="4" dash_array="2,2"/>
+                    <stroke width="1" color="@focus" bottom="4" left="4" right="4" dash_array="2,2"/>
+                    <stroke width="1" color="@focus" left="4" top="4" bottom="4" dash_array="2,2"/>
+                    <stroke width="1" color="@focus" right="4" top="4" bottom="4" dash_array="2,2"/>
                 </shape>
             </item>
         </layer-list>

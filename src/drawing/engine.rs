@@ -76,20 +76,28 @@ impl<'a> DrawingEngine<'a> {
                     // Round width to integer for crisp rendering (already scaled)
                     let width = self.eval_expr(&stroke_style.width, bounds, Axis::X).round();
 
-                    // Add half-pixel offset for pixel-perfect line centering, scaled by DPI
-                    // At 100% scale: 0.5, at 200% scale: 1.0, etc.
-                    // This ensures lines are drawn centered on pixel boundaries for crisp rendering
+                    // Add a half-pixel offset so a 1px line lands crisply on one
+                    // pixel row instead of straddling two. Solid lines always shift
+                    // the same way (+half). Dashed lines (e.g. a focus rectangle)
+                    // shift toward the interior of the bounds — top/left edges down/
+                    // right, bottom/right edges up/left — so the four edges stay
+                    // symmetric and pixel-aligned instead of biasing toward bottom-right.
                     let half_pixel = (self.scale / 2.0) as f32;
+                    let dashed = stroke_style.dash_array.is_some();
 
                     // Determine if line is horizontal or vertical and add centering offset
                     if (y1 - y2).abs() < 0.01 {
                         // Horizontal line - center on Y axis
-                        y1 += half_pixel;
-                        y2 += half_pixel;
+                        let center = (bounds.min.y + bounds.max.y) as f32 / 2.0;
+                        let off = if dashed && y1 > center { -half_pixel } else { half_pixel };
+                        y1 += off;
+                        y2 += off;
                     } else if (x1 - x2).abs() < 0.01 {
                         // Vertical line - center on X axis
-                        x1 += half_pixel;
-                        x2 += half_pixel;
+                        let center = (bounds.min.x + bounds.max.x) as f32 / 2.0;
+                        let off = if dashed && x1 > center { -half_pixel } else { half_pixel };
+                        x1 += off;
+                        x2 += off;
                     }
 
                     if let Some(color) = self.eval_paint(&stroke_style.paint) {
@@ -239,7 +247,14 @@ impl<'a> DrawingEngine<'a> {
         }
     }
 
-    /// Draw a dashed line
+    /// Draw a dashed line with whole-pixel dashes distributed so a dash sits on
+    /// BOTH ends of the line. Dashes keep a fixed integer length and land on the
+    /// pixel grid, so they don't shimmer from anti-aliasing and look identical on
+    /// horizontal and vertical edges; the leftover length is spread across the
+    /// gaps (each at most one pixel larger than the rest). When four of these
+    /// form a rectangle, every corner gets a matching dash and stays symmetric
+    /// regardless of the line length — unlike walking a fixed dash and clamping
+    /// the remainder into a variable stub at the far end.
     fn draw_dashed_line(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, width: f32, color: Color, dash_array: &[f32]) {
         if dash_array.is_empty() {
             self.graphics.draw_line((x1, y1), (x2, y2), width, color);
@@ -250,33 +265,58 @@ impl<'a> DrawingEngine<'a> {
         let dy = y2 - y1;
         let length = (dx * dx + dy * dy).sqrt();
 
-        if length == 0.0 {
+        if length <= 0.0 {
             return;
         }
 
         let ux = dx / length; // Unit vector x
         let uy = dy / length; // Unit vector y
 
-        let mut pos = 0.0;
-        let mut dash_index = 0;
-        let mut drawing = true;
+        // Whole-pixel nominal dash / gap (SVG-style: first entry = dash, second = gap).
+        let dash = (dash_array[0].round() as i32).max(1);
+        let nominal_gap = if dash_array.len() > 1 {
+            (dash_array[1].round() as i32).max(1)
+        } else {
+            dash
+        };
+        let total = length.round() as i32;
+        let cycle = dash + nominal_gap;
 
-        while pos < length {
-            let dash_length = dash_array[dash_index % dash_array.len()];
-            let next_pos = (pos + dash_length).min(length);
+        // Choose a dash count that puts a dash on both ends: k dashes, k-1 gaps,
+        // gaps as close to nominal as possible. Shrink k until the gaps are at
+        // least 1px; lines too short to dash are drawn solid.
+        let mut k = (((total + nominal_gap) as f32) / cycle as f32).round() as i32;
+        if k < 1 {
+            k = 1;
+        }
+        while k > 1 && total - k * dash < k - 1 {
+            k -= 1;
+        }
+        if k <= 1 || total <= dash {
+            self.graphics.draw_line((x1, y1), (x2, y2), width, color);
+            return;
+        }
 
-            if drawing {
-                let start_x = x1 + ux * pos;
-                let start_y = y1 + uy * pos;
-                let end_x = x1 + ux * next_pos;
-                let end_y = y1 + uy * next_pos;
+        // Spread the leftover length across the k-1 gaps; the first `extra` gaps
+        // are one pixel larger. Dashes themselves stay a fixed integer length.
+        let total_gap = total - k * dash;
+        let base_gap = total_gap / (k - 1);
+        let extra = total_gap % (k - 1);
 
-                self.graphics.draw_line((start_x, start_y), (end_x, end_y), width, color);
+        let mut pos = 0i32;
+        for i in 0..k {
+            let start = pos as f32;
+            let end = (pos + dash) as f32;
+            self.graphics.draw_line(
+                (x1 + ux * start, y1 + uy * start),
+                (x1 + ux * end, y1 + uy * end),
+                width,
+                color,
+            );
+            pos += dash;
+            if i < k - 1 {
+                pos += base_gap + if i < extra { 1 } else { 0 };
             }
-
-            pos = next_pos;
-            dash_index += 1;
-            drawing = !drawing;
         }
     }
 }
