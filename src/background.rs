@@ -6,13 +6,7 @@
 //! (`auto`, `cover`, `contain`, explicit dip / percent-of-frame /
 //! factor-of-natural-size components).
 
-use std::hash::{Hash, Hasher};
-use std::io::Cursor;
-
-use image::GenericImageView;
-
-use crate::assets::get_asset;
-use crate::svg;
+use crate::image_source::ImageSource;
 use crate::themes::Theme;
 use crate::types::{Rect, rect};
 use crate::views::{Borders, HAlign, VAlign};
@@ -94,13 +88,8 @@ pub enum BgOrigin {
 /// A configured background image: asset source plus style knobs.
 /// Style fields are public — tweak them directly via `Frame::background_image_mut()`.
 pub struct BackgroundImage {
-    path: String,
-    bytes: Option<Vec<u8>>,
-    load_attempted: bool,
-    is_svg: bool,
-    natural_size: (u32, u32),
-    /// SVG rasterization cache at the last destination size (w, h, rgba).
-    rasterized: Option<(u32, u32, Vec<u8>)>,
+    /// The image itself (load, SVG rasterization, and GPU-cache lifetime).
+    image: ImageSource,
     /// 0.0–1.0, multiplied with the current theme opacity.
     pub opacity: f32,
     pub repeat: BgRepeat,
@@ -112,12 +101,7 @@ pub struct BackgroundImage {
 impl Default for BackgroundImage {
     fn default() -> Self {
         BackgroundImage {
-            path: String::new(),
-            bytes: None,
-            load_attempted: false,
-            is_svg: false,
-            natural_size: (0, 0),
-            rasterized: None,
+            image: ImageSource::new(""),
             opacity: 1.0,
             repeat: BgRepeat::None,
             position: BgPosition::default(),
@@ -128,50 +112,15 @@ impl Default for BackgroundImage {
 }
 
 impl BackgroundImage {
-    /// Changes the image source, resetting all loaded/cached data.
+    /// Changes the image source, replacing the previous one (whose texture is
+    /// freed at the next paint).
     pub fn set_path(&mut self, path: &str) {
-        self.path = path.to_owned();
-        self.bytes = None;
-        self.load_attempted = false;
-        self.is_svg = false;
-        self.natural_size = (0, 0);
-        self.rasterized = None;
-    }
-
-    fn ensure_loaded(&mut self) {
-        if self.bytes.is_some() || self.load_attempted || self.path.is_empty() {
-            return;
-        }
-        self.load_attempted = true;
-        if let Some(bytes) = get_asset(&self.path) {
-            let is_svg = self.path.to_ascii_lowercase().ends_with(".svg") || svg::looks_like_svg(&bytes);
-            if is_svg {
-                if let Ok(tree) = usvg::Tree::from_data(&bytes, &usvg::Options::default()) {
-                    let s = tree.size();
-                    self.natural_size = (s.width().ceil() as u32, s.height().ceil() as u32);
-                } else {
-                    println!("Frame background: failed to parse SVG: {}", self.path);
-                }
-            } else {
-                match image::load(Cursor::new(&bytes), image::ImageFormat::from_path(&self.path).unwrap_or(image::ImageFormat::Png)) {
-                    Ok(img) => {
-                        self.natural_size = img.dimensions();
-                    }
-                    Err(e) => {
-                        println!("Frame background: failed to decode image: {}", e);
-                    }
-                }
-            }
-            self.is_svg = is_svg;
-            self.bytes = Some(bytes);
-        } else {
-            println!("Frame background: asset not found: {}", self.path);
-        }
+        self.image = ImageSource::new(path);
     }
 
     /// Destination size of one image tile in physical pixels.
-    fn dest_size(&self, origin: Rect<i32>, scale: f64) -> (i32, i32) {
-        let (nw, nh) = self.natural_size;
+    fn dest_size(&self, origin: Rect<i32>, natural: (u32, u32), scale: f64) -> (i32, i32) {
+        let (nw, nh) = natural;
         if nw == 0 || nh == 0 {
             return (0, 0);
         }
@@ -222,8 +171,8 @@ impl BackgroundImage {
     /// `padding` is already scaled to physical pixels. The caller must have
     /// clipped to `frame_rect` already (partial tiles rely on the scissor).
     pub fn paint(&mut self, theme: &mut dyn Theme, frame_rect: Rect<i32>, padding: &Borders, scale: f64) {
-        self.ensure_loaded();
-        if self.bytes.is_none() || self.opacity <= 0.0 {
+        let natural = self.image.natural_size();
+        if !self.image.is_loaded() || self.opacity <= 0.0 {
             return;
         }
         let origin = match self.origin {
@@ -236,33 +185,11 @@ impl BackgroundImage {
         if origin.width() <= 0 || origin.height() <= 0 {
             return;
         }
-        let (dw, dh) = self.dest_size(origin, scale);
+        let (dw, dh) = self.dest_size(origin, natural, scale);
         if dw < 1 || dh < 1 {
             return;
         }
         let (ax, ay) = self.anchor(origin, (dw, dh), scale);
-
-        // For SVG: (re)rasterize at the destination size and remember the GPU cache key.
-        let mut raster_cache_key = None;
-        if self.is_svg {
-            let (w, h) = (dw as u32, dh as u32);
-            let needs_render = match &self.rasterized {
-                Some((cw, ch, _)) => *cw != w || *ch != h,
-                None => true,
-            };
-            if needs_render
-                && let Some(src) = &self.bytes
-                && let Some(rgba) = svg::rasterize(src, w, h)
-            {
-                self.rasterized = Some((w, h, rgba));
-            }
-            match &self.rasterized {
-                Some((cw, ch, _)) if *cw == w && *ch == h => {
-                    raster_cache_key = Some(raster_key(&self.path, w, h));
-                }
-                _ => return,
-            }
-        }
 
         let clip_content = self.origin == BgOrigin::Content;
         if clip_content {
@@ -292,13 +219,10 @@ impl BackgroundImage {
             let mut x = start_x;
             while x < end_x {
                 let tile = rect((x, y), (x + dw, y + dh));
-                if let Some(key) = raster_cache_key {
-                    if let Some((w, h, rgba)) = &self.rasterized {
-                        theme.draw_raw_image(tile, rgba, (*w, *h), key);
-                    }
-                } else if let Some(bytes) = &self.bytes {
-                    theme.draw_image(tile, bytes);
-                }
+                // All tiles share this size, so the first uploads/rasterizes and
+                // the rest hit the cache. Opacity is applied via the theme's
+                // opacity stack pushed above, so the tint stays neutral.
+                self.image.draw(theme, tile, 0xFFFFFFFF);
                 x += dw;
             }
             y += dh;
@@ -328,15 +252,6 @@ fn resolve_offset(off: BgOffset, origin_dim: i32, scale: f64) -> i32 {
         BgOffset::Dip(d) => (d as f64 * scale).round() as i32,
         BgOffset::Percent(p) => (origin_dim as f32 * p / 100.0).round() as i32,
     }
-}
-
-fn raster_key(path: &str, w: u32, h: u32) -> u64 {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    "frame_background".hash(&mut hasher);
-    path.hash(&mut hasher);
-    w.hash(&mut hasher);
-    h.hash(&mut hasher);
-    hasher.finish()
 }
 
 /// Parses `none | x | y | both` (anything else → `none`).

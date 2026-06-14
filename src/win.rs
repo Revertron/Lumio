@@ -174,6 +174,19 @@ impl<T: From<WinEvent> + Send + 'static> WindowHandler<T> for Win<T> {
     }
 
     fn on_draw(&mut self, helper: &mut WindowHelper<T>, graphics: &mut Graphics2D) {
+        // Free textures whose ImageSource was dropped or re-rasterized since the
+        // last frame. Done here (not in ImageSource::drop) because deleting a GL
+        // texture needs this window's context current, which it is during on_draw.
+        // A texture id lives in exactly one window's cache; requeue any that
+        // aren't ours so the owning window frees them on its next paint.
+        let mut not_mine = Vec::new();
+        for id in crate::image_source::take_pending_evictions() {
+            if self.image_cache.remove(&id).is_none() {
+                not_mine.push(id);
+            }
+        }
+        crate::image_source::requeue_evictions(not_mine);
+
         if let Some(palette) = self.ui.take_pending_palette() {
             crate::drawing::set_current_palette(palette.clone());
             self.palette = palette;

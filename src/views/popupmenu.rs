@@ -5,8 +5,9 @@ use speedy2d::dimen::Vector2;
 use speedy2d::font::{TextLayout, TextOptions};
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
 
-use crate::assets::{get_asset, get_font_family};
+use crate::assets::get_font_family;
 use crate::events::{EventCallback, EventData, EventType};
+use crate::image_source::ImageSource;
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
@@ -40,7 +41,8 @@ pub struct MenuItem {
 pub struct PopupMenu {
     state: RefCell<FieldsMain>,
     items: RefCell<Vec<MenuItem>>,
-    icon_bytes: RefCell<Vec<Option<Vec<u8>>>>,
+    /// One slot per item; `None` for items without an icon. Parallel to `items`.
+    icons: RefCell<Vec<Option<ImageSource>>>,
     cached_texts: RefCell<Vec<Option<speedy2d::font::FormattedTextBlock>>>,
     hovered: RefCell<Option<usize>>,
     pressed: RefCell<Option<usize>>,
@@ -72,7 +74,7 @@ impl PopupMenu {
         PopupMenu {
             state: RefCell::new(main),
             items: RefCell::new(Vec::new()),
-            icon_bytes: RefCell::new(Vec::new()),
+            icons: RefCell::new(Vec::new()),
             cached_texts: RefCell::new(Vec::new()),
             hovered: RefCell::new(None),
             pressed: RefCell::new(None),
@@ -92,7 +94,7 @@ impl PopupMenu {
             separator: false,
             children: Vec::new(),
         });
-        self.icon_bytes.borrow_mut().push(None);
+        self.icons.borrow_mut().push(ImageSource::for_path(icon_path));
         self.cached_texts.borrow_mut().push(None);
     }
 
@@ -105,7 +107,7 @@ impl PopupMenu {
             separator: false,
             children,
         });
-        self.icon_bytes.borrow_mut().push(None);
+        self.icons.borrow_mut().push(ImageSource::for_path(icon_path));
         self.cached_texts.borrow_mut().push(None);
     }
 
@@ -118,16 +120,19 @@ impl PopupMenu {
             separator: true,
             children: Vec::new(),
         });
-        self.icon_bytes.borrow_mut().push(None);
+        self.icons.borrow_mut().push(None);
         self.cached_texts.borrow_mut().push(None);
     }
 
     /// Replaces all items at once (used by MenuBar and submenu creation).
     pub fn set_items(&mut self, items: Vec<MenuItem>) {
         let n = items.len();
-        *self.items.borrow_mut() = items;
-        *self.icon_bytes.borrow_mut() = (0..n).map(|_| None).collect();
+        *self.icons.borrow_mut() = items
+            .iter()
+            .map(|it| ImageSource::for_path(&it.icon_path))
+            .collect();
         *self.cached_texts.borrow_mut() = (0..n).map(|_| None).collect();
+        *self.items.borrow_mut() = items;
         *self.hovered.borrow_mut() = None;
     }
 
@@ -158,14 +163,8 @@ impl PopupMenu {
     }
 
     fn load_icons(&self) {
-        let items = self.items.borrow();
-        let mut bytes = self.icon_bytes.borrow_mut();
-        for (i, item) in items.iter().enumerate() {
-            if bytes[i].is_none() && !item.icon_path.is_empty() {
-                if let Some(data) = get_asset(&item.icon_path) {
-                    bytes[i] = Some(data);
-                }
-            }
+        for src in self.icons.borrow_mut().iter_mut().flatten() {
+            src.ensure_loaded();
         }
     }
 
@@ -474,7 +473,7 @@ impl View for PopupMenu {
         let hovered = *self.hovered.borrow();
         let items = self.items.borrow();
         let cached = self.cached_texts.borrow();
-        let icon_bytes = self.icon_bytes.borrow();
+        let mut icons = self.icons.borrow_mut();
 
         let content_x = r.min.x + padding.left;
         let mut y = r.min.y + padding.top;
@@ -506,14 +505,15 @@ impl View for PopupMenu {
                 theme.color("text")
             };
 
-            // Draw icon
-            if let Some(Some(bytes)) = icon_bytes.get(i) {
+            // Draw icon, tinted to the item's text color so monochrome (white)
+            // icons match the text and stay visible in any theme.
+            if let Some(Some(src)) = icons.get_mut(i) {
                 let icon_y = y + (item_h - icon_size) / 2;
                 let icon_rect = rect(
                     (content_x + pad_left, icon_y),
                     (content_x + pad_left + icon_size, icon_y + icon_size),
                 );
-                theme.draw_image(icon_rect, bytes);
+                src.draw(theme, icon_rect, text_color);
             }
 
             // Draw text

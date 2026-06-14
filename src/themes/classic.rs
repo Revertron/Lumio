@@ -15,8 +15,8 @@ use super::super::themes::{Theme, Typeface, ViewState};
 use super::super::types;
 use super::super::types::{Rect, rect};
 
-/// Cache for GPU image handles, keyed by the raw pointer of the source byte slice.
-pub type ImageCache = HashMap<usize, ImageHandle>;
+/// Cache for GPU image handles, keyed by the owning `ImageSource`'s unique id.
+pub type ImageCache = HashMap<u64, ImageHandle>;
 
 #[allow(unused)]
 pub struct Classic<'h> {
@@ -237,16 +237,15 @@ impl<'h> Theme for Classic<'h> {
         self.opacity_stack.pop();
     }
 
-    fn draw_image(&mut self, rect: Rect<i32>, image_bytes: &[u8]) {
-        self.draw_image_tinted(rect, image_bytes, 0xFFFFFFFF);
+    fn draw_image(&mut self, rect: Rect<i32>, image_bytes: &[u8], cache_key: u64) {
+        self.draw_image_tinted(rect, image_bytes, cache_key, 0xFFFFFFFF);
     }
 
     fn draw_raw_image(&mut self, rect: Rect<i32>, rgba: &[u8], size: (u32, u32), cache_key: u64) {
         self.draw_raw_image_tinted(rect, rgba, size, cache_key, 0xFFFFFFFF);
     }
 
-    fn draw_image_tinted(&mut self, rect: Rect<i32>, image_bytes: &[u8], tint_argb: u32) {
-        let cache_key = image_bytes.as_ptr() as usize;
+    fn draw_image_tinted(&mut self, rect: Rect<i32>, image_bytes: &[u8], cache_key: u64, tint_argb: u32) {
         if !self.image_cache.contains_key(&cache_key) {
             let cursor = Cursor::new(image_bytes);
             match self.graphics.create_image_from_file_bytes(None, ImageSmoothingMode::Linear, cursor) {
@@ -271,7 +270,7 @@ impl<'h> Theme for Classic<'h> {
     }
 
     fn draw_raw_image_tinted(&mut self, rect: Rect<i32>, rgba: &[u8], size: (u32, u32), cache_key: u64, tint_argb: u32) {
-        let key = cache_key as usize;
+        let key = cache_key;
         if !self.image_cache.contains_key(&key) {
             match self.graphics.create_image_from_raw_pixels(
                 ImageDataType::RGBA,

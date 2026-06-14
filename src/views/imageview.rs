@@ -1,14 +1,10 @@
 use std::cell::RefCell;
-use std::hash::{Hash, Hasher};
-use std::io::Cursor;
 
-use image::GenericImageView;
 use speedy2d::dimen::Vector2;
 use speedy2d::window::MouseButton;
 
-use crate::assets::get_asset;
 use crate::events::{EventCallback, EventData, EventType};
-use crate::svg;
+use crate::image_source::ImageSource;
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
@@ -20,44 +16,12 @@ const DEFAULT_IMAGE_SIZE: u32 = 32;
 
 pub struct ImageView {
     state: RefCell<FieldsMain>,
-    image_path: RefCell<String>,
-    image_bytes: RefCell<Option<Vec<u8>>>,
-    /// Natural image dimensions (width, height) in pixels, decoded from image data
-    natural_size: RefCell<(u32, u32)>,
-    image_is_svg: RefCell<bool>,
-    rasterized: RefCell<Option<(u32, u32, Vec<u8>)>>,
-    /// Optional ARGB tint applied to SVG icons. Replaces the rasterized
-    /// pixel's RGB with the tint's RGB and multiplies the pixel's alpha by
-    /// the tint's alpha — designed for monochrome icons whose shape lives
-    /// in the alpha channel.
+    /// The image (load, SVG rasterization, and GPU-cache lifetime). `None` until
+    /// an image is set; replaced wholesale when the source changes.
+    image: RefCell<Option<ImageSource>>,
+    /// Optional ARGB tint multiplied with the image at draw time (`0xFFFFFFFF`
+    /// = no change). Monochrome icons should be authored white to recolor.
     tint: RefCell<Option<u32>>,
-}
-
-fn path_size_key(path: &str, w: u32, h: u32, tint: Option<u32>) -> u64 {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    path.hash(&mut hasher);
-    w.hash(&mut hasher);
-    h.hash(&mut hasher);
-    tint.hash(&mut hasher);
-    hasher.finish()
-}
-
-/// Applies the tint to a premultiplied-alpha RGBA buffer in place. For each
-/// pixel, the alpha is multiplied by the tint's alpha and the RGB channels
-/// are replaced with the tint's RGB (premultiplied by the new alpha).
-fn apply_tint(rgba: &mut [u8], tint: u32) {
-    let ta = ((tint >> 24) & 0xFF) as u32;
-    let tr = ((tint >> 16) & 0xFF) as u32;
-    let tg = ((tint >> 8) & 0xFF) as u32;
-    let tb = (tint & 0xFF) as u32;
-    for chunk in rgba.chunks_exact_mut(4) {
-        let a = chunk[3] as u32;
-        let new_a = a * ta / 255;
-        chunk[0] = (tr * new_a / 255) as u8;
-        chunk[1] = (tg * new_a / 255) as u8;
-        chunk[2] = (tb * new_a / 255) as u8;
-        chunk[3] = new_a as u8;
-    }
 }
 
 impl HasMainFields for ImageView {
@@ -69,57 +33,26 @@ impl HasMainFields for ImageView {
 impl ViewBasics for ImageView {}
 
 impl ImageView {
-    /// Change the image source. Loads the asset eagerly so callers can swap
-    /// the image without waiting for the next layout pass — useful when the
-    /// image dimensions are fixed and only the source bytes need to change.
+    /// Change the image source. The previous `ImageSource` is dropped (its
+    /// texture freed at the next paint) and a fresh one created.
     pub fn set_image(&mut self, path: &str) {
-        *self.image_path.borrow_mut() = path.to_owned();
-        *self.image_bytes.borrow_mut() = None;
-        *self.image_is_svg.borrow_mut() = false;
-        *self.rasterized.borrow_mut() = None;
-        self.load_image();
+        *self.image.borrow_mut() = Some(ImageSource::new(path));
     }
 
-    /// Set or clear an ARGB tint applied to SVG icons. Pass `None` to render
-    /// the SVG with its original colors. Invalidates the rasterized cache.
+    /// Set or clear an ARGB tint multiplied with the image at draw time. Pass
+    /// `None` for no tint. Monochrome icons should be authored white to recolor.
     pub fn set_tint(&mut self, color: Option<u32>) {
         *self.tint.borrow_mut() = color;
-        *self.rasterized.borrow_mut() = None;
     }
 
-    fn load_image(&self) {
-        if self.image_bytes.borrow().is_some() {
-            return;
-        }
-        let path = self.image_path.borrow().clone();
-        if path.is_empty() {
-            return;
-        }
-        if let Some(bytes) = get_asset(&path) {
-            let is_svg = path.to_ascii_lowercase().ends_with(".svg") || svg::looks_like_svg(&bytes);
-            if is_svg {
-                if let Ok(tree) = usvg::Tree::from_data(&bytes, &usvg::Options::default()) {
-                    let s = tree.size();
-                    *self.natural_size.borrow_mut() = (s.width().ceil() as u32, s.height().ceil() as u32);
-                } else {
-                    println!("ImageView: failed to parse SVG: {}", path);
-                }
-            } else {
-                match image::load(Cursor::new(&bytes), image::ImageFormat::from_path(&path).unwrap_or(image::ImageFormat::Png)) {
-                    Ok(img) => {
-                        let (w, h) = img.dimensions();
-                        *self.natural_size.borrow_mut() = (w, h);
-                    }
-                    Err(e) => {
-                        println!("ImageView: failed to decode image dimensions: {}", e);
-                    }
-                }
-            }
-            *self.image_is_svg.borrow_mut() = is_svg;
-            *self.image_bytes.borrow_mut() = Some(bytes);
-        } else {
-            println!("ImageView: asset not found: {}", path);
-        }
+    /// Natural image size, loading the asset if needed (returns `(0, 0)` when
+    /// no image is set).
+    fn natural_size(&self) -> (u32, u32) {
+        self.image
+            .borrow_mut()
+            .as_mut()
+            .map(|s| s.natural_size())
+            .unwrap_or((0, 0))
     }
 }
 
@@ -130,14 +63,10 @@ impl View for ImageView {
         }
         match name {
             "image" => {
-                *self.image_path.borrow_mut() = value.to_owned();
-                *self.image_bytes.borrow_mut() = None;
-                *self.image_is_svg.borrow_mut() = false;
-                *self.rasterized.borrow_mut() = None;
+                *self.image.borrow_mut() = Some(ImageSource::new(value));
             }
             "tint" => {
                 *self.tint.borrow_mut() = crate::view_base::parse_hex_color(value);
-                *self.rasterized.borrow_mut() = None;
             }
             _ => {}
         }
@@ -153,7 +82,6 @@ impl View for ImageView {
 
     fn layout_content(&mut self, x: i32, y: i32, _width: i32, _height: i32, _typeface: &Typeface, scale: f64) -> Rect<i32> {
         self.base_set_scale(scale);
-        self.load_image();
         let (content_w, content_h) = self.get_content_size();
         let padding = self.get_padding(scale);
         let full_width = padding.left + content_w + padding.right;
@@ -176,14 +104,16 @@ impl View for ImageView {
         theme.push_clip();
         theme.clip_rect(r);
 
-        if self.image_bytes.borrow().is_some() {
+        // Read the natural size (loads the asset) under a short borrow, compute
+        // the aspect-fitted rect, then draw under a fresh borrow — never nest two
+        // borrows of `self.image`.
+        let (nat_w, nat_h) = self.natural_size();
+        if nat_w > 0 && nat_h > 0 {
             let padding = state.padding.scaled(state.scale);
             let content_w = r.width() - padding.left - padding.right;
             let content_h = r.height() - padding.top - padding.bottom;
 
-            let (nat_w, nat_h) = *self.natural_size.borrow();
-            let aspect = if nat_w > 0 && nat_h > 0 { nat_w as f64 / nat_h as f64 } else { 1.0 };
-
+            let aspect = nat_w as f64 / nat_h as f64;
             let (img_w, img_h) = if (content_w as f64 / aspect) <= content_h as f64 {
                 (content_w, (content_w as f64 / aspect).round() as i32)
             } else {
@@ -193,29 +123,11 @@ impl View for ImageView {
             let img_y = r.min.y + padding.top + (content_h - img_h) / 2;
             let img_rect = rect((img_x, img_y), (img_x + img_w, img_y + img_h));
 
-            if *self.image_is_svg.borrow() && img_w > 0 && img_h > 0 {
-                let w = img_w as u32;
-                let h = img_h as u32;
-                let needs_render = match &*self.rasterized.borrow() {
-                    Some((cw, ch, _)) => *cw != w || *ch != h,
-                    None => true,
-                };
-                if needs_render {
-                    if let Some(ref src) = *self.image_bytes.borrow() {
-                        if let Some(mut rgba) = svg::rasterize(src, w, h) {
-                            if let Some(tint) = *self.tint.borrow() {
-                                apply_tint(&mut rgba, tint);
-                            }
-                            *self.rasterized.borrow_mut() = Some((w, h, rgba));
-                        }
-                    }
+            if img_w > 0 && img_h > 0 {
+                let tint = self.tint.borrow().unwrap_or(0xFFFFFFFF);
+                if let Some(img) = self.image.borrow_mut().as_mut() {
+                    img.draw(theme, img_rect, tint);
                 }
-                if let Some((cw, ch, rgba)) = &*self.rasterized.borrow() {
-                    let key = path_size_key(&self.image_path.borrow(), *cw, *ch, *self.tint.borrow());
-                    theme.draw_raw_image(img_rect, rgba, (*cw, *ch), key);
-                }
-            } else if let Some(ref bytes) = *self.image_bytes.borrow() {
-                theme.draw_image(img_rect, bytes);
             }
         }
 
@@ -271,8 +183,8 @@ impl View for ImageView {
     }
 
     fn get_content_size(&self) -> (i32, i32) {
+        let (nat_w, nat_h) = self.natural_size();
         let state = self.state.borrow();
-        let (nat_w, nat_h) = *self.natural_size.borrow();
         let aspect = if nat_w > 0 && nat_h > 0 {
             nat_w as f64 / nat_h as f64
         } else {
@@ -446,11 +358,7 @@ impl Default for ImageView {
         main.state.focusable = false;
         ImageView {
             state: RefCell::new(main),
-            image_path: RefCell::new(String::new()),
-            image_bytes: RefCell::new(None),
-            natural_size: RefCell::new((0, 0)),
-            image_is_svg: RefCell::new(false),
-            rasterized: RefCell::new(None),
+            image: RefCell::new(None),
             tint: RefCell::new(None),
         }
     }

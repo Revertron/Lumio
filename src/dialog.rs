@@ -411,6 +411,9 @@ fn make_icon(asset_path: &str) -> Element {
     icon.set_any("image", asset_path);
     icon.set_any("width", &ICON_SIZE.to_string());
     icon.set_any("height", &ICON_SIZE.to_string());
+    // Tint to the theme text color so monochrome (white-authored) icons stay
+    // visible; resolved at build time, which is fine for a short-lived dialog.
+    icon.set_tint(Some(crate::drawing::current_color("text")));
     Rc::new(RefCell::new(icon))
 }
 

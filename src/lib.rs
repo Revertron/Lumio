@@ -13,6 +13,7 @@ pub mod containers;
 pub mod dialog;
 pub mod layout;
 pub mod background;
+pub mod image_source;
 pub mod views;
 pub mod win;
 pub mod themes;

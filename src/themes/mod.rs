@@ -57,8 +57,9 @@ pub trait Theme {
     fn draw_component(&mut self, role: &str, rect: Rect<i32>, state: ViewState);
 
     /// Draw an image from raw file bytes, scaled to fit the given rect.
-    /// The image is cached by the byte slice pointer for efficiency.
-    fn draw_image(&mut self, rect: Rect<i32>, image_bytes: &[u8]);
+    /// `cache_key` is a caller-supplied stable key (an `ImageSource` id) used to
+    /// upload the decoded texture once and reuse it on subsequent frames.
+    fn draw_image(&mut self, _rect: Rect<i32>, _image_bytes: &[u8], _cache_key: u64) {}
 
     /// Draw a pre-decoded RGBA8 image of the given pixel size into `rect`.
     /// `cache_key` is a caller-supplied stable key used to avoid re-uploading
@@ -67,9 +68,9 @@ pub trait Theme {
 
     /// Draw an image from raw file bytes, multiplied by an ARGB tint colour.
     /// `0xFFFFFFFF` means "no change". `0x80FFFFFF` halves opacity. `0xFFFF0000`
-    /// recolours the image to red full-alpha. Default falls back to plain `draw_image`.
-    fn draw_image_tinted(&mut self, rect: Rect<i32>, image_bytes: &[u8], _tint_argb: u32) {
-        self.draw_image(rect, image_bytes);
+    /// multiplies the image by red full-alpha. Default falls back to plain `draw_image`.
+    fn draw_image_tinted(&mut self, rect: Rect<i32>, image_bytes: &[u8], cache_key: u64, _tint_argb: u32) {
+        self.draw_image(rect, image_bytes, cache_key);
     }
 
     /// Tinted variant of `draw_raw_image`. See `draw_image_tinted` for tint semantics.

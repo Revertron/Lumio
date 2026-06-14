@@ -6,12 +6,10 @@ use speedy2d::dimen::Vector2;
 use speedy2d::font::{TextLayout, TextOptions};
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, VirtualKeyCode};
 
-use std::hash::{Hash, Hasher};
-
-use crate::assets::{get_asset, get_font_family};
+use crate::assets::get_font_family;
 use crate::events::{EventCallback, EventData, EventType};
 use crate::common::{delete_char, delete_range, insert_str, InputFilter, TextEditOp, TextSnapshot, UNDO_LIMIT};
-use crate::svg;
+use crate::image_source::ImageSource;
 use crate::views::{Borders, Gravity};
 use crate::views::popupmenu::PopupMenu;
 use crate::styles::selector::FontSelector;
@@ -49,15 +47,9 @@ pub struct Edit {
     held_ctrl: RefCell<bool>,
     key_repeat_time: RefCell<Instant>,
     key_repeat_started: RefCell<bool>,
-    // Leading/trailing icons + tint
-    icon_left_path: RefCell<String>,
-    icon_left_bytes: RefCell<Option<Vec<u8>>>,
-    icon_left_is_svg: RefCell<bool>,
-    icon_left_rasterized: RefCell<Option<(u32, u32, Vec<u8>)>>,
-    icon_right_path: RefCell<String>,
-    icon_right_bytes: RefCell<Option<Vec<u8>>>,
-    icon_right_is_svg: RefCell<bool>,
-    icon_right_rasterized: RefCell<Option<(u32, u32, Vec<u8>)>>,
+    // Leading/trailing icons + tint. `None` = no icon for that slot.
+    icon_left: RefCell<Option<ImageSource>>,
+    icon_right: RefCell<Option<ImageSource>>,
     /// None = the theme's "icon_tint" token; Some = user override.
     icon_tint: RefCell<Option<u32>>,
     // Track which icon (if any) absorbed the most recent mouse-down — used to
@@ -123,14 +115,8 @@ impl Edit {
             held_ctrl: RefCell::new(false),
             key_repeat_time: RefCell::new(Instant::now()),
             key_repeat_started: RefCell::new(false),
-            icon_left_path: RefCell::new(String::new()),
-            icon_left_bytes: RefCell::new(None),
-            icon_left_is_svg: RefCell::new(false),
-            icon_left_rasterized: RefCell::new(None),
-            icon_right_path: RefCell::new(String::new()),
-            icon_right_bytes: RefCell::new(None),
-            icon_right_is_svg: RefCell::new(false),
-            icon_right_rasterized: RefCell::new(None),
+            icon_left: RefCell::new(None),
+            icon_right: RefCell::new(None),
             icon_tint: RefCell::new(None),
             pressed_icon: RefCell::new(None),
             error: RefCell::new(false),
@@ -236,26 +222,13 @@ impl Edit {
         *self.error.borrow()
     }
 
-    fn load_icon(path: &RefCell<String>, bytes: &RefCell<Option<Vec<u8>>>, is_svg: &RefCell<bool>) {
-        if bytes.borrow().is_some() {
-            return;
-        }
-        let p = path.borrow().clone();
-        if p.is_empty() {
-            return;
-        }
-        if let Some(data) = get_asset(&p) {
-            let svg_flag = p.to_ascii_lowercase().ends_with(".svg") || svg::looks_like_svg(&data);
-            *is_svg.borrow_mut() = svg_flag;
-            *bytes.borrow_mut() = Some(data);
-        } else {
-            println!("Edit: icon asset not found: {}", p);
-        }
-    }
-
     fn load_icons(&self) {
-        Self::load_icon(&self.icon_left_path, &self.icon_left_bytes, &self.icon_left_is_svg);
-        Self::load_icon(&self.icon_right_path, &self.icon_right_bytes, &self.icon_right_is_svg);
+        if let Some(s) = self.icon_left.borrow_mut().as_mut() {
+            s.ensure_loaded();
+        }
+        if let Some(s) = self.icon_right.borrow_mut().as_mut() {
+            s.ensure_loaded();
+        }
     }
 
     /// Width in pixels reserved by an icon side. Returns 0 when no icon is set.
@@ -270,8 +243,8 @@ impl Edit {
     /// Returns (left_inset, right_inset) in pixels for icon reservations.
     /// Used by paint, click hit-testing, scroll bounds, caret rect.
     fn icon_insets(&self, inner_height: i32, scale: f64) -> (i32, i32) {
-        let has_left = !self.icon_left_path.borrow().is_empty();
-        let has_right = !self.icon_right_path.borrow().is_empty();
+        let has_left = self.icon_left.borrow().is_some();
+        let has_right = self.icon_right.borrow().is_some();
         (
             self.icon_side_width(has_left, inner_height, scale),
             self.icon_side_width(has_right, inner_height, scale),
@@ -291,8 +264,8 @@ impl Edit {
         }
         let icon_size = inner_h;
         let inner_top = my_rect.min.y + padding.top;
-        let has_left = !self.icon_left_path.borrow().is_empty();
-        let has_right = !self.icon_right_path.borrow().is_empty();
+        let has_left = self.icon_left.borrow().is_some();
+        let has_right = self.icon_right.borrow().is_some();
         let left = if has_left {
             let x = my_rect.min.x + padding.left;
             Some(crate::types::rect((x, inner_top), (x + icon_size, inner_top + icon_size)))
@@ -313,41 +286,9 @@ impl Edit {
     }
 
     fn draw_icon(&self, theme: &mut dyn Theme, icon_rect: Rect<i32>, is_left: bool, tint: u32) {
-        let (path_cell, bytes_cell, is_svg_cell, raster_cell) = if is_left {
-            (&self.icon_left_path, &self.icon_left_bytes, &self.icon_left_is_svg, &self.icon_left_rasterized)
-        } else {
-            (&self.icon_right_path, &self.icon_right_bytes, &self.icon_right_is_svg, &self.icon_right_rasterized)
-        };
-        if bytes_cell.borrow().is_none() {
-            return;
-        }
-        let w = icon_rect.width().max(0) as u32;
-        let h = icon_rect.height().max(0) as u32;
-        if w == 0 || h == 0 {
-            return;
-        }
-        if *is_svg_cell.borrow() {
-            let needs_render = match &*raster_cell.borrow() {
-                Some((cw, ch, _)) => *cw != w || *ch != h,
-                None => true,
-            };
-            if needs_render {
-                if let Some(ref src) = *bytes_cell.borrow() {
-                    if let Some(rgba) = svg::rasterize(src, w, h) {
-                        *raster_cell.borrow_mut() = Some((w, h, rgba));
-                    }
-                }
-            }
-            if let Some((cw, ch, rgba)) = &*raster_cell.borrow() {
-                let mut hasher = std::collections::hash_map::DefaultHasher::new();
-                path_cell.borrow().hash(&mut hasher);
-                cw.hash(&mut hasher);
-                ch.hash(&mut hasher);
-                let key = hasher.finish();
-                theme.draw_raw_image_tinted(icon_rect, rgba, (*cw, *ch), key, tint);
-            }
-        } else if let Some(ref bytes) = *bytes_cell.borrow() {
-            theme.draw_image_tinted(icon_rect, bytes, tint);
+        let cell = if is_left { &self.icon_left } else { &self.icon_right };
+        if let Some(icon) = cell.borrow_mut().as_mut() {
+            icon.draw(theme, icon_rect, tint);
         }
     }
 
@@ -1027,16 +968,10 @@ impl View for Edit {
                 self.set_input_filter(Some(Box::new(move |c| set.contains(&c))));
             }
             "icon_left" => {
-                *self.icon_left_path.borrow_mut() = value.to_owned();
-                *self.icon_left_bytes.borrow_mut() = None;
-                *self.icon_left_is_svg.borrow_mut() = false;
-                *self.icon_left_rasterized.borrow_mut() = None;
+                *self.icon_left.borrow_mut() = ImageSource::for_path(value);
             }
             "icon_right" => {
-                *self.icon_right_path.borrow_mut() = value.to_owned();
-                *self.icon_right_bytes.borrow_mut() = None;
-                *self.icon_right_is_svg.borrow_mut() = false;
-                *self.icon_right_rasterized.borrow_mut() = None;
+                *self.icon_right.borrow_mut() = ImageSource::for_path(value);
             }
             "icon_tint" => {
                 if let Some(c) = crate::view_base::parse_color_value(value) {

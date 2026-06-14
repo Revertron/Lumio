@@ -1,12 +1,10 @@
 use std::cell::RefCell;
-use std::hash::{Hash, Hasher};
 
 use speedy2d::dimen::Vector2;
 use speedy2d::window::MouseButton;
 
-use crate::assets::get_asset;
 use crate::events::{EventCallback, EventData, EventType};
-use crate::svg;
+use crate::image_source::ImageSource;
 use crate::themes::{Theme, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
@@ -18,25 +16,13 @@ const DEFAULT_IMAGE_SIZE: u32 = 32;
 
 pub struct ImageButton {
     state: RefCell<FieldsMain>,
-    image_path: RefCell<String>,
-    image_bytes: RefCell<Option<Vec<u8>>>,
-    image_is_svg: RefCell<bool>,
-    rasterized: RefCell<Option<(u32, u32, Vec<u8>)>>,
-    hover_image_path: RefCell<String>,
-    hover_image_bytes: RefCell<Option<Vec<u8>>>,
-    hover_image_is_svg: RefCell<bool>,
-    hover_rasterized: RefCell<Option<(u32, u32, Vec<u8>)>>,
+    /// The normal image; `None` until set, replaced wholesale on change.
+    image: RefCell<Option<ImageSource>>,
+    /// The image shown while hovered/pressed (optional).
+    hover_image: RefCell<Option<ImageSource>>,
     flat: RefCell<bool>,
     /// When true, suppress the inset border frame on press
     no_inset: RefCell<bool>,
-}
-
-fn path_size_key(path: &str, w: u32, h: u32) -> u64 {
-    let mut h_state = std::collections::hash_map::DefaultHasher::new();
-    path.hash(&mut h_state);
-    w.hash(&mut h_state);
-    h.hash(&mut h_state);
-    h_state.finish()
 }
 
 impl HasMainFields for ImageButton {
@@ -48,30 +34,13 @@ impl HasMainFields for ImageButton {
 impl ViewBasics for ImageButton {}
 
 impl ImageButton {
-    fn load_image(&self) {
-        if self.image_bytes.borrow().is_none() {
-            let path = self.image_path.borrow().clone();
-            if !path.is_empty() {
-                if let Some(bytes) = get_asset(&path) {
-                    let is_svg = path.to_ascii_lowercase().ends_with(".svg") || svg::looks_like_svg(&bytes);
-                    *self.image_is_svg.borrow_mut() = is_svg;
-                    *self.image_bytes.borrow_mut() = Some(bytes);
-                } else {
-                    println!("ImageButton: asset not found: {}", path);
-                }
-            }
+    /// Eagerly load both images so `is_loaded` is meaningful during paint.
+    fn load_images(&self) {
+        if let Some(s) = self.image.borrow_mut().as_mut() {
+            s.ensure_loaded();
         }
-        if self.hover_image_bytes.borrow().is_none() {
-            let path = self.hover_image_path.borrow().clone();
-            if !path.is_empty() {
-                if let Some(bytes) = get_asset(&path) {
-                    let is_svg = path.to_ascii_lowercase().ends_with(".svg") || svg::looks_like_svg(&bytes);
-                    *self.hover_image_is_svg.borrow_mut() = is_svg;
-                    *self.hover_image_bytes.borrow_mut() = Some(bytes);
-                } else {
-                    println!("ImageButton: hover asset not found: {}", path);
-                }
-            }
+        if let Some(s) = self.hover_image.borrow_mut().as_mut() {
+            s.ensure_loaded();
         }
     }
 }
@@ -83,16 +52,10 @@ impl View for ImageButton {
         }
         match name {
             "image" => {
-                *self.image_path.borrow_mut() = value.to_owned();
-                *self.image_bytes.borrow_mut() = None;
-                *self.image_is_svg.borrow_mut() = false;
-                *self.rasterized.borrow_mut() = None;
+                *self.image.borrow_mut() = Some(ImageSource::new(value));
             }
             "hover_image" => {
-                *self.hover_image_path.borrow_mut() = value.to_owned();
-                *self.hover_image_bytes.borrow_mut() = None;
-                *self.hover_image_is_svg.borrow_mut() = false;
-                *self.hover_rasterized.borrow_mut() = None;
+                *self.hover_image.borrow_mut() = Some(ImageSource::new(value));
             }
             "flat" => {
                 *self.flat.borrow_mut() = value.parse().unwrap_or(true);
@@ -114,7 +77,7 @@ impl View for ImageButton {
 
     fn layout_content(&mut self, x: i32, y: i32, width: i32, height: i32, _typeface: &Typeface, scale: f64) -> Rect<i32> {
         self.base_set_scale(scale);
-        self.load_image();
+        self.load_images();
         let (width, height) = self.calculate_size(width, height, scale);
         let padding = self.get_padding(scale);
         let full_width = padding.left + width + padding.right;
@@ -135,7 +98,7 @@ impl View for ImageButton {
         r.move_by(origin);
         let flat = *self.flat.borrow();
         let no_inset = *self.no_inset.borrow();
-        let has_hover_image = self.hover_image_path.borrow().len() > 0;
+        let has_hover_image = self.hover_image.borrow().is_some();
 
         theme.push_clip();
         theme.clip_rect(r);
@@ -147,10 +110,10 @@ impl View for ImageButton {
             theme.draw_component("button.back", r, state.state);
         }
 
-        // Pick which image bytes to draw: hover image when hovered/pressed, otherwise normal
+        // Use the hover image when hovered/pressed and it actually loaded
+        // (loaded eagerly in layout_content), otherwise the normal image.
         let use_hover = (state.state.hovered || state.state.pressed)
-            && self.hover_image_bytes.borrow().is_some();
-        let active_is_svg = if use_hover { *self.hover_image_is_svg.borrow() } else { *self.image_is_svg.borrow() };
+            && self.hover_image.borrow().as_ref().is_some_and(|s| s.is_loaded());
 
         let padding = state.padding.scaled(state.scale);
         let content_w = r.width() - padding.left - padding.right;
@@ -160,34 +123,10 @@ impl View for ImageButton {
         let img_y = r.min.y + padding.top + (content_h - img_size) / 2;
         let img_rect = rect((img_x, img_y), (img_x + img_size, img_y + img_size));
 
-        if active_is_svg && img_size > 0 {
-            let w = img_size as u32;
-            let h = img_size as u32;
-            let path = if use_hover { self.hover_image_path.borrow().clone() } else { self.image_path.borrow().clone() };
-            let raster_cell = if use_hover { &self.hover_rasterized } else { &self.rasterized };
-            let bytes_cell = if use_hover { &self.hover_image_bytes } else { &self.image_bytes };
-
-            let needs_render = match &*raster_cell.borrow() {
-                Some((cw, ch, _)) => *cw != w || *ch != h,
-                None => true,
-            };
-            if needs_render {
-                if let Some(ref src) = *bytes_cell.borrow() {
-                    if let Some(rgba) = svg::rasterize(src, w, h) {
-                        *raster_cell.borrow_mut() = Some((w, h, rgba));
-                    }
-                }
-            }
-            if let Some((cw, ch, rgba)) = &*raster_cell.borrow() {
-                let key = path_size_key(&path, *cw, *ch);
-                theme.draw_raw_image(img_rect, rgba, (*cw, *ch), key);
-            }
-        } else {
-            let hover_bytes = self.hover_image_bytes.borrow();
-            let normal_bytes = self.image_bytes.borrow();
-            let active_bytes = if use_hover { &hover_bytes } else { &normal_bytes };
-            if let Some(ref bytes) = **active_bytes {
-                theme.draw_image(img_rect, bytes);
+        if img_size > 0 {
+            let cell = if use_hover { &self.hover_image } else { &self.image };
+            if let Some(img) = cell.borrow_mut().as_mut() {
+                img.draw(theme, img_rect, 0xFFFFFFFF);
             }
         }
 
@@ -396,14 +335,8 @@ impl Default for ImageButton {
         main.padding = Borders::with_padding(4);
         ImageButton {
             state: RefCell::new(main),
-            image_path: RefCell::new(String::new()),
-            image_bytes: RefCell::new(None),
-            image_is_svg: RefCell::new(false),
-            rasterized: RefCell::new(None),
-            hover_image_path: RefCell::new(String::new()),
-            hover_image_bytes: RefCell::new(None),
-            hover_image_is_svg: RefCell::new(false),
-            hover_rasterized: RefCell::new(None),
+            image: RefCell::new(None),
+            hover_image: RefCell::new(None),
             flat: RefCell::new(true),
             no_inset: RefCell::new(false),
         }
