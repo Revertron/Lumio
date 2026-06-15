@@ -7,8 +7,7 @@ use std::time::Instant;
 
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::{Reader, XmlVersion};
-use speedy2d::dimen::Vector2;
-use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, MouseScrollDistance, VirtualKeyCode};
+use super::input::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, MouseScrollDistance, VirtualKeyCode};
 
 use super::containers::Frame;
 use super::events::{EventData, EventType};
@@ -107,7 +106,7 @@ pub struct UI {
     types: HashMap<String, fn() -> Element>,
     on_start: Option<Box<dyn FnMut(&mut UI)>>,
     overlays: Vec<PopupEntry>,
-    mouse_pos: Vector2<i32>,
+    mouse_pos: Point<i32>,
     tooltip_view_id: Option<String>,
     tooltip_hover_start: Option<Instant>,
     tooltip_showing: bool,
@@ -137,7 +136,7 @@ pub struct UI {
     hover_owner: Option<String>,
     /// Time, position and DoubleClick-listener target of the last left
     /// mouse-button press, for central double-click detection.
-    last_click: Option<(Instant, Vector2<i32>, Option<String>)>,
+    last_click: Option<(Instant, Point<i32>, Option<String>)>,
     /// True while dispatching a right-click whose `ContextMenu` listener
     /// returned true: built-in context menus (Edit, Memo, Label, RichText)
     /// check it and stay closed, and the click-missed-overlays popup
@@ -198,7 +197,7 @@ impl UI {
     pub fn new(width: u32, height: u32, typeface: Typeface, scale: f64) -> Self {
         let mut ui = UI {
             width, height, typeface, scale, root: None, types: HashMap::new(),
-            on_start: None, overlays: Vec::new(), mouse_pos: Vector2::new(0, 0),
+            on_start: None, overlays: Vec::new(), mouse_pos: Point::new(0, 0),
             tooltip_view_id: None, tooltip_hover_start: None, tooltip_showing: false, tooltip_popup: None, needs_relayout: false,
             notification_stack: None,
             pending_removals: Vec::new(),
@@ -917,7 +916,7 @@ impl UI {
     }
 
     /// Returns the current mouse position in absolute window coordinates.
-    pub fn get_mouse_pos(&self) -> Vector2<i32> {
+    pub fn get_mouse_pos(&self) -> Point<i32> {
         self.mouse_pos
     }
 
@@ -1126,7 +1125,7 @@ impl UI {
         }
     }
 
-    pub fn on_mouse_move(&mut self, position: Vector2<i32>) -> bool {
+    pub fn on_mouse_move(&mut self, position: Point<i32>) -> bool {
         self.mouse_pos = position;
         // Re-evaluate the cursor from scratch each move: views over a link
         // re-request `Pointer` during dispatch; anything left is the default.
@@ -1136,13 +1135,13 @@ impl UI {
         redraw
     }
 
-    fn dispatch_mouse_move(&mut self, position: Vector2<i32>) -> bool {
+    fn dispatch_mouse_move(&mut self, position: Point<i32>) -> bool {
         // Dispatch to overlays first (reverse order = topmost first)
         let entries: Vec<(Element, i32, i32)> = self.overlays.iter().rev()
             .map(|e| (Rc::clone(&e.element), e.x, e.y))
             .collect();
         for (element, ox, oy) in &entries {
-            let local = Vector2::new(position.x - ox, position.y - oy);
+            let local = Point::new(position.x - ox, position.y - oy);
             if element.borrow().on_mouse_move(self, local) {
                 return true;
             }
@@ -1168,7 +1167,7 @@ impl UI {
     /// overlay covers the views beneath it, so coordinate-based input must not
     /// fall through to the root there (used to confine cursor selection;
     /// `hit_test_listener` applies the same rule for hit testing).
-    fn pointer_over_opaque_overlay(&self, position: Vector2<i32>) -> bool {
+    fn pointer_over_opaque_overlay(&self, position: Point<i32>) -> bool {
         self.overlays.iter().any(|entry| {
             if entry.mode == PopupMode::Transparent {
                 return false;
@@ -1185,7 +1184,7 @@ impl UI {
     /// cursor lingers until the next move — e.g. the I-beam staying visible
     /// when a context menu opens over an `Edit`. Returns whether a redraw is
     /// needed.
-    fn refresh_cursor_if_overlays_changed(&mut self, position: Vector2<i32>, overlays_before: usize) -> bool {
+    fn refresh_cursor_if_overlays_changed(&mut self, position: Point<i32>, overlays_before: usize) -> bool {
         if self.overlays.len() == overlays_before {
             return false;
         }
@@ -1347,7 +1346,7 @@ impl UI {
             .show(self);
     }
 
-    pub fn on_mouse_button_down(&mut self, position: Vector2<i32>, button: MouseButton) -> bool {
+    pub fn on_mouse_button_down(&mut self, position: Point<i32>, button: MouseButton) -> bool {
         self.dismiss_tooltip();
         // Double-click bookkeeping (left button only). The target is the
         // deepest view under the cursor with a DoubleClick listener; the
@@ -1443,13 +1442,13 @@ impl UI {
         false
     }
 
-    fn dispatch_mouse_button_down(&mut self, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn dispatch_mouse_button_down(&mut self, position: Point<i32>, button: MouseButton) -> bool {
         // Dispatch to overlays first
         let entries: Vec<(Element, i32, i32)> = self.overlays.iter().rev()
             .map(|e| (Rc::clone(&e.element), e.x, e.y))
             .collect();
         for (element, ox, oy) in &entries {
-            let local = Vector2::new(position.x - ox, position.y - oy);
+            let local = Point::new(position.x - ox, position.y - oy);
             if element.borrow().on_mouse_button_down(self, local, button) {
                 return true;
             }
@@ -1469,19 +1468,19 @@ impl UI {
         }
     }
 
-    pub fn on_mouse_button_up(&mut self, position: Vector2<i32>, button: MouseButton) -> bool {
+    pub fn on_mouse_button_up(&mut self, position: Point<i32>, button: MouseButton) -> bool {
         let overlays_before = self.overlays.len();
         let mut redraw = self.dispatch_mouse_button_up(position, button);
         redraw |= self.refresh_cursor_if_overlays_changed(position, overlays_before);
         redraw
     }
 
-    fn dispatch_mouse_button_up(&mut self, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn dispatch_mouse_button_up(&mut self, position: Point<i32>, button: MouseButton) -> bool {
         let entries: Vec<(Element, i32, i32)> = self.overlays.iter().rev()
             .map(|e| (Rc::clone(&e.element), e.x, e.y))
             .collect();
         for (element, ox, oy) in &entries {
-            let local = Vector2::new(position.x - ox, position.y - oy);
+            let local = Point::new(position.x - ox, position.y - oy);
             if element.borrow().on_mouse_button_up(self, local, button) {
                 return true;
             }
@@ -1496,12 +1495,12 @@ impl UI {
         }
     }
 
-    pub fn on_mouse_wheel_scroll(&mut self, position: Vector2<i32>, distance: MouseScrollDistance) -> bool {
+    pub fn on_mouse_wheel_scroll(&mut self, position: Point<i32>, distance: MouseScrollDistance) -> bool {
         let entries: Vec<(Element, i32, i32)> = self.overlays.iter().rev()
             .map(|e| (Rc::clone(&e.element), e.x, e.y))
             .collect();
         for (element, ox, oy) in &entries {
-            let local = Vector2::new(position.x - ox, position.y - oy);
+            let local = Point::new(position.x - ox, position.y - oy);
             if element.borrow().on_mouse_wheel_scroll(self, local, distance) {
                 return true;
             }

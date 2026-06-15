@@ -1,9 +1,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use speedy2d::dimen::Vector2;
 use crate::text::{TextBlock, TextOptions};
-use speedy2d::window::MouseButton;
+use crate::input::MouseButton;
 
 use crate::assets::get_font_family;
 use crate::events::{EventCallback, EventData, EventType};
@@ -470,7 +469,7 @@ impl View for MenuBar {
         self.sync_open(ui)
     }
 
-    fn on_mouse_move(&self, ui: &mut UI, position: Vector2<i32>) -> bool {
+    fn on_mouse_move(&self, ui: &mut UI, position: Point<i32>) -> bool {
         // Redraw when stale open state is cleared (menu chain dismissed by a
         // click outside) so the title highlight goes away.
         let cleared = self.sync_open(ui);
@@ -490,7 +489,7 @@ impl View for MenuBar {
         cleared || old != hit
     }
 
-    fn on_mouse_button_down(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_down(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() || !matches!(button, MouseButton::Left) {
             return false;
         }
@@ -720,7 +719,7 @@ impl View for MenuItemTag {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use speedy2d::window::{ModifiersState, VirtualKeyCode};
+    use crate::input::{ModifiersState, VirtualKeyCode};
 
     const XML: &str = r#"
     <Frame id="root" width="max" height="max" direction="vertical">

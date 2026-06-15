@@ -2,9 +2,8 @@ use std::cell::RefCell;
 use std::cmp::{max, min};
 use std::rc::Rc;
 use std::time::Instant;
-use speedy2d::dimen::Vector2;
 use crate::text::{TextBlock, TextOptions};
-use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, VirtualKeyCode};
+use crate::input::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, VirtualKeyCode};
 
 use crate::assets::get_font_family;
 use crate::events::{EventCallback, EventData, EventType};
@@ -1368,7 +1367,7 @@ impl View for Edit {
         redraw
     }
 
-    fn on_mouse_move(&self, ui: &mut UI, position: Vector2<i32>) -> bool {
+    fn on_mouse_move(&self, ui: &mut UI, position: Point<i32>) -> bool {
         let scale = self.state.borrow().main.scale;
         let padding = self.get_padding(scale);
         let my_rect = self.state.borrow().main.rect;
@@ -1401,7 +1400,7 @@ impl View for Edit {
         self.state.borrow().main.state != old_state
     }
 
-    fn on_mouse_button_down(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_down(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
         if !self.state.borrow().main.rect.hit((position.x, position.y)) {
             return false;
@@ -1492,7 +1491,7 @@ impl View for Edit {
         true
     }
 
-    fn on_mouse_button_up(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_up(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
         if !matches!(button, MouseButton::Left) {
             return false;

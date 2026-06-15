@@ -7,6 +7,15 @@ pub struct Point<N> {
     pub y: N
 }
 
+impl<N> Point<N> {
+    /// Construct a point from its coordinates. Mirrors the signature of
+    /// `speedy2d::dimen::Vector2::new` so mouse-position call sites read the same.
+    #[inline]
+    pub const fn new(x: N, y: N) -> Self {
+        Point { x, y }
+    }
+}
+
 impl<T> From<(T, T)> for Point<T> where T: Copy {
     #[inline]
     fn from(value: (T, T)) -> Self {

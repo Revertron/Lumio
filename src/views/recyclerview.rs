@@ -3,8 +3,7 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use downcast_rs::{impl_downcast, Downcast};
-use speedy2d::dimen::Vector2;
-use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
+use crate::input::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
 use super::super::events::{EventCallback, EventData, EventType};
 use super::super::themes::{Theme, Typeface, ViewState};
 use super::super::traits::{Element, View, WeakElement};
@@ -1237,7 +1236,7 @@ impl View for RecyclerView {
         *self.needs_layout.borrow()
     }
 
-    fn on_mouse_button_down(&self, _ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_down(&self, _ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
         if !self.state.borrow().rect.hit((position.x, position.y)) {
             return false;
@@ -1265,7 +1264,7 @@ impl View for RecyclerView {
         false
     }
 
-    fn on_mouse_button_up(&self, _ui: &mut UI, _position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_up(&self, _ui: &mut UI, _position: Point<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
         if matches!(button, MouseButton::Left) {
             if self.state.borrow().state.pressed {
@@ -1276,7 +1275,7 @@ impl View for RecyclerView {
         false
     }
 
-    fn on_mouse_wheel_scroll(&self, _ui: &mut UI, position: Vector2<i32>, distance: MouseScrollDistance) -> bool {
+    fn on_mouse_wheel_scroll(&self, _ui: &mut UI, position: Point<i32>, distance: MouseScrollDistance) -> bool {
         if self.state.borrow().rect.hit((position.x, position.y)) {
             let mut scroll_y = *self.scroll_y.borrow();
 

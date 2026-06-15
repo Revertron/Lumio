@@ -1,9 +1,8 @@
 use std::cell::{Cell, RefCell};
 use std::cmp::min;
 
-use speedy2d::dimen::Vector2;
 use crate::text::{TextBlock, TextOptions};
-use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
+use crate::input::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
 
 use crate::assets::get_font_family;
 use crate::events::{EventCallback, EventData, EventType};
@@ -1157,7 +1156,7 @@ impl View for TableView {
         false
     }
 
-    fn on_mouse_move(&self, _ui: &mut UI, position: Vector2<i32>) -> bool {
+    fn on_mouse_move(&self, _ui: &mut UI, position: Point<i32>) -> bool {
         let r = self.state.borrow().rect;
         if !r.hit((position.x, position.y)) {
             if self.header_hover.get().is_some() {
@@ -1226,7 +1225,7 @@ impl View for TableView {
         false
     }
 
-    fn on_mouse_button_down(&self, _ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_down(&self, _ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
         let r = self.state.borrow().rect;
         if !r.hit((position.x, position.y)) { return false; }
@@ -1319,7 +1318,7 @@ impl View for TableView {
         true
     }
 
-    fn on_mouse_button_up(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_up(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !matches!(button, MouseButton::Left) { return false; }
         let r = self.state.borrow().rect;
         let local_x = position.x - r.min.x;
@@ -1367,7 +1366,7 @@ impl View for TableView {
         false
     }
 
-    fn on_mouse_wheel_scroll(&self, _ui: &mut UI, position: Vector2<i32>, distance: MouseScrollDistance) -> bool {
+    fn on_mouse_wheel_scroll(&self, _ui: &mut UI, position: Point<i32>, distance: MouseScrollDistance) -> bool {
         let r = self.state.borrow().rect;
         if !r.hit((position.x, position.y)) { return false; }
         let row_h = self.row_height_px.get().max(20);

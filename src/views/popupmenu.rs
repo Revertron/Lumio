@@ -1,9 +1,8 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use speedy2d::dimen::Vector2;
 use crate::text::{TextBlock, TextOptions};
-use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
+use crate::input::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
 
 use crate::assets::get_font_family;
 use crate::events::{EventCallback, EventData, EventType};
@@ -706,7 +705,7 @@ impl View for PopupMenu {
         self.base_fire_event(ui, EventType::Click, &EventData::None)
     }
 
-    fn on_mouse_move(&self, ui: &mut UI, position: Vector2<i32>) -> bool {
+    fn on_mouse_move(&self, ui: &mut UI, position: Point<i32>) -> bool {
         self.sync_submenu(ui);
         let hit_item = self.get_hit_item(position.x, position.y);
         let old = *self.hovered.borrow();
@@ -732,7 +731,7 @@ impl View for PopupMenu {
         old != *self.hovered.borrow()
     }
 
-    fn on_mouse_button_down(&self, _ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_down(&self, _ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
         if !matches!(button, MouseButton::Left) {
             return false;
@@ -742,7 +741,7 @@ impl View for PopupMenu {
         hit.is_some()
     }
 
-    fn on_mouse_button_up(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_up(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
         if !matches!(button, MouseButton::Left) {
             return false;

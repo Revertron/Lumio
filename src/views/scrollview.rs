@@ -1,8 +1,7 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use speedy2d::dimen::Vector2;
-use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
+use crate::input::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
 
 use crate::events::{EventCallback, EventData, EventType};
 use crate::themes::{Theme, Typeface, ViewState};
@@ -513,9 +512,9 @@ impl View for ScrollView {
         false
     }
 
-    fn on_mouse_move(&self, ui: &mut UI, position: Vector2<i32>) -> bool {
+    fn on_mouse_move(&self, ui: &mut UI, position: Point<i32>) -> bool {
         let my_rect = self.state.borrow().rect;
-        let local = Vector2::new(position.x - my_rect.min.x, position.y - my_rect.min.y);
+        let local = Point::new(position.x - my_rect.min.x, position.y - my_rect.min.y);
 
         // Handle thumb dragging
         if self.thumb_dragging.get() {
@@ -564,8 +563,8 @@ impl View for ScrollView {
         if let Some(child) = &*self.child.borrow() {
             let vp = self.viewport_rect();
             let child_pos = match self.direction {
-                Direction::Vertical => Vector2::new(local.x - vp.min.x, local.y - vp.min.y - self.scroll_offset.get()),
-                Direction::Horizontal => Vector2::new(local.x - vp.min.x - self.scroll_offset.get(), local.y - vp.min.y),
+                Direction::Vertical => Point::new(local.x - vp.min.x, local.y - vp.min.y - self.scroll_offset.get()),
+                Direction::Horizontal => Point::new(local.x - vp.min.x - self.scroll_offset.get(), local.y - vp.min.y),
             };
             if child.borrow().on_mouse_move(ui, child_pos) {
                 return true;
@@ -574,9 +573,9 @@ impl View for ScrollView {
         false
     }
 
-    fn on_mouse_button_down(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_down(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         let my_rect = self.state.borrow().rect;
-        let local = Vector2::new(position.x - my_rect.min.x, position.y - my_rect.min.y);
+        let local = Point::new(position.x - my_rect.min.x, position.y - my_rect.min.y);
 
         // Check if click is within our bounds
         let bounds = rect((0, 0), (my_rect.width(), my_rect.height()));
@@ -589,8 +588,8 @@ impl View for ScrollView {
             if let Some(child) = &*self.child.borrow() {
                 let vp = self.viewport_rect();
                 let child_pos = match self.direction {
-                    Direction::Vertical => Vector2::new(local.x - vp.min.x, local.y - vp.min.y - self.scroll_offset.get()),
-                    Direction::Horizontal => Vector2::new(local.x - vp.min.x - self.scroll_offset.get(), local.y - vp.min.y),
+                    Direction::Vertical => Point::new(local.x - vp.min.x, local.y - vp.min.y - self.scroll_offset.get()),
+                    Direction::Horizontal => Point::new(local.x - vp.min.x - self.scroll_offset.get(), local.y - vp.min.y),
                 };
                 return child.borrow().on_mouse_button_down(ui, child_pos, button);
             }
@@ -671,8 +670,8 @@ impl View for ScrollView {
             let vp = self.viewport_rect();
             if vp.hit((local.x, local.y)) {
                 let child_pos = match self.direction {
-                    Direction::Vertical => Vector2::new(local.x - vp.min.x, local.y - vp.min.y - self.scroll_offset.get()),
-                    Direction::Horizontal => Vector2::new(local.x - vp.min.x - self.scroll_offset.get(), local.y - vp.min.y),
+                    Direction::Vertical => Point::new(local.x - vp.min.x, local.y - vp.min.y - self.scroll_offset.get()),
+                    Direction::Horizontal => Point::new(local.x - vp.min.x - self.scroll_offset.get(), local.y - vp.min.y),
                 };
                 return child.borrow().on_mouse_button_down(ui, child_pos, button);
             }
@@ -680,9 +679,9 @@ impl View for ScrollView {
         false
     }
 
-    fn on_mouse_button_up(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_up(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         let my_rect = self.state.borrow().rect;
-        let local = Vector2::new(position.x - my_rect.min.x, position.y - my_rect.min.y);
+        let local = Point::new(position.x - my_rect.min.x, position.y - my_rect.min.y);
 
         let was_dragging = self.thumb_dragging.get();
         let was_arrow = self.arrow_start_pressed.get() || self.arrow_end_pressed.get();
@@ -698,8 +697,8 @@ impl View for ScrollView {
         if let Some(child) = &*self.child.borrow() {
             let vp = self.viewport_rect();
             let child_pos = match self.direction {
-                Direction::Vertical => Vector2::new(local.x - vp.min.x, local.y - vp.min.y - self.scroll_offset.get()),
-                Direction::Horizontal => Vector2::new(local.x - vp.min.x - self.scroll_offset.get(), local.y - vp.min.y),
+                Direction::Vertical => Point::new(local.x - vp.min.x, local.y - vp.min.y - self.scroll_offset.get()),
+                Direction::Horizontal => Point::new(local.x - vp.min.x - self.scroll_offset.get(), local.y - vp.min.y),
             };
             if child.borrow().on_mouse_button_up(ui, child_pos, button) {
                 return true;
@@ -708,9 +707,9 @@ impl View for ScrollView {
         false
     }
 
-    fn on_mouse_wheel_scroll(&self, ui: &mut UI, position: Vector2<i32>, distance: MouseScrollDistance) -> bool {
+    fn on_mouse_wheel_scroll(&self, ui: &mut UI, position: Point<i32>, distance: MouseScrollDistance) -> bool {
         let my_rect = self.state.borrow().rect;
-        let local = Vector2::new(position.x - my_rect.min.x, position.y - my_rect.min.y);
+        let local = Point::new(position.x - my_rect.min.x, position.y - my_rect.min.y);
         let bounds = rect((0, 0), (my_rect.width(), my_rect.height()));
         if !bounds.hit((local.x, local.y)) {
             return false;
@@ -720,8 +719,8 @@ impl View for ScrollView {
         if let Some(child) = &*self.child.borrow() {
             let vp = self.viewport_rect();
             let child_pos = match self.direction {
-                Direction::Vertical => Vector2::new(local.x - vp.min.x, local.y - vp.min.y - self.scroll_offset.get()),
-                Direction::Horizontal => Vector2::new(local.x - vp.min.x - self.scroll_offset.get(), local.y - vp.min.y),
+                Direction::Vertical => Point::new(local.x - vp.min.x, local.y - vp.min.y - self.scroll_offset.get()),
+                Direction::Horizontal => Point::new(local.x - vp.min.x - self.scroll_offset.get(), local.y - vp.min.y),
             };
             if child.borrow().on_mouse_wheel_scroll(ui, child_pos, distance) {
                 return true;

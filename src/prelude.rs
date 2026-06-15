@@ -3,6 +3,8 @@ pub use crate::win::{Win, WinEvent};
 pub use crate::traits::{View, Container, Element};
 pub use crate::events::{EventCallback, EventData, EventType};
 pub use crate::shortcut::Shortcut;
+pub use crate::input::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, MouseScrollDistance, VirtualKeyCode};
+pub use crate::types::{Point, Rect};
 pub use crate::assets::{AssetsProvider, set_provider, set_font_fallbacks};
 pub use crate::themes::{Theme, Classic, Typeface, FontStyle};
 pub use crate::drawing::Palette;

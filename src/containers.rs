@@ -1,8 +1,7 @@
 use std::cell::{RefCell, RefMut};
 use std::rc::Rc;
 
-use speedy2d::dimen::Vector2;
-use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
+use crate::input::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
 use super::background::{self, BackgroundImage};
 use super::events::{EventCallback, EventData, EventType};
 use super::views::Borders;
@@ -512,7 +511,7 @@ impl View for Frame {
         false
     }
 
-    fn on_mouse_move(&self, ui: &mut UI, position: Vector2<i32>) -> bool {
+    fn on_mouse_move(&self, ui: &mut UI, position: Point<i32>) -> bool {
         let position = (position.x - self.state.borrow().rect.min.x, position.y - self.state.borrow().rect.min.y);
         let mut processed = false;
         for v in self.views.iter().rev() {
@@ -520,12 +519,12 @@ impl View for Frame {
             if vb.get_visibility() != Visibility::Visible || !vb.is_enabled() {
                 continue;
             }
-            processed |= vb.on_mouse_move(ui, Vector2::from(position));
+            processed |= vb.on_mouse_move(ui, Point::from(position));
         }
         processed
     }
 
-    fn on_mouse_button_down(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_down(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         println!("Mouse down in {}", &self.state.borrow().id);
         let position = (position.x - self.state.borrow().rect.min.x, position.y - self.state.borrow().rect.min.y);
         let focused;
@@ -537,7 +536,7 @@ impl View for Frame {
                 }
             }
             let f = v.borrow().is_focused();
-            if v.borrow().on_mouse_button_down(ui, Vector2::from(position), button) {
+            if v.borrow().on_mouse_button_down(ui, Point::from(position), button) {
                 // If focused changed to true
                 focused = !f && v.borrow().is_focused();
                 if focused {
@@ -553,7 +552,7 @@ impl View for Frame {
         false
     }
 
-    fn on_mouse_button_up(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_up(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         let position = (position.x - self.state.borrow().rect.min.x, position.y - self.state.borrow().rect.min.y);
         for v in self.views.iter().rev() {
             {
@@ -562,14 +561,14 @@ impl View for Frame {
                     continue;
                 }
             }
-            if v.borrow().on_mouse_button_up(ui, Vector2::from(position), button) {
+            if v.borrow().on_mouse_button_up(ui, Point::from(position), button) {
                 return true;
             }
         }
         false
     }
 
-    fn on_mouse_wheel_scroll(&self, ui: &mut UI, position: Vector2<i32>, distance: speedy2d::window::MouseScrollDistance) -> bool {
+    fn on_mouse_wheel_scroll(&self, ui: &mut UI, position: Point<i32>, distance: crate::input::MouseScrollDistance) -> bool {
         let position = (position.x - self.state.borrow().rect.min.x, position.y - self.state.borrow().rect.min.y);
         for v in self.views.iter().rev() {
             {
@@ -578,7 +577,7 @@ impl View for Frame {
                     continue;
                 }
             }
-            if v.borrow().on_mouse_wheel_scroll(ui, Vector2::from(position), distance) {
+            if v.borrow().on_mouse_wheel_scroll(ui, Point::from(position), distance) {
                 return true;
             }
         }

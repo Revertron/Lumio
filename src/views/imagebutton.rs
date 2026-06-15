@@ -1,7 +1,6 @@
 use std::cell::RefCell;
 
-use speedy2d::dimen::Vector2;
-use speedy2d::window::MouseButton;
+use crate::input::MouseButton;
 
 use crate::events::{EventCallback, EventData, EventType};
 use crate::image_source::ImageSource;
@@ -292,14 +291,14 @@ impl View for ImageButton {
         self.base_fire_event(ui, EventType::Click, &EventData::None)
     }
 
-    fn on_mouse_move(&self, _ui: &mut UI, position: Vector2<i32>) -> bool {
+    fn on_mouse_move(&self, _ui: &mut UI, position: Point<i32>) -> bool {
         let hit = self.state.borrow().rect.hit((position.x, position.y));
         let old_state = self.state.borrow().state;
         self.state.borrow_mut().state.hovered = hit;
         self.state.borrow().state != old_state
     }
 
-    fn on_mouse_button_down(&self, _ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_down(&self, _ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
         let hit = self.state.borrow().rect.hit((position.x, position.y));
         if hit {
@@ -313,7 +312,7 @@ impl View for ImageButton {
         false
     }
 
-    fn on_mouse_button_up(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_up(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
         let hit = self.state.borrow().rect.hit((position.x, position.y));
         if matches!(button, MouseButton::Left) {

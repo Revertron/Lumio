@@ -9,8 +9,7 @@
 
 use std::cell::{Cell, RefCell};
 
-use speedy2d::dimen::Vector2;
-use speedy2d::window::MouseButton;
+use crate::input::MouseButton;
 
 use crate::events::{EventCallback, EventData, EventType};
 use crate::themes::{Theme, Typeface, ViewState};
@@ -348,9 +347,9 @@ impl View for Grid {
         false
     }
 
-    fn on_mouse_move(&self, ui: &mut UI, position: Vector2<i32>) -> bool {
+    fn on_mouse_move(&self, ui: &mut UI, position: Point<i32>) -> bool {
         let r = self.state.borrow().rect;
-        let local = Vector2::new(position.x - r.min.x, position.y - r.min.y);
+        let local = Point::new(position.x - r.min.x, position.y - r.min.y);
         let mut processed = false;
         for cell in self.cells.borrow().iter().rev() {
             let vis = { let cb = cell.borrow(); cb.get_visibility() == Visibility::Visible && cb.is_enabled() };
@@ -360,10 +359,10 @@ impl View for Grid {
         processed
     }
 
-    fn on_mouse_button_down(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_down(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         let r = self.state.borrow().rect;
         if !r.hit((position.x, position.y)) { return false; }
-        let local = Vector2::new(position.x - r.min.x, position.y - r.min.y);
+        let local = Point::new(position.x - r.min.x, position.y - r.min.y);
         for cell in self.cells.borrow().iter().rev() {
             let vis = { let cb = cell.borrow(); cb.get_visibility() == Visibility::Visible && cb.is_enabled() };
             if !vis { continue; }
@@ -374,9 +373,9 @@ impl View for Grid {
         false
     }
 
-    fn on_mouse_button_up(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_up(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         let r = self.state.borrow().rect;
-        let local = Vector2::new(position.x - r.min.x, position.y - r.min.y);
+        let local = Point::new(position.x - r.min.x, position.y - r.min.y);
         for cell in self.cells.borrow().iter().rev() {
             let vis = { let cb = cell.borrow(); cb.get_visibility() == Visibility::Visible && cb.is_enabled() };
             if !vis { continue; }

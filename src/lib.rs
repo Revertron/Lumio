@@ -6,6 +6,7 @@ extern crate downcast_rs;
 pub use speedy2d;
 
 pub mod common;
+pub mod input;
 pub mod text;
 pub mod ui;
 pub mod events;

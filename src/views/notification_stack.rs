@@ -2,8 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use speedy2d::dimen::Vector2;
-use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
+use crate::input::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
 
 use crate::events::{EventCallback, EventData, EventType};
 use crate::themes::{Theme, Typeface, ViewState};
@@ -452,7 +451,7 @@ impl View for NotificationStack {
         redraw
     }
 
-    fn on_mouse_move(&self, ui: &mut UI, position: Vector2<i32>) -> bool {
+    fn on_mouse_move(&self, ui: &mut UI, position: Point<i32>) -> bool {
         let snapshot = self.snapshot_visible();
         let pt = Point::from((position.x, position.y));
         let mut over_item = false;
@@ -467,7 +466,7 @@ impl View for NotificationStack {
         over_item
     }
 
-    fn on_mouse_button_down(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_down(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         let snapshot = self.snapshot_visible();
         let pt = Point::from((position.x, position.y));
         for (el, r) in snapshot {
@@ -482,7 +481,7 @@ impl View for NotificationStack {
         false
     }
 
-    fn on_mouse_button_up(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_up(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         let snapshot = self.snapshot_visible();
         let pt = Point::from((position.x, position.y));
         for (el, r) in snapshot {
@@ -494,7 +493,7 @@ impl View for NotificationStack {
         false
     }
 
-    fn on_mouse_wheel_scroll(&self, ui: &mut UI, position: Vector2<i32>, distance: MouseScrollDistance) -> bool {
+    fn on_mouse_wheel_scroll(&self, ui: &mut UI, position: Point<i32>, distance: MouseScrollDistance) -> bool {
         let snapshot = self.snapshot_visible();
         let pt = Point::from((position.x, position.y));
         for (el, r) in snapshot {

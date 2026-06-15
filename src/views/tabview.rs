@@ -1,9 +1,8 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use speedy2d::dimen::Vector2;
 use crate::text::{TextBlock, TextOptions};
-use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
+use crate::input::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
 
 use crate::assets::get_font_family;
 use crate::events::{EventCallback, EventData, EventType};
@@ -484,16 +483,16 @@ impl View for TabView {
         false
     }
 
-    fn on_mouse_move(&self, ui: &mut UI, position: Vector2<i32>) -> bool {
+    fn on_mouse_move(&self, ui: &mut UI, position: Point<i32>) -> bool {
         let local = (position.x - self.state.borrow().rect.min.x, position.y - self.state.borrow().rect.min.y);
         let active = self.active_tab.get();
         if active < self.views.len() {
-            return self.views[active].borrow().on_mouse_move(ui, Vector2::from(local));
+            return self.views[active].borrow().on_mouse_move(ui, Point::from(local));
         }
         false
     }
 
-    fn on_mouse_button_down(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_down(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         let rect = self.state.borrow().rect;
         if !rect.hit((position.x, position.y)) {
             return false;
@@ -523,7 +522,7 @@ impl View for TabView {
             let focused;
             let v = &self.views[active];
             let f = v.borrow().is_focused();
-            if v.borrow().on_mouse_button_down(ui, Vector2::new(local_x, local_y), button) {
+            if v.borrow().on_mouse_button_down(ui, Point::new(local_x, local_y), button) {
                 focused = !f && v.borrow().is_focused();
                 if focused {
                     // Unfocus other tabs' children
@@ -539,20 +538,20 @@ impl View for TabView {
         false
     }
 
-    fn on_mouse_button_up(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_up(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         let local = (position.x - self.state.borrow().rect.min.x, position.y - self.state.borrow().rect.min.y);
         let active = self.active_tab.get();
         if active < self.views.len() {
-            return self.views[active].borrow().on_mouse_button_up(ui, Vector2::from(local), button);
+            return self.views[active].borrow().on_mouse_button_up(ui, Point::from(local), button);
         }
         false
     }
 
-    fn on_mouse_wheel_scroll(&self, ui: &mut UI, position: Vector2<i32>, distance: MouseScrollDistance) -> bool {
+    fn on_mouse_wheel_scroll(&self, ui: &mut UI, position: Point<i32>, distance: MouseScrollDistance) -> bool {
         let local = (position.x - self.state.borrow().rect.min.x, position.y - self.state.borrow().rect.min.y);
         let active = self.active_tab.get();
         if active < self.views.len() {
-            return self.views[active].borrow().on_mouse_wheel_scroll(ui, Vector2::from(local), distance);
+            return self.views[active].borrow().on_mouse_wheel_scroll(ui, Point::from(local), distance);
         }
         false
     }

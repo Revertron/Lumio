@@ -3,7 +3,7 @@
 use include_dir::{Dir, include_dir};
 use speedy2d::dimen::Vector2;
 use speedy2d::Window;
-use speedy2d::window::{VirtualKeyCode, WindowCreationOptions, WindowPosition, WindowSize};
+use speedy2d::window::{WindowCreationOptions, WindowPosition, WindowSize};
 
 use lumio::prelude::*;
 

@@ -1,4 +1,4 @@
-use speedy2d::window::{ModifiersState, VirtualKeyCode};
+use crate::input::{ModifiersState, VirtualKeyCode};
 use crate::traits::View;
 use crate::ui::UI;
 

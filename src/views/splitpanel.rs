@@ -2,8 +2,7 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::str::FromStr;
 
-use speedy2d::dimen::Vector2;
-use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
+use crate::input::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
 
 use crate::events::{EventCallback, EventData, EventType};
 use crate::themes::{Theme, Typeface, ViewState};
@@ -548,8 +547,8 @@ impl View for SplitPanel {
         redraw
     }
 
-    fn on_mouse_move(&self, ui: &mut UI, position: Vector2<i32>) -> bool {
-        let local = Vector2::new(
+    fn on_mouse_move(&self, ui: &mut UI, position: Point<i32>) -> bool {
+        let local = Point::new(
             position.x - self.state.borrow().rect.min.x,
             position.y - self.state.borrow().rect.min.y,
         );
@@ -596,8 +595,8 @@ impl View for SplitPanel {
         processed
     }
 
-    fn on_mouse_button_down(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
-        let local = Vector2::new(
+    fn on_mouse_button_down(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
+        let local = Point::new(
             position.x - self.state.borrow().rect.min.x,
             position.y - self.state.borrow().rect.min.y,
         );
@@ -624,13 +623,13 @@ impl View for SplitPanel {
         false
     }
 
-    fn on_mouse_button_up(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_up(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if self.divider_dragging.get() {
             self.divider_dragging.set(false);
             return true;
         }
 
-        let local = Vector2::new(
+        let local = Point::new(
             position.x - self.state.borrow().rect.min.x,
             position.y - self.state.borrow().rect.min.y,
         );
@@ -642,8 +641,8 @@ impl View for SplitPanel {
         false
     }
 
-    fn on_mouse_wheel_scroll(&self, ui: &mut UI, position: Vector2<i32>, distance: speedy2d::window::MouseScrollDistance) -> bool {
-        let local = Vector2::new(
+    fn on_mouse_wheel_scroll(&self, ui: &mut UI, position: Point<i32>, distance: crate::input::MouseScrollDistance) -> bool {
+        let local = Point::new(
             position.x - self.state.borrow().rect.min.x,
             position.y - self.state.borrow().rect.min.y,
         );

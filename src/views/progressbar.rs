@@ -1,7 +1,6 @@
 use std::cell::{Cell, RefCell};
 
-use speedy2d::dimen::Vector2;
-use speedy2d::window::MouseButton;
+use crate::input::MouseButton;
 
 use crate::events::{EventCallback, EventData, EventType};
 use crate::themes::{Theme, Typeface, ViewState};
@@ -287,7 +286,7 @@ impl View for ProgressBar {
         self.base_fire_event(ui, EventType::Click, &EventData::None)
     }
 
-    fn on_mouse_button_down(&self, _ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_down(&self, _ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() || !matches!(button, MouseButton::Left) {
             return false;
         }
@@ -302,7 +301,7 @@ impl View for ProgressBar {
         false
     }
 
-    fn on_mouse_button_up(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_up(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !matches!(button, MouseButton::Left) {
             return false;
         }

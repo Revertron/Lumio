@@ -4,7 +4,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use speedy2d::dimen::Vector2;
 use speedy2d::Graphics2D;
-use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, MouseScrollDistance, UserEventSender, VirtualKeyCode, WindowCreationOptions, WindowHandler, WindowHelper, WindowPosition, WindowSize, WindowStartupInfo};
+use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, UserEventSender, VirtualKeyCode, WindowCreationOptions, WindowHandler, WindowHelper, WindowPosition, WindowSize, WindowStartupInfo};
+use crate::input::MouseCursorType;
+use crate::types::Point;
 use crate::drawing::{DrawableRegistry, Palette};
 use super::ui::{UI, WindowCommand};
 use super::themes::*;
@@ -17,7 +19,7 @@ pub struct Win<T> {
     image_cache: ImageCache,
     width: u32,
     height: u32,
-    mouse_pos: Vector2<i32>,
+    mouse_pos: Point<i32>,
     mod_state: ModifiersState,
     /// Last cursor shape pushed to the OS, so we only call `set_cursor` on a
     /// real transition (avoids per-move churn).
@@ -53,7 +55,7 @@ impl<T> Win<T> {
             image_cache: ImageCache::new(),
             width: 0,
             height: 0,
-            mouse_pos: Vector2::new(-1, -1),
+            mouse_pos: Point::new(-1, -1),
             mod_state: ModifiersState::default(),
             last_cursor: None,
             alive: Arc::new(AtomicBool::new(true)),
@@ -84,7 +86,7 @@ impl<T> Win<T> {
     fn apply_cursor(&mut self, helper: &mut WindowHelper<T>) {
         let cursor = self.ui.current_cursor();
         if self.last_cursor != Some(cursor) {
-            helper.set_cursor(cursor);
+            helper.set_cursor(cursor.into());
             self.last_cursor = Some(cursor);
         }
     }
@@ -200,7 +202,7 @@ impl<T: From<WinEvent> + Send + 'static> WindowHandler<T> for Win<T> {
 
     fn on_mouse_move(&mut self, helper: &mut WindowHelper<T>, position: Vector2<f32>) {
         //println!("Position: {} x {}", position.x, position.y);
-        let position = Vector2::new(position.x.round() as i32, position.y.round() as i32);
+        let position = Point::new(position.x.round() as i32, position.y.round() as i32);
         self.mouse_pos = position;
         let redraw = self.ui.on_mouse_move(position);
         self.apply_cursor(helper);
@@ -210,7 +212,7 @@ impl<T: From<WinEvent> + Send + 'static> WindowHandler<T> for Win<T> {
     }
 
     fn on_mouse_button_down(&mut self, helper: &mut WindowHelper<T>, button: MouseButton) {
-        let redraw = self.ui.on_mouse_button_down(self.mouse_pos, button);
+        let redraw = self.ui.on_mouse_button_down(self.mouse_pos, button.into());
         // A popup opened/closed by the click changes the cursor without a move.
         self.apply_cursor(helper);
         if redraw {
@@ -219,7 +221,7 @@ impl<T: From<WinEvent> + Send + 'static> WindowHandler<T> for Win<T> {
     }
 
     fn on_mouse_button_up(&mut self, helper: &mut WindowHelper<T>, button: MouseButton) {
-        let redraw = self.ui.on_mouse_button_up(self.mouse_pos, button);
+        let redraw = self.ui.on_mouse_button_up(self.mouse_pos, button.into());
         self.apply_cursor(helper);
         if redraw {
             helper.request_redraw();
@@ -227,7 +229,7 @@ impl<T: From<WinEvent> + Send + 'static> WindowHandler<T> for Win<T> {
     }
 
     fn on_mouse_wheel_scroll(&mut self, helper: &mut WindowHelper<T>, distance: MouseScrollDistance) {
-        if self.ui.on_mouse_wheel_scroll(self.mouse_pos, distance) {
+        if self.ui.on_mouse_wheel_scroll(self.mouse_pos, distance.into()) {
             helper.request_redraw();
         }
     }
@@ -235,7 +237,11 @@ impl<T: From<WinEvent> + Send + 'static> WindowHandler<T> for Win<T> {
 
     fn on_key_down(&mut self, helper: &mut WindowHelper<T>, virtual_key_code: Option<VirtualKeyCode>, scancode: KeyScancode) {
         println!("KeyCode: {:?}, scancode: {:?} down", virtual_key_code, scancode);
-        let consumed = self.ui.on_key_down(virtual_key_code, scancode, self.mod_state.clone());
+        let consumed = self.ui.on_key_down(
+            virtual_key_code.and_then(crate::input::VirtualKeyCode::from_speedy2d),
+            scancode,
+            self.mod_state.clone().into(),
+        );
         // Escape policy runs AFTER dispatch so a dialog or view consuming Esc
         // (e.g. a cancel button) is not followed by closing/terminating here.
         if !consumed && virtual_key_code == Some(VirtualKeyCode::Escape) {
@@ -263,14 +269,18 @@ impl<T: From<WinEvent> + Send + 'static> WindowHandler<T> for Win<T> {
 
     fn on_key_up(&mut self, helper: &mut WindowHelper<T>, virtual_key_code: Option<VirtualKeyCode>, scancode: KeyScancode) {
         println!("KeyCode: {:?}, scancode: {:?} up", virtual_key_code, scancode);
-        if self.ui.on_key_up(virtual_key_code, scancode, self.mod_state.clone()) {
+        if self.ui.on_key_up(
+            virtual_key_code.and_then(crate::input::VirtualKeyCode::from_speedy2d),
+            scancode,
+            self.mod_state.clone().into(),
+        ) {
             helper.request_redraw();
         }
     }
 
     fn on_keyboard_char(&mut self, helper: &mut WindowHelper<T>, unicode_codepoint: char) {
         println!("Codepoint {:?}", unicode_codepoint);
-        if self.ui.on_key_char(unicode_codepoint, self.mod_state.clone()) {
+        if self.ui.on_key_char(unicode_codepoint, self.mod_state.clone().into()) {
             helper.request_redraw();
         }
     }

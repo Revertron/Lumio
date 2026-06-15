@@ -2,9 +2,8 @@ use std::cell::RefCell;
 use std::cmp::{max, min};
 use std::rc::Rc;
 use std::time::Instant;
-use speedy2d::dimen::Vector2;
 use crate::text::{TextAlignment, TextBlock, TextOptions};
-use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, MouseScrollDistance, VirtualKeyCode};
+use crate::input::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, MouseScrollDistance, VirtualKeyCode};
 
 use crate::assets::get_font_family;
 use crate::events::{EventCallback, EventData, EventType};
@@ -1427,7 +1426,7 @@ impl View for Memo {
         redraw
     }
 
-    fn on_mouse_move(&self, ui: &mut UI, position: Vector2<i32>) -> bool {
+    fn on_mouse_move(&self, ui: &mut UI, position: Point<i32>) -> bool {
         // Drag-selection: extend regardless of whether the pointer is still
         // inside the view (the parent dispatches moves to every child).
         if *self.dragging.borrow() {
@@ -1453,7 +1452,7 @@ impl View for Memo {
         self.state.borrow().main.state != old_state
     }
 
-    fn on_mouse_button_down(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_down(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
         self.break_undo_coalescing();
         if !self.state.borrow().main.rect.hit((position.x, position.y)) {
@@ -1525,7 +1524,7 @@ impl View for Memo {
         true
     }
 
-    fn on_mouse_button_up(&self, _ui: &mut UI, _position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_up(&self, _ui: &mut UI, _position: Point<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
         // End any drag-selection; collapse a zero-length anchor from a plain click.
         if *self.dragging.borrow() {
@@ -1539,7 +1538,7 @@ impl View for Memo {
         false
     }
 
-    fn on_mouse_wheel_scroll(&self, _ui: &mut UI, position: Vector2<i32>, distance: MouseScrollDistance) -> bool {
+    fn on_mouse_wheel_scroll(&self, _ui: &mut UI, position: Point<i32>, distance: MouseScrollDistance) -> bool {
         if !self.state.borrow().main.rect.hit((position.x, position.y)) {
             return false;
         }

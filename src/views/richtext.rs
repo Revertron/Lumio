@@ -3,9 +3,8 @@ use std::collections::HashMap;
 use std::ops::Range;
 use std::rc::Rc;
 
-use speedy2d::dimen::Vector2;
 use crate::text::{TextBlock, TextOptions};
-use speedy2d::window::{MouseButton, MouseCursorType};
+use crate::input::{MouseButton, MouseCursorType};
 
 use crate::assets::get_font_family;
 use crate::events::{EventCallback, EventData, EventType};
@@ -378,7 +377,7 @@ impl RichText {
     }
 
     /// Find the link href whose run rectangle contains `position` (local coords).
-    fn link_at(&self, position: Vector2<i32>) -> Option<Rc<String>> {
+    fn link_at(&self, position: Point<i32>) -> Option<Rc<String>> {
         let laid = self.laid.borrow();
         let laid = laid.as_ref()?;
         let state = self.state.borrow();
@@ -1324,7 +1323,7 @@ impl View for RichText {
         self.fire_click(ui)
     }
 
-    fn on_mouse_move(&self, ui: &mut UI, position: Vector2<i32>) -> bool {
+    fn on_mouse_move(&self, ui: &mut UI, position: Point<i32>) -> bool {
         // Selection drag — continues even when the pointer leaves the view.
         if *self.dragging.borrow() {
             *self.caret_pos.borrow_mut() = self.byte_pos_from_point(position.x, position.y);
@@ -1343,7 +1342,7 @@ impl View for RichText {
         old != link_hit
     }
 
-    fn on_mouse_button_down(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_down(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() {
             return false;
         }
@@ -1383,7 +1382,7 @@ impl View for RichText {
         self.pressed_href.borrow().is_some()
     }
 
-    fn on_mouse_button_up(&self, ui: &mut UI, position: Vector2<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_up(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !matches!(button, MouseButton::Left) {
             return false;
         }

@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
-use speedy2d::window::{ModifiersState, VirtualKeyCode};
+use crate::input::{ModifiersState, VirtualKeyCode};
 
 /// A keyboard accelerator: a key plus modifier state, usable as a `HashMap`
 /// key in the [`crate::ui::UI`] shortcut registry. Parse one from a string
