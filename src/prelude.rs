@@ -1,6 +1,8 @@
 pub use crate::ui::{UI, UiHandle, UiTask, PopupMode, PopupDirection, WindowRequest, WindowCommand};
 #[cfg(feature = "backend-gl")]
 pub use crate::win::{Win, WinEvent};
+#[cfg(feature = "backend-software")]
+pub use crate::software_window::run as run_software_window;
 pub use crate::traits::{View, Container, Element};
 pub use crate::events::{EventCallback, EventData, EventType};
 pub use crate::shortcut::Shortcut;

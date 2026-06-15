@@ -15,7 +15,7 @@ default = ["backend-gl"]
 #   today; gains a winit/softbuffer window loop in a later step).
 # The `text-*` features are the text-layer half each backend pulls in.
 backend-gl = ["text-speedy2d"]
-backend-software = ["text-software", "dep:fontdue"]
+backend-software = ["text-software", "dep:fontdue", "dep:winit", "dep:softbuffer"]
 text-speedy2d = []
 text-software = []
 
@@ -31,6 +31,10 @@ usvg = { version = "0.47.0", default-features = false }
 tiny-skia = "0.12.0"
 font-kit = "0.14"
 fontdue = { version = "0.9", optional = true }
+# Software window backend (gated by `backend-software`). Pin winit to 0.30 to
+# unify with the vendored speedy2d's winit (no duplicate in the tree).
+winit = { version = "0.30", optional = true, default-features = false, features = ["rwh_06", "x11", "wayland"] }
+softbuffer = { version = "0.4", optional = true }
 
 [dev-dependencies]
 include_dir = "0.7"
@@ -85,6 +89,9 @@ required-features = ["backend-gl"]
 # Headless software render demo — needs the software backend.
 [[example]]
 name = "headless_render"
+required-features = ["backend-software"]
+[[example]]
+name = "software_window_example"
 required-features = ["backend-software"]
 
 [profile.release]

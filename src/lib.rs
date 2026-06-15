@@ -31,6 +31,9 @@ pub mod drawing;
 /// Headless software rendering (UI → `tiny_skia::Pixmap`). Software backend only.
 #[cfg(feature = "backend-software")]
 pub mod render;
+/// winit + softbuffer software window loop. Software backend only.
+#[cfg(feature = "backend-software")]
+pub mod software_window;
 pub mod prelude;
 pub mod svg;
 

@@ -13,7 +13,7 @@ pub use self::classic::Classic;
 #[cfg(feature = "backend-gl")]
 pub use self::classic::ImageCache;
 #[cfg(feature = "backend-software")]
-pub use self::software::{SoftwareTheme, SoftwareImageCache};
+pub use self::software::{GlyphCache, SoftwareImageCache, SoftwareTheme};
 use super::types::Rect;
 
 /// The default root typeface: the palette's "default" role with its size
