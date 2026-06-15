@@ -6,9 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Lumio is a Rust GUI library that provides a declarative XML-based layout system for creating desktop applications. It uses a retained-mode GUI architecture where view hierarchies are maintained in memory, with support for theming and event handling.
 
-It has two compile-time-selected rendering backends (mutually exclusive):
-- `backend-gl` (default): OpenGL window + rendering via the vendored `speedy2d`.
-- `backend-software`: CPU rendering via `tiny-skia` + `fontdue`, in a `winit` + `softbuffer` window. Also supports headless rendering (UI → `tiny_skia::Pixmap`/PNG).
+Both backends run on a single Lumio-owned `winit` window loop (`src/window/`); the
+backend selects only the per-window `RenderSurface` (mutually exclusive):
+- `backend-gl` (default): OpenGL rendering via the vendored `speedy2d` used as a
+  *pure renderer* (its `windowing` feature is off), drawing into a `glutin` GL
+  context Lumio creates.
+- `backend-software`: CPU rendering via `tiny-skia` + `fontdue`, blitted to a
+  `softbuffer` surface. Also supports headless rendering (UI → `tiny_skia::Pixmap`/PNG).
 
 Apps launch backend-agnostically with `lumio::run(ui, WindowConfig::new(..))`; switching backends is a Cargo-feature change, no source edits.
 
@@ -51,7 +55,7 @@ Note: the software backend renders on the CPU and is ~30x slower unoptimized, so
 
 - **View Trait** (`src/traits.rs`): Central trait that all UI elements implement. Defines the contract for layout, painting, event handling, and state management. Uses `downcast-rs` for runtime type casting.
 
-- **Window loop**: backend-specific, behind the neutral `lumio::run(ui, WindowConfig)` launcher (`src/app.rs`). The GL backend is **`src/win.rs`** (`speedy2d::WindowHandler`; background thread posts 60fps update events). The software backend is **`src/software_window/`** (winit `ApplicationHandler` + softbuffer; 15ms tick). Both support multi-window + app-modal dialogs. Input/event types are backend-neutral (`src/input/`).
+- **Window loop**: one backend-neutral winit `ApplicationHandler` in **`src/window/`** (15ms tick; multi-window + app-modal dialogs), behind the neutral `lumio::run(ui, WindowConfig)` launcher (`src/app.rs`). The per-window paint sits behind a `RenderSurface` trait, cfg-selected per backend: `GlSurface` (`window/surface_gl.rs`, glutin context + `speedy2d::GLRenderer` → `Classic`) or `SoftwareSurface` (`window/surface_software.rs`, tiny-skia → softbuffer). winit→Lumio input conversions live in `window/input_winit.rs`. Input/event types are backend-neutral (`src/input/`). See docs/unified_window_loop.md for the design.
 
 - **Theme System** (`src/themes/`): Pluggable theming via the `Theme` trait — the rendering abstraction seam. `Classic` (GL) and `SoftwareTheme` (tiny-skia) are the two implementations, cfg-selected by backend. Handles rendering of different view states (focused, hovered, pressed, etc.). Text shaping is abstracted behind `crate::text` (speedy2d vs fontdue).
 

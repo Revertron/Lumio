@@ -27,8 +27,9 @@ static NEXT_IMAGE_ID: AtomicU64 = AtomicU64::new(1);
 
 thread_local! {
     /// Texture ids whose `ImageSource` was dropped or re-rasterized at a new
-    /// size. Drained by `Win::on_draw` (when a GL context is current) and removed
-    /// from that window's image cache. Only touched from the UI thread.
+    /// size. Drained in each window's `RenderSurface::paint` (GL: with its
+    /// context current) and removed from that window's image cache. Only touched
+    /// from the UI thread.
     static PENDING_IMAGE_EVICTIONS: RefCell<Vec<u64>> = const { RefCell::new(Vec::new()) };
 }
 
@@ -36,8 +37,8 @@ fn push_pending(id: u64) {
     PENDING_IMAGE_EVICTIONS.with(|q| q.borrow_mut().push(id));
 }
 
-/// Take all pending texture-eviction ids. The window handler calls this at the
-/// top of `on_draw` and removes the ids from its own image cache.
+/// Take all pending texture-eviction ids. Called via [`drain_evictions`] from a
+/// surface's paint, which removes the ids from its own image cache.
 pub fn take_pending_evictions() -> Vec<u64> {
     PENDING_IMAGE_EVICTIONS.with(|q| std::mem::take(&mut *q.borrow_mut()))
 }
@@ -54,8 +55,8 @@ pub fn requeue_evictions(keys: Vec<u64>) {
 /// Drain pending texture evictions into `cache`, removing each id from it. Ids
 /// not in this cache are requeued — each id lives in exactly one window's cache,
 /// so the owning window claims them on its next paint. Both backends call this
-/// at the top of their per-frame paint (`Win::on_draw` / software `render`),
-/// where the cache's graphics context is current and textures can be freed.
+/// at the top of `RenderSurface::paint`, where the cache's graphics context is
+/// current (GL) and textures can be freed.
 pub fn drain_evictions<V>(cache: &mut HashMap<u64, V>) {
     let mut not_mine = Vec::new();
     for id in take_pending_evictions() {
@@ -189,10 +190,10 @@ impl ImageSource {
 
 impl Drop for ImageSource {
     fn drop(&mut self) {
-        // Enqueue this image's texture id for eviction at the next on_draw, when
+        // Enqueue this image's texture id for eviction at the next paint, when
         // a GL context is current (deleting a GL texture needs its context). Views
         // are Rc-based / !Send, so an ImageSource is only ever dropped on the UI
-        // thread — the same thread that drains the queue in Win::on_draw.
+        // thread — the same thread that drains the queue in RenderSurface::paint.
         push_pending(self.id);
     }
 }

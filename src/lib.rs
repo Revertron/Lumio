@@ -21,10 +21,6 @@ pub mod layout;
 pub mod background;
 pub mod image_source;
 pub mod views;
-/// The speedy2d (GL) window handler. Only built for the GL backend; the
-/// software backend's window loop is a separate later step.
-#[cfg(feature = "backend-gl")]
-pub mod win;
 pub mod themes;
 pub mod types;
 pub mod assets;
@@ -35,9 +31,11 @@ pub mod drawing;
 /// Headless software rendering (UI → `tiny_skia::Pixmap`). Software backend only.
 #[cfg(feature = "backend-software")]
 pub mod render;
-/// winit + softbuffer software window loop. Software backend only.
-#[cfg(feature = "backend-software")]
-pub mod software_window;
+/// Backend-neutral winit window loop, shared by both backends; the per-window
+/// paint sits behind a `RenderSurface` (GL or software). See
+/// docs/unified_window_loop.md.
+#[cfg(any(feature = "backend-gl", feature = "backend-software"))]
+pub mod window;
 pub mod prelude;
 pub mod svg;
 

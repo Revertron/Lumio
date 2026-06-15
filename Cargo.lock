@@ -977,6 +977,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "glutin-winit"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85edca7075f8fc728f28cb8fbb111a96c3b89e930574369e3e9c27eb75d3788f"
+dependencies = [
+ "cfg_aliases",
+ "glutin",
+ "raw-window-handle",
+ "winit",
+]
+
+[[package]]
 name = "glutin_egl_sys"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1331,10 +1343,13 @@ dependencies = [
  "downcast-rs 2.0.2",
  "font-kit",
  "fontdue",
+ "glutin",
+ "glutin-winit",
  "image",
  "include_dir",
  "quick-xml 0.40.1",
  "rand 0.8.6",
+ "raw-window-handle",
  "resvg",
  "softbuffer",
  "speedy2d",
@@ -2548,17 +2563,14 @@ dependencies = [
  "cfg_aliases",
  "earcutr",
  "glow",
- "glutin",
  "image",
  "log",
  "num-traits",
- "raw-window-handle",
  "rusttype",
  "smallvec",
  "unicode-normalization",
  "wasm-bindgen",
  "web-sys",
- "winit",
 ]
 
 [[package]]

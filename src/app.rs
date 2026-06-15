@@ -118,18 +118,12 @@ impl WindowConfig {
     }
 }
 
-/// Open a window for `ui` and run the event loop until the app exits, using the
-/// compiled-in rendering backend (GL). Blocks until the last window closes.
-#[cfg(feature = "backend-gl")]
+/// Open a window for `ui` and run the event loop until the app exits. Both
+/// backends share Lumio's winit window loop ([`crate::window`]); the compiled-in
+/// backend only picks the per-window render surface. Blocks until the last
+/// window closes.
 pub fn run(ui: UI, config: WindowConfig) {
-    crate::win::run_gl(ui, config)
-}
-
-/// Open a window for `ui` and run the event loop until the app exits, using the
-/// compiled-in rendering backend (software). Blocks until the last window closes.
-#[cfg(feature = "backend-software")]
-pub fn run(ui: UI, config: WindowConfig) {
-    if let Err(e) = crate::software_window::run_with_config(ui, config) {
-        panic!("software window event loop failed: {e}");
+    if let Err(e) = crate::window::run_with_config(ui, config) {
+        panic!("window event loop failed: {e}");
     }
 }

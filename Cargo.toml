@@ -10,21 +10,26 @@ categories = ["gui", "rendering"]
 [features]
 default = ["backend-gl"]
 # Selects the rendering + text backend. Exactly one `backend-*` must be enabled.
-# - backend-gl: the GL window (`win.rs`) + `Classic` theme + speedy2d text.
-# - backend-software: the tiny-skia software renderer + fontdue text (headless
-#   today; gains a winit/softbuffer window loop in a later step).
+# Both backends share the winit window loop in `src/window/`; they differ only in
+# the per-window `RenderSurface`:
+# - backend-gl: speedy2d as a GL renderer (its `windowing` feature OFF) painting
+#   `Classic`, over a glutin-created GL context Lumio owns.
+# - backend-software: tiny-skia software renderer + fontdue text.
 # The `text-*` features are the text-layer half each backend pulls in.
-backend-gl = ["text-speedy2d"]
+backend-gl = ["text-speedy2d", "dep:winit", "dep:glutin", "dep:glutin-winit", "dep:raw-window-handle"]
 backend-software = ["text-software", "dep:fontdue", "dep:winit", "dep:softbuffer"]
-# Pulls in speedy2d — the GL backend's only consumer of it. The software
-# backend enables neither, so speedy2d is absent from its dependency tree.
+# Pulls in speedy2d (renderer only). The software backend enables neither, so
+# speedy2d is absent from its dependency tree.
 text-speedy2d = ["dep:speedy2d"]
 text-software = []
 
 [dependencies]
 quick-xml = "0.40.1"
 downcast-rs = "2.0.2"
-speedy2d = { path="../Speedy2D", optional = true }
+# speedy2d is used as a pure GL renderer: `windowing` (winit/glutin) is off;
+# `image-loading` stays on for `Classic`'s texture decoding. Lumio owns the
+# window + GL context (see the `dep:glutin*` deps below).
+speedy2d = { path = "../Speedy2D", optional = true, default-features = false, features = ["image-loading"] }
 image = "0.25.10"
 rand = "0.8.6"
 arboard = "3"
@@ -33,10 +38,15 @@ usvg = { version = "0.47.0", default-features = false }
 tiny-skia = "0.12.0"
 font-kit = "0.14"
 fontdue = { version = "0.9", optional = true }
-# Software window backend (gated by `backend-software`). Pin winit to 0.30 to
-# unify with the vendored speedy2d's winit (no duplicate in the tree).
+# winit drives the window loop for BOTH backends (shared, 0.30 to match the
+# vendored speedy2d's winit — no duplicate in the tree).
 winit = { version = "0.30", optional = true, default-features = false, features = ["rwh_06", "x11", "wayland"] }
 softbuffer = { version = "0.4", optional = true }
+# GL backend only: create the GL context Lumio hands to speedy2d's GLRenderer.
+# Versions pinned to match the vendored speedy2d (glutin 0.32 / rwh 0.6).
+glutin = { version = "0.32.3", optional = true }
+glutin-winit = { version = "0.5", optional = true }
+raw-window-handle = { version = "0.6.2", optional = true }
 
 [dev-dependencies]
 include_dir = "0.7"

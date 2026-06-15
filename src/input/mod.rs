@@ -9,13 +9,8 @@
 //! Mouse positions are not defined here — they use the existing
 //! [`crate::types::Point<i32>`].
 //!
-//! Conversions from/to speedy2d's types live in [`from_speedy2d`] (the speedy2d
-//! window-backend boundary); the one exception is
-//! [`VirtualKeyCode::from_speedy2d`], generated alongside the enum below so the
-//! variant list has a single source of truth.
-
-#[cfg(feature = "backend-gl")]
-mod from_speedy2d;
+//! Both backends now run on winit; the winit→Lumio conversions live at the
+//! window-loop boundary in [`crate::window`] (`window/input_winit.rs`).
 
 /// A platform-specific opaque key scancode. Never inspected by Lumio; passed
 /// through from the window backend to views. Mirrors `speedy2d`'s alias.
@@ -127,33 +122,16 @@ impl ModifiersState {
     }
 }
 
-/// Defines [`VirtualKeyCode`] (mirroring `speedy2d::window::VirtualKeyCode`
-/// verbatim) and, from the same single variant list, the speedy2d→Lumio
-/// conversion `VirtualKeyCode::from_speedy2d`. Keeping both in one macro
-/// invocation guarantees the enum and the conversion can never drift; every
-/// listed name is checked against both enums at compile time. The speedy2d
-/// reference is the only one in this module and marks the (future-gateable)
-/// backend boundary for key codes.
+/// Defines [`VirtualKeyCode`], whose variants mirror `speedy2d::window::VirtualKeyCode`
+/// verbatim (the names also line up with the winit `KeyEvent` mapping in
+/// `window/input_winit.rs`). A macro keeps the variant list a single source of truth.
 macro_rules! virtual_key_codes {
     ($($variant:ident),+ $(,)?) => {
-        /// A virtual key code. Mirrors `speedy2d::window::VirtualKeyCode`.
+        /// A virtual key code. Variant names mirror `speedy2d::window::VirtualKeyCode`.
         #[allow(missing_docs)]
         #[derive(Debug, Hash, Ord, PartialOrd, PartialEq, Eq, Clone, Copy)]
         pub enum VirtualKeyCode {
             $($variant),+
-        }
-
-        impl VirtualKeyCode {
-            /// Map a speedy2d key code to its Lumio equivalent, or `None` for a
-            /// variant Lumio does not mirror. Only the GL window backend needs it.
-            #[cfg(feature = "backend-gl")]
-            pub(crate) fn from_speedy2d(key: speedy2d::window::VirtualKeyCode) -> Option<Self> {
-                use speedy2d::window::VirtualKeyCode as S;
-                match key {
-                    $( S::$variant => Some(VirtualKeyCode::$variant), )+
-                    _ => None,
-                }
-            }
         }
     };
 }
