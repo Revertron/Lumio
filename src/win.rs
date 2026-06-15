@@ -34,7 +34,6 @@ pub(crate) fn run_gl(ui: UI, config: WindowConfig) -> ! {
     let sender = window.create_user_event_sender();
     let mut win = Win::new(ui, sender);
     win.set_palette(config.palette);
-    win.set_close_hides(config.close_hides);
     window.run_loop(win)
 }
 
@@ -52,12 +51,15 @@ pub struct Win<T> {
     last_cursor: Option<MouseCursorType>,
     /// Cleared on drop so this window's update ticker thread stops.
     alive: Arc<AtomicBool>,
-    /// Child windows close on Esc instead of terminating the app.
+    /// Child/dialog windows close on Esc; the main window never does.
     is_child: bool,
-    /// When set on the main window, the close gesture (Esc) hides the window
-    /// instead of terminating the loop — pairs with speedy2d's
-    /// `with_hide_on_close` (which handles the X button) for tray apps.
-    close_hides: bool,
+    /// An Esc *press* on a child window asked to close it; the close is executed
+    /// on the Esc *release*. Destroying the focused window while Esc is still
+    /// physically held makes the OS move focus to the next window and re-deliver
+    /// the held key to it as a fresh press (verified outside Lumio with a bare
+    /// winit program), cascade-closing a stack of nested dialogs on one press.
+    /// Closing on release destroys the window when no key is held.
+    esc_pending_close: bool,
     t: PhantomData<T>
 }
 
@@ -86,17 +88,9 @@ impl<T> Win<T> {
             last_cursor: None,
             alive: Arc::new(AtomicBool::new(true)),
             is_child,
-            close_hides: false,
+            esc_pending_close: false,
             t: PhantomData
         }
-    }
-
-    /// When `true`, the close gesture (Esc) on the main window hides it instead
-    /// of terminating the app. Pair with speedy2d's
-    /// [`WindowCreationOptions::with_hide_on_close`] (for the X button) so an
-    /// app can live in the system tray. No effect on child windows.
-    pub fn set_close_hides(&mut self, value: bool) {
-        self.close_hides = value;
     }
 
     /// Choose the palette the window starts with (default: `Palette::classic()`).
@@ -272,22 +266,17 @@ impl<T: From<WinEvent> + Send + 'static> WindowHandler<T> for Win<T> {
             self.mod_state.clone().into(),
         );
         // Escape policy runs AFTER dispatch so a dialog or view consuming Esc
-        // (e.g. a cancel button) is not followed by closing/terminating here.
+        // (e.g. a cancel button) is not followed by closing here. Esc only
+        // dismisses popups and closes child/dialog windows; it never closes or
+        // quits the main window — that's up to the app's own handler/shortcut.
+        // A child window is closed on the Esc *release* (see `esc_pending_close`),
+        // not the press; popups are dismissed immediately (they don't move focus).
         if !consumed && virtual_key_code == Some(VirtualKeyCode::Escape) {
             if self.ui.has_dismissable_popups() {
                 self.ui.close_all_popups();
                 helper.request_redraw();
-                return;
-            }
-            if self.is_child {
-                // Esc closes a child window; only the main window exits the app.
-                helper.close_window();
-            } else if self.close_hides {
-                // Tray app: Esc hides the main window instead of quitting,
-                // matching the X button (speedy2d's `with_hide_on_close`).
-                helper.set_visible(false);
-            } else {
-                helper.terminate_loop();
+            } else if self.is_child {
+                self.esc_pending_close = true;
             }
             return;
         }
@@ -298,6 +287,14 @@ impl<T: From<WinEvent> + Send + 'static> WindowHandler<T> for Win<T> {
 
     fn on_key_up(&mut self, helper: &mut WindowHelper<T>, virtual_key_code: Option<VirtualKeyCode>, scancode: KeyScancode) {
         println!("KeyCode: {:?}, scancode: {:?} up", virtual_key_code, scancode);
+        // Execute a close requested by an earlier Esc press now that the key is
+        // released (so destroying this window doesn't re-deliver the held key to
+        // the next one — see `esc_pending_close`).
+        if virtual_key_code == Some(VirtualKeyCode::Escape) && self.esc_pending_close {
+            self.esc_pending_close = false;
+            helper.close_window();
+            return;
+        }
         if self.ui.on_key_up(
             virtual_key_code.and_then(crate::input::VirtualKeyCode::from_speedy2d),
             scancode,
