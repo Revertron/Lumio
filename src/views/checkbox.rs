@@ -135,6 +135,7 @@ impl View for CheckBox {
                 }
             }
             "single_line" => { self.state.borrow_mut().single_line = value.parse().unwrap_or(true) }
+            "checked" => { self.set_checked(value.parse().unwrap_or(false)) }
             &_ => {}
         }
     }
