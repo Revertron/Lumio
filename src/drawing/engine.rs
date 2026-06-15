@@ -1,7 +1,7 @@
 use speedy2d::Graphics2D;
 use speedy2d::color::Color;
 use speedy2d::dimen::Vector2;
-use speedy2d::shape::Rectangle;
+use speedy2d::shape::{Polygon, Rectangle, RoundedRectangle};
 
 use super::palette::Palette;
 use super::primitives::*;
@@ -55,6 +55,37 @@ impl<'a> DrawingEngine<'a> {
                 // Draw stroke
                 if let Some(stroke_style) = stroke {
                     self.draw_rect_stroke(rect, stroke_style);
+                }
+            }
+
+            DrawCommand::RoundRect { x, y, width, height, radius, fill, stroke } => {
+                let x = self.eval_expr(x, bounds, Axis::X);
+                let y = self.eval_expr(y, bounds, Axis::Y);
+                let w = self.eval_expr(width, bounds, Axis::X);
+                let h = self.eval_expr(height, bounds, Axis::Y);
+                if w > 0.0 && h > 0.0 {
+                    // Clamp radius to half the smaller side (matches the software engine).
+                    let r = self.eval_expr(radius, bounds, Axis::X).max(0.0).min(w / 2.0).min(h / 2.0);
+
+                    if let Some(paint) = fill {
+                        if let Some(color) = self.eval_paint(paint) {
+                            if r <= 0.0 {
+                                self.graphics.draw_rectangle(Rectangle::from_tuples((x, y), (x + w, y + h)), color);
+                            } else {
+                                let rr = RoundedRectangle::from_tuples((x, y), (x + w, y + h), r);
+                                self.graphics.draw_rounded_rectangle(rr, color);
+                            }
+                        }
+                    }
+                    // speedy2d has no rounded-rect stroke, so flatten the outline to a
+                    // polyline (sampled corners) and draw it as line segments.
+                    if let Some(stroke_style) = stroke {
+                        let sw = self.eval_expr(&stroke_style.width, bounds, Axis::X);
+                        if let Some(color) = self.eval_paint(&stroke_style.paint) {
+                            let pts = rounded_rect_outline(x, y, w, h, r);
+                            draw_closed_polyline(&mut *self.graphics, &pts, sw, color);
+                        }
+                    }
                 }
             }
 
@@ -146,19 +177,78 @@ impl<'a> DrawingEngine<'a> {
                 }
             }
 
-            DrawCommand::Path { commands: _, fill: _, stroke: _ } => {
-                // TODO: Implement path rendering
-                // This would require converting path commands to speedy2d primitives
+            DrawCommand::Path { commands, fill, stroke } => {
+                // Flatten the path into subpaths of points (beziers sampled to line
+                // segments), since speedy2d has no path API: fill each closed subpath
+                // as a tessellated polygon and stroke as connected line segments.
+                let mut subpaths: Vec<(Vec<(f32, f32)>, bool)> = Vec::new();
+                let mut current: Vec<(f32, f32)> = Vec::new();
+                let mut last = (0.0f32, 0.0f32);
+                for pc in commands {
+                    match pc {
+                        PathCommand::MoveTo { x, y } => {
+                            if !current.is_empty() {
+                                subpaths.push((std::mem::take(&mut current), false));
+                            }
+                            last = (self.eval_expr(x, bounds, Axis::X), self.eval_expr(y, bounds, Axis::Y));
+                            current.push(last);
+                        }
+                        PathCommand::LineTo { x, y } => {
+                            last = (self.eval_expr(x, bounds, Axis::X), self.eval_expr(y, bounds, Axis::Y));
+                            current.push(last);
+                        }
+                        PathCommand::QuadTo { x1, y1, x, y } => {
+                            let c = (self.eval_expr(x1, bounds, Axis::X), self.eval_expr(y1, bounds, Axis::Y));
+                            let p = (self.eval_expr(x, bounds, Axis::X), self.eval_expr(y, bounds, Axis::Y));
+                            flatten_quad(last, c, p, &mut current);
+                            last = p;
+                        }
+                        PathCommand::CurveTo { x1, y1, x2, y2, x, y } => {
+                            let c1 = (self.eval_expr(x1, bounds, Axis::X), self.eval_expr(y1, bounds, Axis::Y));
+                            let c2 = (self.eval_expr(x2, bounds, Axis::X), self.eval_expr(y2, bounds, Axis::Y));
+                            let p = (self.eval_expr(x, bounds, Axis::X), self.eval_expr(y, bounds, Axis::Y));
+                            flatten_cubic(last, c1, c2, p, &mut current);
+                            last = p;
+                        }
+                        PathCommand::Close => {
+                            if !current.is_empty() {
+                                subpaths.push((std::mem::take(&mut current), true));
+                            }
+                        }
+                    }
+                }
+                if !current.is_empty() {
+                    subpaths.push((current, false));
+                }
+
+                if let Some(paint) = fill {
+                    if let Some(color) = self.eval_paint(paint) {
+                        for (sp, _) in &subpaths {
+                            if sp.len() >= 3 {
+                                self.graphics.draw_polygon(&Polygon::new(sp), (0.0, 0.0), color);
+                            }
+                        }
+                    }
+                }
+                if let Some(stroke_style) = stroke {
+                    let sw = self.eval_expr(&stroke_style.width, bounds, Axis::X);
+                    if let Some(color) = self.eval_paint(&stroke_style.paint) {
+                        for (sp, closed) in &subpaths {
+                            for seg in sp.windows(2) {
+                                self.graphics.draw_line(seg[0], seg[1], sw, color);
+                            }
+                            if *closed && sp.len() >= 2 {
+                                self.graphics.draw_line(sp[sp.len() - 1], sp[0], sw, color);
+                            }
+                        }
+                    }
+                }
             }
 
             DrawCommand::Group { commands } => {
                 for sub_cmd in commands {
                     self.draw_command(sub_cmd, bounds);
                 }
-            }
-
-            _ => {
-                // Other commands not yet implemented
             }
         }
     }
@@ -279,4 +369,63 @@ impl<'a> DrawingEngine<'a> {
             }
         }
     }
+}
+
+/// Sample a quadratic bezier into line points (start excluded, end included),
+/// appending to `out`. speedy2d has no curve API, so paths are flattened.
+fn flatten_quad(p0: (f32, f32), c: (f32, f32), p1: (f32, f32), out: &mut Vec<(f32, f32)>) {
+    const N: usize = 12;
+    for i in 1..=N {
+        let t = i as f32 / N as f32;
+        let mt = 1.0 - t;
+        let (a, b, cc) = (mt * mt, 2.0 * mt * t, t * t);
+        out.push((a * p0.0 + b * c.0 + cc * p1.0, a * p0.1 + b * c.1 + cc * p1.1));
+    }
+}
+
+/// Sample a cubic bezier into line points (start excluded, end included).
+fn flatten_cubic(p0: (f32, f32), c1: (f32, f32), c2: (f32, f32), p1: (f32, f32), out: &mut Vec<(f32, f32)>) {
+    const N: usize = 16;
+    for i in 1..=N {
+        let t = i as f32 / N as f32;
+        let mt = 1.0 - t;
+        let (a, b, cc, d) = (mt * mt * mt, 3.0 * mt * mt * t, 3.0 * mt * t * t, t * t * t);
+        out.push((
+            a * p0.0 + b * c1.0 + cc * c2.0 + d * p1.0,
+            a * p0.1 + b * c1.1 + cc * c2.1 + d * p1.1,
+        ));
+    }
+}
+
+/// The closed outline of a rounded rectangle as a point list (corners sampled as
+/// quarter-circle arcs; straight edges fall out as the lines between arcs).
+fn rounded_rect_outline(x: f32, y: f32, w: f32, h: f32, r: f32) -> Vec<(f32, f32)> {
+    if r <= 0.0 {
+        return vec![(x, y), (x + w, y), (x + w, y + h), (x, y + h)];
+    }
+    use std::f32::consts::PI;
+    const N: usize = 6;
+    let mut pts = Vec::with_capacity((N + 1) * 4);
+    let mut arc = |cx: f32, cy: f32, a0: f32, a1: f32| {
+        for i in 0..=N {
+            let a = a0 + (a1 - a0) * (i as f32 / N as f32);
+            pts.push((cx + r * a.cos(), cy + r * a.sin()));
+        }
+    };
+    arc(x + r, y + r, PI, 1.5 * PI); // top-left
+    arc(x + w - r, y + r, 1.5 * PI, 2.0 * PI); // top-right
+    arc(x + w - r, y + h - r, 0.0, 0.5 * PI); // bottom-right
+    arc(x + r, y + h - r, 0.5 * PI, PI); // bottom-left
+    pts
+}
+
+/// Draw a closed polyline as connected line segments (last point back to first).
+fn draw_closed_polyline(graphics: &mut Graphics2D, pts: &[(f32, f32)], width: f32, color: Color) {
+    if pts.len() < 2 {
+        return;
+    }
+    for seg in pts.windows(2) {
+        graphics.draw_line(seg[0], seg[1], width, color);
+    }
+    graphics.draw_line(pts[pts.len() - 1], pts[0], width, color);
 }

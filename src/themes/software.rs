@@ -5,7 +5,7 @@
 
 use std::collections::{HashMap, VecDeque};
 
-use tiny_skia::{FillRule, IntSize, Mask, Paint as TsPaint, PathBuilder, Pixmap, PixmapPaint, Rect as TsRect, Transform};
+use tiny_skia::{FillRule, FilterQuality, IntSize, Mask, Paint as TsPaint, PathBuilder, Pixmap, PixmapPaint, Rect as TsRect, Transform};
 
 use super::super::drawing::engine_software::{argb_to_color, SoftwareDrawingEngine};
 use super::super::drawing::{Drawable, DrawableRegistry, Palette};
@@ -367,12 +367,19 @@ impl<'h> Theme for SoftwareTheme<'h> {
 }
 
 impl<'h> SoftwareTheme<'h> {
-    /// Blit straight RGBA8 (tinted, opacity-folded, premultiplied) at `rect`'s
-    /// top-left, 1:1 (no scaling — sources are expected to be laid-out size; SVG
-    /// is re-rasterized by `ImageSource`). A future enhancement adds scaling.
+    /// Blit straight RGBA8 (tinted, opacity-folded, premultiplied), scaled to fill
+    /// `rect`. SVG sources arrive already rasterized at `rect`'s size, so the scale
+    /// is 1:1 and the blit stays crisp; raster images arrive at their natural
+    /// `size` and are scaled here to match the rect (mirrors the GL backend, which
+    /// scales the texture on the GPU).
     fn blit_rgba(&mut self, rect: Rect<i32>, rgba: &[u8], size: (u32, u32), tint_argb: u32) {
         let (w, h) = size;
         if w == 0 || h == 0 || rgba.len() < (w * h * 4) as usize {
+            return;
+        }
+        let dw = rect.width().max(0) as u32;
+        let dh = rect.height().max(0) as u32;
+        if dw == 0 || dh == 0 {
             return;
         }
         let opacity = self.current_opacity();
@@ -395,23 +402,56 @@ impl<'h> SoftwareTheme<'h> {
         }
         let Some(isize) = IntSize::from_wh(w, h) else { return };
         let Some(src) = Pixmap::from_vec(data, isize) else { return };
-        let dest = crate::types::rect(
-            (rect.min.x, rect.min.y),
-            (rect.min.x + w as i32, rect.min.y + h as i32),
-        );
-        let mask = match self.clip_decision(dest) {
+        let mask = match self.clip_decision(rect) {
             ClipDecision::Skip => return,
             ClipDecision::NoMask => None,
             ClipDecision::Masked => self.clip_mask.as_ref(),
         };
-        self.pixmap.as_mut().draw_pixmap(
-            rect.min.x,
-            rect.min.y,
-            src.as_ref(),
-            &PixmapPaint::default(),
-            Transform::identity(),
-            mask,
-        );
+        // Map the source (w×h) onto the destination rect (dw×dh) at rect.min. At
+        // scale 1:1 this is a pure translate, identical to a plain blit at rect.min.
+        let scaled = dw != w || dh != h;
+        let transform = Transform::from_scale(dw as f32 / w as f32, dh as f32 / h as f32)
+            .post_translate(rect.min.x as f32, rect.min.y as f32);
+        let paint = PixmapPaint {
+            // Match the GL backend's linear smoothing when scaling; keep 1:1 blits
+            // (SVG, exact-size icons) crisp with nearest-neighbor.
+            quality: if scaled { FilterQuality::Bilinear } else { FilterQuality::Nearest },
+            ..PixmapPaint::default()
+        };
+        self.pixmap.as_mut().draw_pixmap(0, 0, src.as_ref(), &paint, transform, mask);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::rect;
+
+    #[test]
+    fn raw_image_scales_to_rect() {
+        // A 2×2 opaque-white source drawn into a 20×20 rect must fill the rect
+        // (scaled), not just paint a 2×2 corner (the pre-fix 1:1 behavior).
+        let mut pixmap = Pixmap::new(40, 40).unwrap();
+        let registry = DrawableRegistry::new();
+        let palette = Palette::classic();
+        let mut image_cache = SoftwareImageCache::new();
+        let mut glyph_cache = GlyphCache::new();
+        {
+            let mut theme = SoftwareTheme::new(
+                &mut pixmap, &registry, &palette, &mut image_cache, &mut glyph_cache, 40, 40, 1.0,
+            );
+            let img = vec![255u8; 2 * 2 * 4];
+            theme.draw_raw_image_tinted(rect((10, 10), (30, 30)), &img, (2, 2), 1, 0xFFFF_FFFF);
+        }
+        let px = |x: u32, y: u32| {
+            let i = ((y * 40 + x) * 4) as usize;
+            let d = pixmap.data();
+            (d[i], d[i + 1], d[i + 2], d[i + 3])
+        };
+        // Center of the destination rect is opaque white → the source scaled up.
+        assert_eq!(px(20, 20), (255, 255, 255, 255), "image did not scale to fill the rect");
+        // Outside the rect is untouched.
+        assert_eq!(px(2, 2), (0, 0, 0, 0), "drew outside the destination rect");
     }
 }
 

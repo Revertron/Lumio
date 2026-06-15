@@ -1,0 +1,9 @@
+<Frame id="root" width="max" height="max" direction="vertical" padding="10" background_color="#101018">
+    <Label text="Space wallpaper (Hubble 'Pillars of Creation', NASA/ESA — public domain). The same JPEG is drawn at several sizes; resize the window to rescale the large one live." text_color="#e0e0f0" margin_bottom="10"/>
+    <Frame direction="horizontal" height="min" margin_bottom="10">
+        <ImageView image="space.jpg" width="120" height="80" margin_right="10"/>
+        <ImageView image="space.jpg" width="240" height="160" margin_right="10"/>
+        <ImageView image="space.jpg" width="360" height="240"/>
+    </Frame>
+    <ImageView image="space.jpg" width="max" height="max"/>
+</Frame>
