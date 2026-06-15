@@ -9,7 +9,6 @@ use speedy2d::image::{ImageDataType, ImageHandle, ImageSmoothingMode};
 use speedy2d::shape::Rectangle;
 
 use super::super::drawing::{Drawable, DrawableRegistry, DrawingEngine, Palette};
-use super::super::styles::selector::{DrawState, MainSelector};
 use super::super::text::TextBlock;
 use super::super::themes::{Theme, Typeface, ViewState};
 use super::super::types;
@@ -95,44 +94,8 @@ impl<'h> Theme for Classic<'h> {
         self.set_clip(self.current_clip);
     }
 
-    fn typeface(&self, role: &str) -> Typeface {
-        self.palette.typeface(role)
-    }
-
-    fn get_back_color(&self, state: ViewState, selector: Option<&MainSelector>) -> u32 {
-        if let Some(selector) = selector {
-            if let Some(s) = selector.get_state(&state) {
-                match s {
-                    DrawState::Transparent => return 0x00000000,
-                    DrawState::Color(c) => return *c,
-                    DrawState::Token(t) => return self.palette.color(t),
-                    _ => {}
-                }
-            }
-        }
-        self.palette.color("background")
-    }
-
-    fn get_text_color(&self, state: ViewState, selector: Option<&MainSelector>) -> u32 {
-        if let Some(selector) = selector {
-            if let Some(s) = selector.get_state(&state) {
-                match s {
-                    DrawState::Transparent => return 0x00000000,
-                    DrawState::Color(c) => return *c,
-                    DrawState::Token(t) => return self.palette.color(t),
-                    _ => {}
-                }
-            }
-        }
-        self.palette.color("text")
-    }
-
-    fn color(&self, token: &str) -> u32 {
-        self.palette.color(token)
-    }
-
-    fn dimension(&self, token: &str) -> f32 {
-        self.palette.dimension(token)
+    fn palette(&self) -> &Palette {
+        self.palette
     }
 
     fn set_clip(&mut self, rect: Rect<i32>) {

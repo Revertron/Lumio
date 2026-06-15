@@ -5,8 +5,8 @@ mod utils;
 #[cfg(feature = "backend-software")]
 mod software;
 
-use super::styles::selector::MainSelector;
-use super::drawing::{Drawable, DrawableRegistry};
+use super::styles::selector::{DrawState, MainSelector};
+use super::drawing::{Drawable, DrawableRegistry, Palette};
 use super::text::TextBlock;
 #[cfg(feature = "backend-gl")]
 pub use self::classic::Classic;
@@ -28,17 +28,59 @@ pub fn default_typeface() -> Typeface {
 
 pub trait Theme {
     fn clear_screen(&mut self);
+
+    /// The palette this theme resolves colors, dimensions and typefaces against.
+    /// Backs the default `typeface`/`color`/`dimension`/`get_back_color`/
+    /// `get_text_color` implementations below, which are identical across
+    /// backends.
+    fn palette(&self) -> &Palette;
+
     /// Resolve a typeface role (e.g. "default") against the theme's palette.
     /// Unknown roles fall back to "default".
-    fn typeface(&self, role: &str) -> Typeface;
-    fn get_back_color(&self, state: ViewState, selector: Option<&MainSelector>) -> u32;
-    fn get_text_color(&self, state: ViewState, selector: Option<&MainSelector>) -> u32;
+    fn typeface(&self, role: &str) -> Typeface {
+        self.palette().typeface(role)
+    }
+
+    fn get_back_color(&self, state: ViewState, selector: Option<&MainSelector>) -> u32 {
+        if let Some(selector) = selector {
+            if let Some(s) = selector.get_state(&state) {
+                match s {
+                    DrawState::Transparent => return 0x00000000,
+                    DrawState::Color(c) => return *c,
+                    DrawState::Token(t) => return self.palette().color(t),
+                    _ => {}
+                }
+            }
+        }
+        self.palette().color("background")
+    }
+
+    fn get_text_color(&self, state: ViewState, selector: Option<&MainSelector>) -> u32 {
+        if let Some(selector) = selector {
+            if let Some(s) = selector.get_state(&state) {
+                match s {
+                    DrawState::Transparent => return 0x00000000,
+                    DrawState::Color(c) => return *c,
+                    DrawState::Token(t) => return self.palette().color(t),
+                    _ => {}
+                }
+            }
+        }
+        self.palette().color("text")
+    }
+
     /// Resolve a named palette color token (e.g. "selection") to an ARGB color.
-    fn color(&self, token: &str) -> u32;
+    fn color(&self, token: &str) -> u32 {
+        self.palette().color(token)
+    }
+
     /// Resolve a named palette dimension token (e.g. "scrollbar.thickness")
     /// to dips. Layout code without a `Theme` instance uses
     /// `drawing::current_dimension` instead.
-    fn dimension(&self, token: &str) -> f32;
+    fn dimension(&self, token: &str) -> f32 {
+        self.palette().dimension(token)
+    }
+
     fn set_clip(&mut self, rect: Rect<i32>);
     fn clip_rect(&mut self, rect: Rect<i32>) -> Rect<i32>;
     fn push_clip(&mut self);

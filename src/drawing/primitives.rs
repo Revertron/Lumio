@@ -16,6 +16,47 @@ pub enum Expr {
     Div(Box<Expr>, Box<Expr>),       // expr / expr
 }
 
+/// Which bounds dimension [`Expr::Percent`] refers to: `X` = width, `Y` = height.
+#[derive(Clone, Copy)]
+pub enum Axis {
+    X,
+    Y,
+}
+
+/// Evaluate an [`Expr`] to a concrete pixel value, shared by both drawing
+/// engines. `scale` is the DPI scale: `Literal`s are in dips and multiplied by
+/// it. `axis` selects which bounds dimension `Percent` resolves against.
+pub fn eval_expr(expr: &Expr, bounds: crate::types::Rect<i32>, axis: Axis, scale: f64) -> f32 {
+    match expr {
+        Expr::Literal(v) => *v * scale as f32,
+        Expr::Percent(p) => {
+            let dimension = match axis {
+                Axis::X => bounds.width(),
+                Axis::Y => bounds.height(),
+            };
+            dimension as f32 * p / 100.0
+        }
+        Expr::BoundsWidth => bounds.width() as f32,
+        Expr::BoundsHeight => bounds.height() as f32,
+        Expr::BoundsLeft => bounds.min.x as f32,
+        Expr::BoundsTop => bounds.min.y as f32,
+        Expr::BoundsRight => bounds.max.x as f32,
+        Expr::BoundsBottom => bounds.max.y as f32,
+        Expr::Scale => scale as f32,
+        Expr::Add(a, b) => eval_expr(a, bounds, axis, scale) + eval_expr(b, bounds, axis, scale),
+        Expr::Sub(a, b) => eval_expr(a, bounds, axis, scale) - eval_expr(b, bounds, axis, scale),
+        Expr::Mul(a, b) => eval_expr(a, bounds, axis, scale) * eval_expr(b, bounds, axis, scale),
+        Expr::Div(a, b) => {
+            let divisor = eval_expr(b, bounds, axis, scale);
+            if divisor != 0.0 {
+                eval_expr(a, bounds, axis, scale) / divisor
+            } else {
+                0.0
+            }
+        }
+    }
+}
+
 /// Drawing commands - minimal set like SVG
 #[derive(Debug, Clone)]
 pub enum DrawCommand {

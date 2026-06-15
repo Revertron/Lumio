@@ -1,0 +1,40 @@
+//! Headless software rendering: lay out a UI and paint it into a
+//! `tiny_skia::Pixmap` with the [`SoftwareTheme`], no window required. Useful
+//! for tests, screenshots, and as the foundation the software window loop will
+//! reuse. Only available under the `backend-software` feature.
+
+use tiny_skia::Pixmap;
+
+use crate::drawing::{DrawableRegistry, Palette};
+use crate::themes::{GlyphCache, SoftwareImageCache, SoftwareTheme};
+use crate::ui::UI;
+
+/// Paint an already-laid-out `ui` into a fresh `width`×`height` pixmap at the
+/// given DPI `scale`. Returns `None` only if the pixmap could not be allocated
+/// (zero or absurd dimensions).
+pub fn render_to_pixmap(
+    ui: &UI,
+    width: u32,
+    height: u32,
+    scale: f64,
+    palette: &Palette,
+    registry: &DrawableRegistry,
+) -> Option<Pixmap> {
+    let mut pixmap = Pixmap::new(width, height)?;
+    let mut image_cache = SoftwareImageCache::new();
+    let mut glyph_cache = GlyphCache::new();
+    {
+        let mut theme = SoftwareTheme::new(
+            &mut pixmap,
+            registry,
+            palette,
+            &mut image_cache,
+            &mut glyph_cache,
+            width as i32,
+            height as i32,
+            scale,
+        );
+        ui.paint(&mut theme);
+    }
+    Some(pixmap)
+}

@@ -12,13 +12,6 @@ pub struct DrawContext {
     pub scale: f64,
 }
 
-/// Which bounds dimension `Expr::Percent` refers to: X = width, Y = height.
-#[derive(Clone, Copy)]
-enum Axis {
-    X,
-    Y,
-}
-
 /// Drawing engine that renders drawables to speedy2d Graphics2D
 pub struct DrawingEngine<'a> {
     graphics: &'a mut Graphics2D,
@@ -170,37 +163,11 @@ impl<'a> DrawingEngine<'a> {
         }
     }
 
-    /// Evaluate an expression to a concrete float value. `axis` selects which
-    /// bounds dimension `Percent` refers to.
+    /// Evaluate an expression to a concrete float value. Forwards to the shared
+    /// [`primitives::eval_expr`](super::primitives::eval_expr); see it for the
+    /// `axis`/`scale` semantics.
     fn eval_expr(&self, expr: &Expr, bounds: Rect<i32>, axis: Axis) -> f32 {
-        match expr {
-            Expr::Literal(v) => *v * self.scale as f32,
-            Expr::Percent(p) => {
-                let dimension = match axis {
-                    Axis::X => bounds.width(),
-                    Axis::Y => bounds.height(),
-                };
-                dimension as f32 * p / 100.0
-            }
-            Expr::BoundsWidth => bounds.width() as f32,
-            Expr::BoundsHeight => bounds.height() as f32,
-            Expr::BoundsLeft => bounds.min.x as f32,
-            Expr::BoundsTop => bounds.min.y as f32,
-            Expr::BoundsRight => bounds.max.x as f32,
-            Expr::BoundsBottom => bounds.max.y as f32,
-            Expr::Scale => self.scale as f32,
-            Expr::Add(a, b) => self.eval_expr(a, bounds, axis) + self.eval_expr(b, bounds, axis),
-            Expr::Sub(a, b) => self.eval_expr(a, bounds, axis) - self.eval_expr(b, bounds, axis),
-            Expr::Mul(a, b) => self.eval_expr(a, bounds, axis) * self.eval_expr(b, bounds, axis),
-            Expr::Div(a, b) => {
-                let divisor = self.eval_expr(b, bounds, axis);
-                if divisor != 0.0 {
-                    self.eval_expr(a, bounds, axis) / divisor
-                } else {
-                    0.0
-                }
-            }
-        }
+        super::primitives::eval_expr(expr, bounds, axis, self.scale)
     }
 
     /// Evaluate paint to concrete color
