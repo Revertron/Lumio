@@ -1,12 +1,30 @@
+#[cfg(feature = "backend-gl")]
 mod classic;
+#[cfg(feature = "backend-gl")]
 mod utils;
+#[cfg(feature = "backend-software")]
+mod software;
 
 use super::styles::selector::MainSelector;
 use super::drawing::{Drawable, DrawableRegistry};
 use super::text::TextBlock;
+#[cfg(feature = "backend-gl")]
 pub use self::classic::Classic;
+#[cfg(feature = "backend-gl")]
 pub use self::classic::ImageCache;
+#[cfg(feature = "backend-software")]
+pub use self::software::{SoftwareTheme, SoftwareImageCache};
 use super::types::Rect;
+
+/// The default root typeface: the palette's "default" role with its size
+/// stripped (so per-role palette sizes win when they cascade into views).
+/// Backend-neutral; used at app startup to seed `UI::from_xml`. `Classic` and
+/// the software backend both expose this.
+pub fn default_typeface() -> Typeface {
+    let mut typeface = crate::drawing::current_typeface("default");
+    typeface.font_size = None;
+    typeface
+}
 
 pub trait Theme {
     fn clear_screen(&mut self);

@@ -60,9 +60,7 @@ impl<'h> Classic<'h> {
     /// cascade into every view and shadow the palette's per-role font sizes
     /// ("button", "menu", ...).
     pub fn typeface() -> Typeface {
-        let mut typeface = crate::drawing::current_typeface("default");
-        typeface.font_size = None;
-        typeface
+        super::default_typeface()
     }
 
     pub fn new(

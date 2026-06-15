@@ -26,7 +26,7 @@ use std::rc::Rc;
 
 use crate::containers::Frame;
 use crate::events::EventType;
-use crate::themes::{Classic, Typeface};
+use crate::themes::{Typeface, default_typeface};
 use crate::traits::{Element, View};
 use crate::types::rect;
 use crate::ui::{UI, WindowRequest};
@@ -108,7 +108,7 @@ impl Dialog {
             buttons: Vec::new(),
             default_id: None,
             cancel_id: None,
-            typeface: Classic::typeface(),
+            typeface: default_typeface(),
             size: None,
             on_result: None,
         }
@@ -150,7 +150,7 @@ impl Dialog {
         self
     }
 
-    /// Overrides the typeface (defaults to [`Classic::typeface`]).
+    /// Overrides the typeface (defaults to [`default_typeface`]).
     pub fn typeface(mut self, typeface: Typeface) -> Self {
         self.typeface = typeface;
         self

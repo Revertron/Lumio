@@ -17,6 +17,9 @@ pub mod layout;
 pub mod background;
 pub mod image_source;
 pub mod views;
+/// The speedy2d (GL) window handler. Only built for the GL backend; the
+/// software backend's window loop is a separate later step.
+#[cfg(feature = "backend-gl")]
 pub mod win;
 pub mod themes;
 pub mod types;
@@ -25,6 +28,9 @@ pub mod styles;
 pub mod view_base;
 pub mod shortcut;
 pub mod drawing;
+/// Headless software rendering (UI → `tiny_skia::Pixmap`). Software backend only.
+#[cfg(feature = "backend-software")]
+pub mod render;
 pub mod prelude;
 pub mod svg;
 

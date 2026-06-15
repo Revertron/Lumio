@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use font_kit::family_name::FamilyName;
 use font_kit::properties::{Properties, Style as FkStyle, Weight};
 use font_kit::source::SystemSource;
-use speedy2d::font::{Font, FontFamily};
 
 use crate::text::FontHandle;
 use crate::themes::FontStyle;
@@ -15,8 +14,6 @@ pub trait AssetsProvider {
 
 thread_local! {
     static PROVIDER: RefCell<Option<Box<dyn AssetsProvider>>> = const { RefCell::new(None) };
-    static FONTS: RefCell<HashMap<(String, FontStyle), Font>> = RefCell::new(HashMap::new());
-    static FAMILIES: RefCell<HashMap<(String, FontStyle), FontFamily>> = RefCell::new(HashMap::new());
     static FALLBACKS: RefCell<Vec<(String, FontStyle)>> = const { RefCell::new(Vec::new()) };
     static SYSTEM: RefCell<Option<SystemSource>> = const { RefCell::new(None) };
 }
@@ -46,66 +43,30 @@ pub fn get_asset(path: &str) -> Option<Vec<u8>> {
 /// every family with the new chain.
 pub fn set_font_fallbacks(chain: Vec<(String, FontStyle)>) {
     FALLBACKS.with(|c| *c.borrow_mut() = chain);
-    FAMILIES.with(|c| c.borrow_mut().clear());
+    clear_family_cache();
 }
 
-/// Returns a [`FontHandle`] whose first entry is the requested font and whose
-/// tail is the configured fallback chain (with missing fonts silently dropped).
-/// Returns `None` only when the primary font cannot be resolved through any
-/// path.
-///
-/// The returned handle is backend-neutral; the speedy2d `FontFamily` it wraps
-/// is an implementation detail of the active text backend. The byte-resolution
-/// helpers below (`resolve_primary` → `try_system`/`try_assets`) are themselves
-/// backend-agnostic and are the reuse point for a future software text backend,
-/// which would build its own font objects from the same bytes.
-pub fn get_font_family(name: &str, style: FontStyle) -> Option<FontHandle> {
-    let key = (name.to_owned(), style);
-    if let Some(fam) = FAMILIES.with(|c| c.borrow().get(&key).cloned()) {
-        return Some(FontHandle::new(fam));
-    }
+// ---------------------------------------------------------------------------
+// Backend-neutral font BYTE resolution. Both text backends build their own font
+// objects (speedy2d `Font` / fontdue `Font`) from these raw bytes.
+// ---------------------------------------------------------------------------
 
-    let primary = resolve_primary(name, style)?;
-    let mut chain = vec![primary];
-
-    let fallbacks = FALLBACKS.with(|c| c.borrow().clone());
-    for (n, s) in fallbacks {
-        if (n.as_str(), s) == (name, style) {
-            continue;
-        }
-        if let Some(f) = resolve_primary(&n, s) {
-            chain.push(f);
-        }
-    }
-
-    let fam = FontFamily::new(chain);
-    FAMILIES.with(|c| c.borrow_mut().insert(key, fam.clone()));
-    Some(FontHandle::new(fam))
-}
-
-fn resolve_primary(name: &str, style: FontStyle) -> Option<Font> {
-    let cache_key = (name.to_owned(), style);
-    if let Some(f) = FONTS.with(|c| c.borrow().get(&cache_key).cloned()) {
-        return Some(f);
-    }
-
-    let font = try_system(name, style)
-        .or_else(|| try_assets(name, style))
+/// System → bundled-asset → last-resort `sans-serif` (for the default/Noto
+/// typeface) raw font bytes.
+fn resolve_font_bytes(name: &str, style: FontStyle) -> Option<Vec<u8>> {
+    system_font_bytes(name, style)
+        .or_else(|| asset_font_bytes(name, style))
         .or_else(|| {
-            // Last-resort fallback for the default typeface so a freshly
-            // bootstrapped app always renders text.
+            // Last-resort so a freshly bootstrapped app always renders text.
             if name == crate::themes::default_font_name() || name == "NotoSans" {
-                try_system("sans-serif", style)
+                system_font_bytes("sans-serif", style)
             } else {
                 None
             }
-        })?;
-
-    FONTS.with(|c| c.borrow_mut().insert(cache_key, font.clone()));
-    Some(font)
+        })
 }
 
-fn try_system(name: &str, style: FontStyle) -> Option<Font> {
+fn system_font_bytes(name: &str, style: FontStyle) -> Option<Vec<u8>> {
     SYSTEM.with(|s| {
         if s.borrow().is_none() {
             *s.borrow_mut() = Some(SystemSource::new());
@@ -117,11 +78,11 @@ fn try_system(name: &str, style: FontStyle) -> Option<Font> {
             .ok()?;
         let fk_font = handle.load().ok()?;
         let bytes = fk_font.copy_font_data()?;
-        Font::new(bytes.as_ref()).ok()
+        Some(bytes.as_ref().clone())
     })
 }
 
-fn try_assets(name: &str, style: FontStyle) -> Option<Font> {
+fn asset_font_bytes(name: &str, style: FontStyle) -> Option<Vec<u8>> {
     let normalized_name = name.replace(' ', "");
     let style_str = format!("{:?}", style);
     let path = format!(
@@ -133,8 +94,7 @@ fn try_assets(name: &str, style: FontStyle) -> Option<Font> {
     PROVIDER.with(|p| {
         let provider = p.borrow();
         let provider = provider.as_ref()?;
-        let bytes = provider.get_file(&path)?;
-        Font::new(bytes).ok()
+        Some(provider.get_file(&path)?.to_vec())
     })
 }
 
@@ -163,4 +123,110 @@ fn family_name_for(name: &str) -> FamilyName {
         "monospace" => FamilyName::Monospace,
         other => FamilyName::Title(other.to_owned()),
     }
+}
+
+// ---------------------------------------------------------------------------
+// speedy2d text backend: build `FontFamily` from the resolved bytes.
+// ---------------------------------------------------------------------------
+#[cfg(feature = "text-speedy2d")]
+mod backend {
+    use super::*;
+    use speedy2d::font::{Font, FontFamily};
+
+    thread_local! {
+        static FONTS: RefCell<HashMap<(String, FontStyle), Font>> = RefCell::new(HashMap::new());
+        static FAMILIES: RefCell<HashMap<(String, FontStyle), FontFamily>> = RefCell::new(HashMap::new());
+    }
+
+    pub(super) fn clear_family_cache() {
+        FAMILIES.with(|c| c.borrow_mut().clear());
+    }
+
+    pub(super) fn get_font_family(name: &str, style: FontStyle) -> Option<FontHandle> {
+        let key = (name.to_owned(), style);
+        if let Some(fam) = FAMILIES.with(|c| c.borrow().get(&key).cloned()) {
+            return Some(FontHandle::new(fam));
+        }
+
+        let mut chain = vec![resolve_primary(name, style)?];
+        for (n, s) in FALLBACKS.with(|c| c.borrow().clone()) {
+            if (n.as_str(), s) == (name, style) {
+                continue;
+            }
+            if let Some(f) = resolve_primary(&n, s) {
+                chain.push(f);
+            }
+        }
+
+        let fam = FontFamily::new(chain);
+        FAMILIES.with(|c| c.borrow_mut().insert(key, fam.clone()));
+        Some(FontHandle::new(fam))
+    }
+
+    fn resolve_primary(name: &str, style: FontStyle) -> Option<Font> {
+        let key = (name.to_owned(), style);
+        if let Some(f) = FONTS.with(|c| c.borrow().get(&key).cloned()) {
+            return Some(f);
+        }
+        let font = Font::new(&resolve_font_bytes(name, style)?).ok()?;
+        FONTS.with(|c| c.borrow_mut().insert(key, font.clone()));
+        Some(font)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// fontdue software text backend: build `Rc<Vec<fontdue::Font>>` from the bytes.
+// ---------------------------------------------------------------------------
+#[cfg(feature = "text-software")]
+mod backend {
+    use super::*;
+    use std::rc::Rc;
+    use fontdue::{Font, FontSettings};
+
+    thread_local! {
+        static FAMILIES: RefCell<HashMap<(String, FontStyle), Rc<Vec<Font>>>> = RefCell::new(HashMap::new());
+    }
+
+    pub(super) fn clear_family_cache() {
+        FAMILIES.with(|c| c.borrow_mut().clear());
+    }
+
+    pub(super) fn get_font_family(name: &str, style: FontStyle) -> Option<FontHandle> {
+        let key = (name.to_owned(), style);
+        if let Some(fam) = FAMILIES.with(|c| c.borrow().get(&key).cloned()) {
+            return Some(FontHandle::new(fam));
+        }
+
+        let mut chain = vec![build_font(name, style)?];
+        for (n, s) in FALLBACKS.with(|c| c.borrow().clone()) {
+            if (n.as_str(), s) == (name, style) {
+                continue;
+            }
+            if let Some(f) = build_font(&n, s) {
+                chain.push(f);
+            }
+        }
+
+        let fam = Rc::new(chain);
+        FAMILIES.with(|c| c.borrow_mut().insert(key, Rc::clone(&fam)));
+        Some(FontHandle::new(fam))
+    }
+
+    fn build_font(name: &str, style: FontStyle) -> Option<Font> {
+        let bytes = resolve_font_bytes(name, style)?;
+        Font::from_bytes(bytes, FontSettings::default()).ok()
+    }
+}
+
+fn clear_family_cache() {
+    backend::clear_family_cache();
+}
+
+/// Returns a [`FontHandle`] whose first entry is the requested font and whose
+/// tail is the configured fallback chain (missing fonts silently dropped).
+/// Returns `None` only when the primary font cannot be resolved through any
+/// path. The wrapped object is the active text backend's font (speedy2d
+/// `FontFamily` or `Rc<Vec<fontdue::Font>>`) — an implementation detail.
+pub fn get_font_family(name: &str, style: FontStyle) -> Option<FontHandle> {
+    backend::get_font_family(name, style)
 }

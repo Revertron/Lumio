@@ -8,13 +8,16 @@ keywords = ["gui", "ui", "xml", "desktop", "framework"]
 categories = ["gui", "rendering"]
 
 [features]
-default = ["text-speedy2d"]
-# Selects the text shaping/measurement backend. Exactly one must be enabled.
-# speedy2d remains a normal (non-optional) dependency for windowing, graphics
-# and input; this feature only switches the text layer in `src/text` and the
-# font loader in `src/assets.rs`. A future `text-software` backend would be
-# additive here.
+default = ["backend-gl"]
+# Selects the rendering + text backend. Exactly one `backend-*` must be enabled.
+# - backend-gl: the GL window (`win.rs`) + `Classic` theme + speedy2d text.
+# - backend-software: the tiny-skia software renderer + fontdue text (headless
+#   today; gains a winit/softbuffer window loop in a later step).
+# The `text-*` features are the text-layer half each backend pulls in.
+backend-gl = ["text-speedy2d"]
+backend-software = ["text-software", "dep:fontdue"]
 text-speedy2d = []
+text-software = []
 
 [dependencies]
 quick-xml = "0.40.1"
@@ -27,9 +30,62 @@ resvg = { version = "0.47.0", default-features = false }
 usvg = { version = "0.47.0", default-features = false }
 tiny-skia = "0.12.0"
 font-kit = "0.14"
+fontdue = { version = "0.9", optional = true }
 
 [dev-dependencies]
 include_dir = "0.7"
+
+# The existing examples open a GL window (`Win`), so they need `backend-gl`.
+[[example]]
+name = "background_example"
+required-features = ["backend-gl"]
+[[example]]
+name = "edit_polish_example"
+required-features = ["backend-gl"]
+[[example]]
+name = "empty_example"
+required-features = ["backend-gl"]
+[[example]]
+name = "example"
+required-features = ["backend-gl"]
+[[example]]
+name = "grid_example"
+required-features = ["backend-gl"]
+[[example]]
+name = "label_polish_example"
+required-features = ["backend-gl"]
+[[example]]
+name = "layouts_example"
+required-features = ["backend-gl"]
+[[example]]
+name = "menubar_example"
+required-features = ["backend-gl"]
+[[example]]
+name = "messenger"
+required-features = ["backend-gl"]
+[[example]]
+name = "multiwindow_example"
+required-features = ["backend-gl"]
+[[example]]
+name = "notification_example"
+required-features = ["backend-gl"]
+[[example]]
+name = "richtext_example"
+required-features = ["backend-gl"]
+[[example]]
+name = "scroll_example"
+required-features = ["backend-gl"]
+[[example]]
+name = "tableview_example"
+required-features = ["backend-gl"]
+[[example]]
+name = "visibility_example"
+required-features = ["backend-gl"]
+
+# Headless software render demo — needs the software backend.
+[[example]]
+name = "headless_render"
+required-features = ["backend-software"]
 
 [profile.release]
 opt-level = 3

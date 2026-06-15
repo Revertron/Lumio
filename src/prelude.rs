@@ -1,4 +1,5 @@
 pub use crate::ui::{UI, UiHandle, UiTask, PopupMode, PopupDirection, WindowRequest, WindowCommand};
+#[cfg(feature = "backend-gl")]
 pub use crate::win::{Win, WinEvent};
 pub use crate::traits::{View, Container, Element};
 pub use crate::events::{EventCallback, EventData, EventType};
@@ -6,7 +7,9 @@ pub use crate::shortcut::Shortcut;
 pub use crate::input::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, MouseScrollDistance, VirtualKeyCode};
 pub use crate::types::{Point, Rect};
 pub use crate::assets::{AssetsProvider, set_provider, set_font_fallbacks};
-pub use crate::themes::{Theme, Classic, Typeface, FontStyle};
+pub use crate::themes::{Theme, Typeface, FontStyle, default_typeface};
+#[cfg(feature = "backend-gl")]
+pub use crate::themes::Classic;
 pub use crate::drawing::Palette;
 pub use crate::containers::Frame;
 pub use crate::layout::{Layout, LinearLayout, OverlayLayout, DockLayout, create_layout};
