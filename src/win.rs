@@ -25,7 +25,10 @@ pub(crate) fn run_gl(ui: UI, config: WindowConfig) -> ! {
     let position = if config.center { Some(WindowPosition::Center) } else { None };
     let options = WindowCreationOptions::new_windowed(size, position)
         .with_visible(config.visible)
-        .with_hide_on_close(config.hide_on_close);
+        .with_hide_on_close(config.hide_on_close)
+        .with_resizable(config.resizable)
+        .with_minimizable(config.minimizable)
+        .with_maximizable(config.maximizable);
     let window: Window<WinEvent> =
         Window::new_with_user_events(&config.title, options).expect("Failed to create the window");
     let sender = window.create_user_event_sender();
@@ -158,7 +161,10 @@ impl<T: From<WinEvent> + Send + 'static> WindowHandler<T> for Win<T> {
             let size = WindowSize::ScaledPixels(
                 Vector2::new(request.width as f32, request.height as f32));
             // Child windows open centered over the window that opened them.
-            let options = WindowCreationOptions::new_windowed(size, Some(WindowPosition::CenterOnParent));
+            let options = WindowCreationOptions::new_windowed(size, Some(WindowPosition::CenterOnParent))
+                .with_resizable(request.resizable)
+                .with_minimizable(request.minimizable)
+                .with_maximizable(request.maximizable);
 
             if request.modal {
                 helper.create_modal_window(&request.title, options, Box::new(win));

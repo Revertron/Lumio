@@ -33,6 +33,26 @@ fn wire_main(ui: &mut UI) {
                 height: 160,
                 ui: info,
                 modal: false,
+                resizable: true,
+                minimizable: true,
+                maximizable: true,
+            });
+            true
+        }));
+    }
+
+    if let Some(b) = ui.get_view("btn_fixed") {
+        b.borrow_mut().on_event(EventType::Click, Box::new(|ui, _, _| {
+            let info = build_info_ui("This window is fixed:\nit can't be resized, minimized or maximized.");
+            ui.open_window(WindowRequest {
+                title: "Fixed window".to_string(),
+                width: 380,
+                height: 160,
+                ui: info,
+                modal: false,
+                resizable: false,
+                minimizable: false,
+                maximizable: false,
             });
             true
         }));

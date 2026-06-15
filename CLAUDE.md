@@ -4,7 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Lumio is a Rust GUI library built on top of `speedy2d` that provides a declarative XML-based layout system for creating desktop applications. It uses a retained-mode GUI architecture where view hierarchies are maintained in memory, with support for theming and event handling.
+Lumio is a Rust GUI library that provides a declarative XML-based layout system for creating desktop applications. It uses a retained-mode GUI architecture where view hierarchies are maintained in memory, with support for theming and event handling.
+
+It has two compile-time-selected rendering backends (mutually exclusive):
+- `backend-gl` (default): OpenGL window + rendering via the vendored `speedy2d`.
+- `backend-software`: CPU rendering via `tiny-skia` + `fontdue`, in a `winit` + `softbuffer` window. Also supports headless rendering (UI → `tiny_skia::Pixmap`/PNG).
+
+Apps launch backend-agnostically with `lumio::run(ui, WindowConfig::new(..))`; switching backends is a Cargo-feature change, no source edits.
 
 ## Build Commands
 
@@ -21,12 +27,21 @@ cargo test
 # Run the example application
 cargo run --example example
 
+# Build / run / test the software backend (no GL)
+cargo build --no-default-features --features backend-software
+cargo run --example example --no-default-features --features backend-software
+cargo test  --no-default-features --features backend-software
+
 # Run linter
 cargo clippy
 
 # Run linter with auto-fix
 cargo clippy --fix
 ```
+
+Note: the software backend renders on the CPU and is ~30x slower unoptimized, so
+`[profile.dev]` in `Cargo.toml` optimizes dependencies (`opt-level = 3` for
+`package."*"`) to keep debug builds responsive.
 
 ## Architecture
 
@@ -36,9 +51,9 @@ cargo clippy --fix
 
 - **View Trait** (`src/traits.rs`): Central trait that all UI elements implement. Defines the contract for layout, painting, event handling, and state management. Uses `downcast-rs` for runtime type casting.
 
-- **Win Handler** (`src/win.rs`): Window event handler implementing `speedy2d::WindowHandler`. Manages the render loop, input events, and coordinates between the window system and UI. Spawns a background thread for 60fps update events.
+- **Window loop**: backend-specific, behind the neutral `lumio::run(ui, WindowConfig)` launcher (`src/app.rs`). The GL backend is **`src/win.rs`** (`speedy2d::WindowHandler`; background thread posts 60fps update events). The software backend is **`src/software_window/`** (winit `ApplicationHandler` + softbuffer; 15ms tick). Both support multi-window + app-modal dialogs. Input/event types are backend-neutral (`src/input/`).
 
-- **Theme System** (`src/themes/`): Pluggable theming via the `Theme` trait. Currently, implements `Classic` theme. Handles rendering of different view states (focused, hovered, pressed, etc.).
+- **Theme System** (`src/themes/`): Pluggable theming via the `Theme` trait — the rendering abstraction seam. `Classic` (GL) and `SoftwareTheme` (tiny-skia) are the two implementations, cfg-selected by backend. Handles rendering of different view states (focused, hovered, pressed, etc.). Text shaping is abstracted behind `crate::text` (speedy2d vs fontdue).
 
 - **Prelude** (`src/prelude.rs`): Convenience re-exports for common types. Use `use lumio::prelude::*;` for quick access.
 
@@ -46,7 +61,15 @@ cargo clippy --fix
 
 Views are organized in a retained parent-child tree structure:
 - **Container** (`src/containers.rs`): `Frame` is the primary container that can hold child views. Supports vertical/horizontal layout with optional line breaking.
-- **Views** (`src/views/`): Concrete implementations include `Label`, `Button`, `Edit`, `CheckBox`, `List`, and `RecyclerView`.
+- **Views** (`src/views/`): Concrete implementations, grouped by role:
+  - Text: `Label`, `Edit`, `Memo` (multi-line), `RichText` (spannable HTML subset)
+  - Buttons & toggles: `Button`, `ImageButton`, `CheckBox`, `RadioButton`
+  - Selection & data: `ComboBox`, `List`, `RecyclerView` (virtualized), `TableView` (sortable/resizable columns)
+  - Layout & containers: `Frame`, `Grid`, `ScrollView`, `TabView`, `SplitPanel`, `Separator`
+  - Images & indicators: `ImageView`, `ProgressBar`, `StatusBar`
+  - Menus & overlays: `MenuBar`, `PopupMenu`, `NotificationStack`
+
+  All are re-exported from the prelude. New views should follow `CheckBox` as a template (see "Creating New View Types" below).
 
 ### Layout System
 
@@ -133,8 +156,11 @@ Fonts cascade from parent to child. Set at container level to apply to all child
 ## Testing Notes
 
 - Drawing registry tests are in `src/drawing/registry.rs` and pass
-- `src/tests.rs` is a placeholder for future integration tests (requires mocking `speedy2d::Graphics2D`)
+- `src/tests.rs` is a placeholder for future integration tests
+- The software backend enables **headless render testing** without a window:
+  `render::render_to_pixmap(..)` → `tiny_skia::Pixmap` (see `tests/software_render.rs`
+  and `examples/headless_render.rs`). This sidesteps the old need to mock `Graphics2D`.
 
 ## Rust Edition
 
-Project uses Rust 2021 edition (specified in Cargo.toml).
+Project uses Rust 2024 edition (specified in Cargo.toml).

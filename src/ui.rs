@@ -179,6 +179,13 @@ pub struct WindowRequest {
     /// Application-modal: until this window closes, all other windows ignore
     /// mouse/keyboard/close input, and clicking them refocuses this window.
     pub modal: bool,
+    /// Whether the user can resize the window. A non-resizable window also
+    /// can't be maximized on most platforms.
+    pub resizable: bool,
+    /// Whether the window shows an enabled minimize button.
+    pub minimizable: bool,
+    /// Whether the window shows an enabled maximize button.
+    pub maximizable: bool,
 }
 
 /// A window-visibility action requested from outside the window handler

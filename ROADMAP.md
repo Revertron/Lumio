@@ -1,14 +1,23 @@
 # Lumio Evolution Roadmap
 
 A tiered plan for evolving Lumio from its current state (26 view types, 3 layout
-engines, one theme with light/dark palettes, multi-window) into a complete
-desktop GUI toolkit.
+engines, one theme with light/dark palettes, multi-window, two rendering
+backends) into a complete desktop GUI toolkit.
 
 ## Current state
 
 The core is solid: retained view tree, XML layouts, three layout engines behind
 the `Layout` trait, virtualized lists (RecyclerView), a full-featured TableView,
 RichText, popups/dialogs/notifications/tooltips, SVG support, HiDPI awareness.
+
+**Switchable rendering backends — DONE 2026-06.** Two compile-time-selected,
+mutually-exclusive backends behind a backend-neutral seam (the `Theme`, text and
+input abstractions): `backend-gl` (default — OpenGL via the vendored speedy2d)
+and `backend-software` (CPU rendering via tiny-skia + fontdue, in a winit +
+softbuffer window, with a headless UI → `Pixmap`/PNG path). Apps launch with the
+neutral `lumio::run(ui, WindowConfig)` and switch backends by Cargo feature, no
+source edits. `speedy2d` is now an optional dependency (absent from the software
+build).
 
 The gaps cluster into five areas:
 
@@ -101,7 +110,8 @@ Gates everything else; cheap and high leverage:
 - README with a widget gallery.
 - Rustdoc on the public API (RadioButton, `UI::find_with`, Gravity, TableView,
   Grid are already on the pending list).
-- Fix the stale view list in CLAUDE.md.
+- Fix the stale view list in CLAUDE.md — DONE 2026-06-15 (full grouped widget
+  list + backend/edition facts refreshed).
 
 ---
 
@@ -173,10 +183,12 @@ Each deserves its own design discussion before committing.
   observable models. A big philosophical shift from the current imperative
   callback style; only pursue if callback wiring proves painful in practice.
   Current lean: no.
-- **Testing infrastructure** — `src/tests.rs` is an empty skeleton blocked on
-  mocking `Graphics2D`. A headless backend that records draw calls would
-  unlock layout regression tests — valuable exactly when the theming refactor
-  (item 1) starts churning rendering code.
+- **Testing infrastructure** — `src/tests.rs` is an empty skeleton. The
+  `backend-software` renderer now unblocks this: `render::render_to_pixmap(..)`
+  produces a `tiny_skia::Pixmap` headlessly (no window, no `Graphics2D` to mock),
+  so layout/visual regression tests can snapshot the rendered output
+  (`tests/software_render.rs` is the starting point). Pixel-snapshot or
+  draw-call-recording harnesses can build on this.
 
 ---
 

@@ -93,6 +93,7 @@ pub struct Dialog {
     cancel_id: Option<String>,
     typeface: Typeface,
     size: Option<(u32, u32)>,
+    resizable: bool,
     on_result: Option<ResultCallback>,
 }
 
@@ -110,6 +111,7 @@ impl Dialog {
             cancel_id: None,
             typeface: default_typeface(),
             size: None,
+            resizable: false,
             on_result: None,
         }
     }
@@ -147,6 +149,14 @@ impl Dialog {
     /// Sets an explicit window size in dips, opting out of auto-sizing.
     pub fn size(mut self, width: u32, height: u32) -> Self {
         self.size = Some((width, height));
+        self
+    }
+
+    /// Sets whether the dialog window can be resized. Dialogs are fixed by
+    /// default (non-resizable, with no minimize/maximize buttons); pass `true`
+    /// to open a normal resizable window instead.
+    pub fn resizable(mut self, value: bool) -> Self {
+        self.resizable = value;
         self
     }
 
@@ -195,6 +205,9 @@ impl Dialog {
 
     /// Builds and opens the dialog as an application-modal child window of `ui`.
     pub fn show(self, ui: &mut UI) {
+        // Dialogs are fixed by default: a fixed dialog disables resize and the
+        // minimize/maximize buttons; `.resizable(true)` opens a normal window.
+        let resizable = self.resizable;
         let (dialog_ui, title, width, height) = self.build_window();
         ui.open_window(WindowRequest {
             title,
@@ -202,6 +215,9 @@ impl Dialog {
             height,
             ui: dialog_ui,
             modal: true,
+            resizable,
+            minimizable: resizable,
+            maximizable: resizable,
         });
     }
 
