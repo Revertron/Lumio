@@ -27,6 +27,10 @@ const ICON_GAP_DIP: i32 = 2;
 pub struct Edit {
     state: RefCell<FieldsTexted>,
     scroll_x: RefCell<i32>,
+    /// The caret position the horizontal scroll was last followed to. Scroll
+    /// chases the caret only when this differs from `caret_pos` (i.e. the caret
+    /// actually moved), so resize/blur/repaint never re-scroll.
+    scroll_caret: std::cell::Cell<usize>,
     caret_pos: RefCell<usize>,
     caret_rect: RefCell<Rect<i32>>,
     caret_time: RefCell<Instant>,
@@ -99,6 +103,7 @@ impl Edit {
         Edit {
             state: RefCell::new(fields),
             scroll_x: RefCell::new(0),
+            scroll_caret: std::cell::Cell::new(usize::MAX),
             caret_pos: RefCell::new(0),
             caret_rect: RefCell::new(crate::types::rect((0, 0), (0, 0))),
             caret_time: RefCell::new(Instant::now()),
@@ -568,21 +573,43 @@ impl Edit {
     fn update_scroll(&self) {
         let scale = self.state.borrow().main.scale;
         let my_rect = self.state.borrow().main.rect;
-        let caret_rect = self.get_caret_rect(scale);
         let padding = self.get_padding(scale);
         let inner_h = my_rect.height() - padding.top - padding.bottom;
         let (left_inset, right_inset) = self.icon_insets(inner_h, scale);
-        let cur_scroll_x = *self.scroll_x.borrow();
         let view_left = my_rect.min.x + padding.left + left_inset;
         let view_right = my_rect.max.x - padding.right - right_inset;
+        let inner_width = (view_right - view_left).max(0);
+        let text_width = self
+            .state
+            .borrow()
+            .cached_text
+            .as_ref()
+            .map(|t| t.width().ceil() as i32)
+            .unwrap_or(0);
 
-        if caret_rect.max.x + cur_scroll_x > view_right {
-            // Caret is past the right edge — scroll so caret is at the right edge
-            *self.scroll_x.borrow_mut() = view_right - caret_rect.max.x;
-        } else if caret_rect.min.x + cur_scroll_x < view_left {
-            // Caret is past the left edge — scroll so caret is at the left edge
-            *self.scroll_x.borrow_mut() = view_left - caret_rect.min.x;
+        // Scroll to reveal the caret ONLY when it actually moved (typing, arrows,
+        // click, selection). Resize, blur and plain repaints must not re-scroll,
+        // so a field the user scrolled for reference keeps its position.
+        let caret_pos = *self.caret_pos.borrow();
+        if caret_pos != self.scroll_caret.get() {
+            self.scroll_caret.set(caret_pos);
+            let caret_rect = self.get_caret_rect(scale);
+            let cur = *self.scroll_x.borrow();
+            if caret_rect.max.x + cur > view_right {
+                // Caret past the right edge — scroll so it sits at the right edge.
+                *self.scroll_x.borrow_mut() = view_right - caret_rect.max.x;
+            } else if caret_rect.min.x + cur < view_left {
+                // Caret past the left edge — scroll so it sits at the left edge.
+                *self.scroll_x.borrow_mut() = view_left - caret_rect.min.x;
+            }
         }
+
+        // Always keep the offset in range: never reveal blank space past the end,
+        // and anchor at the start when the whole text fits. This is what adjusts
+        // on resize — by clamping, not by chasing the caret.
+        let min_scroll = (inner_width - text_width).min(0);
+        let clamped = (*self.scroll_x.borrow()).clamp(min_scroll, 0);
+        *self.scroll_x.borrow_mut() = clamped;
     }
 
     fn get_line_height(&self) -> f32 {
