@@ -9,7 +9,7 @@ use crate::app::WindowConfig;
 use crate::input::MouseCursorType;
 use crate::types::Point;
 use crate::drawing::{DrawableRegistry, Palette};
-use super::ui::{UI, WindowCommand};
+use super::ui::{EscapeAction, UI, WindowCommand};
 use super::themes::*;
 use super::themes::ImageCache;
 
@@ -104,10 +104,8 @@ impl<T> Win<T> {
     /// button events, since a popup opened/closed by a click changes the
     /// cursor without generating a mouse move.
     fn apply_cursor(&mut self, helper: &mut WindowHelper<T>) {
-        let cursor = self.ui.current_cursor();
-        if self.last_cursor != Some(cursor) {
+        if let Some(cursor) = crate::input::cursor_transition(self.ui.current_cursor(), &mut self.last_cursor) {
             helper.set_cursor(cursor.into());
-            self.last_cursor = Some(cursor);
         }
     }
 }
@@ -258,17 +256,14 @@ impl<T: From<WinEvent> + Send + 'static> WindowHandler<T> for Win<T> {
             self.mod_state.clone().into(),
         );
         // Escape policy runs AFTER dispatch so a dialog or view consuming Esc
-        // (e.g. a cancel button) is not followed by closing here. Esc only
-        // dismisses popups and closes child/dialog windows; it never closes or
-        // quits the main window — that's up to the app's own handler/shortcut.
-        // A child window is closed on the Esc *release* (see `esc_pending_close`),
-        // not the press; popups are dismissed immediately (they don't move focus).
+        // (e.g. a cancel button) is not followed by closing here. The decision is
+        // centralized in `UI::escape_press_action`; child windows close on the
+        // Esc *release* (see `esc_pending_close` / `EscapeAction::CloseChildWindow`).
         if !consumed && virtual_key_code == Some(VirtualKeyCode::Escape) {
-            if self.ui.has_dismissable_popups() {
-                self.ui.close_all_popups();
-                helper.request_redraw();
-            } else if self.is_child {
-                self.esc_pending_close = true;
+            match self.ui.escape_press_action(self.is_child) {
+                EscapeAction::DismissedPopups => helper.request_redraw(),
+                EscapeAction::CloseChildWindow => self.esc_pending_close = true,
+                EscapeAction::None => {}
             }
             return;
         }

@@ -10,7 +10,7 @@ use tiny_skia::{FillRule, IntSize, Mask, Paint as TsPaint, PathBuilder, Pixmap, 
 use super::super::drawing::engine_software::{argb_to_color, SoftwareDrawingEngine};
 use super::super::drawing::{Drawable, DrawableRegistry, Palette};
 use super::super::text::TextBlock;
-use super::super::themes::{Theme, ViewState};
+use super::super::themes::{OpacityStack, Theme, ViewState};
 use super::super::types::{Rect, rect};
 
 /// Decoded images for the software backend, keyed by the owning `ImageSource`
@@ -48,7 +48,7 @@ pub struct SoftwareTheme<'h> {
     /// built for the current clip; reset whenever the clip changes. Rect fills
     /// clip geometrically and never touch this.
     clip_mask: Option<Mask>,
-    opacity_stack: Vec<f32>,
+    opacity: OpacityStack,
     drawable_registry: &'h DrawableRegistry,
     palette: &'h Palette,
     image_cache: &'h mut SoftwareImageCache,
@@ -76,7 +76,7 @@ impl<'h> SoftwareTheme<'h> {
             clip_stack: VecDeque::new(),
             clip_full: true,
             clip_mask: None,
-            opacity_stack: Vec::new(),
+            opacity: OpacityStack::new(),
             drawable_registry,
             palette,
             image_cache,
@@ -85,7 +85,7 @@ impl<'h> SoftwareTheme<'h> {
     }
 
     fn current_opacity(&self) -> f32 {
-        self.opacity_stack.last().copied().unwrap_or(1.0)
+        self.opacity.current()
     }
 
     /// True when `dest` lies entirely within the current clip (so a primitive
@@ -136,11 +136,7 @@ impl<'h> SoftwareTheme<'h> {
     /// Geometric intersection of `r` with the current clip (for rect fills, which
     /// never need a mask).
     fn clip_rect_geom(&self, r: Rect<i32>) -> Rect<i32> {
-        let c = self.current_clip;
-        rect(
-            (r.min.x.max(c.min.x), r.min.y.max(c.min.y)),
-            (r.max.x.min(c.max.x), r.max.y.min(c.max.y)),
-        )
+        self.current_clip.intersect(&r)
     }
 }
 
@@ -164,11 +160,7 @@ impl<'h> Theme for SoftwareTheme<'h> {
     }
 
     fn clip_rect(&mut self, rect: Rect<i32>) -> Rect<i32> {
-        let min_x = rect.min.x.max(self.current_clip.min.x);
-        let max_x = rect.max.x.min(self.current_clip.max.x);
-        let min_y = rect.min.y.max(self.current_clip.min.y);
-        let max_y = rect.max.y.min(self.current_clip.max.y);
-        let clipped = crate::types::rect((min_x, min_y), (max_x, max_y));
+        let clipped = self.current_clip.intersect(&rect);
         self.set_clip(clipped);
         clipped
     }
@@ -335,12 +327,11 @@ impl<'h> Theme for SoftwareTheme<'h> {
     }
 
     fn push_opacity(&mut self, opacity: f32) {
-        let current = self.current_opacity();
-        self.opacity_stack.push(current * opacity);
+        self.opacity.push(opacity);
     }
 
     fn pop_opacity(&mut self) {
-        self.opacity_stack.pop();
+        self.opacity.pop();
     }
 
     fn draw_raw_image(&mut self, rect: Rect<i32>, rgba: &[u8], size: (u32, u32), cache_key: u64) {

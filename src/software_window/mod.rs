@@ -23,7 +23,7 @@ use crate::drawing::{DrawableRegistry, Palette};
 use crate::input::{ModifiersState, MouseCursorType, VirtualKeyCode};
 use crate::themes::{GlyphCache, SoftwareImageCache, SoftwareTheme};
 use crate::types::Point;
-use crate::ui::{WindowCommand, UI};
+use crate::ui::{EscapeAction, WindowCommand, UI};
 
 type SbContext = softbuffer::Context<Rc<Window>>;
 type SbSurface = softbuffer::Surface<Rc<Window>, Rc<Window>>;
@@ -77,10 +77,8 @@ struct WindowState {
 impl WindowState {
     /// Push the UI's requested cursor to the OS, only on a real change.
     fn apply_cursor(&mut self) {
-        let cursor = self.ui.current_cursor();
-        if self.last_cursor != Some(cursor) {
+        if let Some(cursor) = crate::input::cursor_transition(self.ui.current_cursor(), &mut self.last_cursor) {
             self.window.set_cursor(to_cursor_icon(cursor));
-            self.last_cursor = Some(cursor);
         }
     }
 
@@ -428,27 +426,17 @@ impl ApplicationHandler for App {
                         ElementState::Released => ws.ui.on_key_up(vk, 0, ws.mod_state.clone()),
                     };
                     redraw |= consumed;
-                    // Escape policy (after dispatch, only if not consumed). Esc
-                    // dismisses popups and closes child/dialog windows; it never
-                    // closes/quits the main window (the app wires that itself).
-                    //
-                    // A child window is closed on the Escape *release*, not the
-                    // press: destroying the focused window while Esc is still
-                    // physically held makes the OS move focus to the next window
-                    // and re-deliver the held key to it as a fresh `Pressed`
-                    // (verified outside Lumio with a bare winit program), which
-                    // would cascade-close a whole stack of nested dialogs on one
-                    // press. Closing on release destroys the window when no key
-                    // is held, so nothing is re-delivered. Popups don't move OS
-                    // focus, so they're dismissed immediately on the press.
+                    // Escape policy (after dispatch, only if not consumed). The
+                    // decision is centralized in `UI::escape_press_action`; a
+                    // child window closes on the Escape *release*, not the press
+                    // (see `EscapeAction::CloseChildWindow` / `esc_pending_close`).
                     if vk == Some(VirtualKeyCode::Escape) {
                         match ke.state {
                             ElementState::Pressed if !ke.repeat && !consumed => {
-                                if ws.ui.has_dismissable_popups() {
-                                    ws.ui.close_all_popups();
-                                    redraw = true;
-                                } else if ws.is_child {
-                                    esc_down_close = true;
+                                match ws.ui.escape_press_action(ws.is_child) {
+                                    EscapeAction::DismissedPopups => redraw = true,
+                                    EscapeAction::CloseChildWindow => esc_down_close = true,
+                                    EscapeAction::None => {}
                                 }
                             }
                             ElementState::Released => esc_up = true,

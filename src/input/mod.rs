@@ -72,6 +72,23 @@ pub enum MouseCursorType {
     ZoomOut,
 }
 
+/// Decide whether a cursor change should be pushed to the OS. Returns
+/// `Some(current)` (and records it in `last`) only when it differs from the last
+/// cursor pushed, else `None`. Both window backends call this so the
+/// apply-on-transition guard isn't duplicated; each then applies the returned
+/// cursor with its own windowing API (avoids per-event `set_cursor` churn).
+pub fn cursor_transition(
+    current: MouseCursorType,
+    last: &mut Option<MouseCursorType>,
+) -> Option<MouseCursorType> {
+    if *last == Some(current) {
+        None
+    } else {
+        *last = Some(current);
+        Some(current)
+    }
+}
+
 /// The state of the modifier keys. Mirrors `speedy2d::window::ModifiersState`.
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Default)]
 pub struct ModifiersState {

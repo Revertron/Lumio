@@ -1,4 +1,3 @@
-use std::cmp::{max, min};
 use std::collections::{HashMap, VecDeque};
 use std::io::Cursor;
 
@@ -10,8 +9,7 @@ use speedy2d::shape::Rectangle;
 
 use super::super::drawing::{Drawable, DrawableRegistry, DrawingEngine, Palette};
 use super::super::text::TextBlock;
-use super::super::themes::{Theme, Typeface, ViewState};
-use super::super::types;
+use super::super::themes::{OpacityStack, Theme, Typeface, ViewState};
 use super::super::types::{Rect, rect};
 
 /// Cache for GPU image handles, keyed by the owning `ImageSource`'s unique id.
@@ -25,7 +23,7 @@ pub struct Classic<'h> {
     scale: f64,
     current_clip: Rect<i32>,
     clip_stack: VecDeque<Rect<i32>>,
-    opacity_stack: Vec<f32>,
+    opacity: OpacityStack,
     drawable_registry: &'h DrawableRegistry,
     palette: &'h Palette,
     image_cache: &'h mut ImageCache
@@ -34,7 +32,7 @@ pub struct Classic<'h> {
 #[allow(dead_code)]
 impl<'h> Classic<'h> {
     fn current_opacity(&self) -> f32 {
-        self.opacity_stack.last().copied().unwrap_or(1.0)
+        self.opacity.current()
     }
 
     fn apply_color(&self, color: Color) -> Color {
@@ -79,7 +77,7 @@ impl<'h> Classic<'h> {
             scale,
             current_clip,
             clip_stack: VecDeque::new(),
-            opacity_stack: Vec::new(),
+            opacity: OpacityStack::new(),
             drawable_registry,
             palette,
             image_cache
@@ -105,13 +103,9 @@ impl<'h> Theme for Classic<'h> {
     }
 
     fn clip_rect(&mut self, rect: Rect<i32>) -> Rect<i32> {
-        let min_x = max(rect.min.x, self.current_clip.min.x);
-        let max_x = min(rect.max.x, self.current_clip.max.x);
-        let min_y = max(rect.min.y, self.current_clip.min.y);
-        let max_y = min(rect.max.y, self.current_clip.max.y);
-        let rect = types::rect((min_x, min_y), (max_x, max_y));
-        self.set_clip(rect);
-        rect
+        let clipped = self.current_clip.intersect(&rect);
+        self.set_clip(clipped);
+        clipped
     }
 
     fn push_clip(&mut self) {
@@ -190,12 +184,11 @@ impl<'h> Theme for Classic<'h> {
     }
 
     fn push_opacity(&mut self, opacity: f32) {
-        let current = self.current_opacity();
-        self.opacity_stack.push(current * opacity);
+        self.opacity.push(opacity);
     }
 
     fn pop_opacity(&mut self) {
-        self.opacity_stack.pop();
+        self.opacity.pop();
     }
 
     fn draw_image(&mut self, rect: Rect<i32>, image_bytes: &[u8], cache_key: u64) {

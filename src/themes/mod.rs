@@ -26,6 +26,36 @@ pub fn default_typeface() -> Typeface {
     typeface
 }
 
+/// A stack of nested opacity multipliers, shared by the theme backends (both
+/// `Classic` and `SoftwareTheme` embed one). Pushing multiplies the new opacity
+/// into the current effective value so nested faded/disabled views compose;
+/// [`current`](Self::current) is the effective opacity to draw with.
+#[derive(Default)]
+pub struct OpacityStack {
+    stack: Vec<f32>,
+}
+
+impl OpacityStack {
+    pub fn new() -> Self {
+        OpacityStack { stack: Vec::new() }
+    }
+
+    /// The effective opacity to draw with (`1.0` when nothing is pushed).
+    pub fn current(&self) -> f32 {
+        self.stack.last().copied().unwrap_or(1.0)
+    }
+
+    /// Push a nested opacity, pre-multiplied into the current effective value.
+    pub fn push(&mut self, opacity: f32) {
+        let current = self.current();
+        self.stack.push(current * opacity);
+    }
+
+    pub fn pop(&mut self) {
+        self.stack.pop();
+    }
+}
+
 pub trait Theme {
     fn clear_screen(&mut self);
 

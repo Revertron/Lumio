@@ -99,3 +99,16 @@ impl<N: ops::Sub<Output = N> + Copy + Add<Output = N> + PartialOrd + AddAssign +
         self.min.x <= point.x && self.max.x >= point.x && self.min.y <= point.y && self.max.y >= point.y
     }
 }
+
+impl<N: Ord + Copy> Rect<N> {
+    /// The axis-aligned overlap of `self` and `other`. The result is empty (its
+    /// `min` ≥ `max` on an axis) when they don't overlap on that axis — callers
+    /// using it as a clip rect should treat that as "nothing visible". Used by
+    /// the themes to intersect a requested clip with the current one.
+    pub fn intersect(&self, other: &Rect<N>) -> Rect<N> {
+        Rect {
+            min: Point::new(self.min.x.max(other.min.x), self.min.y.max(other.min.y)),
+            max: Point::new(self.max.x.min(other.max.x), self.max.y.min(other.max.y)),
+        }
+    }
+}

@@ -199,6 +199,26 @@ pub enum WindowCommand {
     Quit,
 }
 
+/// What a window backend should do about an unconsumed Escape key *press*, as
+/// decided by [`UI::escape_press_action`]. The action is backend-neutral; each
+/// loop maps it to its own redraw/close primitives.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum EscapeAction {
+    /// Nothing to do (no dismissable popups, and this is the main window).
+    None,
+    /// Dismissable popups were just closed; the window should redraw.
+    DismissedPopups,
+    /// A child/dialog window should close. The actual destroy is deferred to the
+    /// Escape *release*, not done here: destroying the focused window while Esc
+    /// is still physically held makes the OS move focus to the next window and
+    /// re-deliver the held key to it as a fresh press (verified outside Lumio
+    /// with a bare winit program), which would cascade-close a whole stack of
+    /// nested dialogs on one press. Closing on release destroys the window when
+    /// no key is held, so nothing is re-delivered. (Popups don't move OS focus,
+    /// so `DismissedPopups` acts immediately on the press.)
+    CloseChildWindow,
+}
+
 #[allow(dead_code)]
 impl UI {
     pub fn new(width: u32, height: u32, typeface: Typeface, scale: f64) -> Self {
@@ -551,6 +571,23 @@ impl UI {
     /// stack) and modal dialogs do not count.
     pub fn has_dismissable_popups(&self) -> bool {
         self.overlays.iter().any(|e| e.mode == PopupMode::Popup)
+    }
+
+    /// Centralized Escape-key policy for the window backends. Call on an
+    /// *unconsumed* Escape key press (the caller already checked it wasn't
+    /// consumed by a view/dialog, and on winit that it isn't a key repeat).
+    /// Dismisses popups immediately and reports what the window should do via
+    /// [`EscapeAction`]. Escape never closes or quits the main window — that's
+    /// left to the app's own handler/shortcut.
+    pub fn escape_press_action(&mut self, is_child: bool) -> EscapeAction {
+        if self.has_dismissable_popups() {
+            self.close_all_popups();
+            EscapeAction::DismissedPopups
+        } else if is_child {
+            EscapeAction::CloseChildWindow
+        } else {
+            EscapeAction::None
+        }
     }
 
     /// Lazily ensures the notification stack overlay exists, returning a clone of its Element.
