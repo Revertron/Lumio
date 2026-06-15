@@ -946,8 +946,13 @@ impl RecyclerView {
             // Get item count
             let item_count = self.adapter.borrow().as_ref().unwrap().get_item_count();
 
-            // Force update of cumulative positions by calling layout_items (this rebuilds the cache)
-            {
+            // Recompute the visible range with the now-measured heights and rebuild
+            // the position cache. The first pass used `default_item_height` (a
+            // guess), so when items are taller than that guess it attaches far more
+            // holders than actually fit (e.g. default 24 vs real 95 → ~4x). Recycle
+            // the holders that fall outside the corrected range, otherwise we keep
+            // laying out and painting dozens of off-screen items every frame.
+            let corrected = {
                 let adapter_ref = self.adapter.borrow();
                 let adapter = adapter_ref.as_ref().unwrap();
                 self.layout_manager.borrow_mut().layout_items(
@@ -955,10 +960,25 @@ impl RecyclerView {
                     viewport,
                     scroll_offset,
                     adapter.as_ref()
-                );
+                )
+            };
+            let visible: HashSet<usize> = corrected.iter().map(|l| l.position).collect();
+            {
+                let adapter_ref = self.adapter.borrow();
+                let adapter = adapter_ref.as_ref().unwrap();
+                let mut attached = self.attached_holders.borrow_mut();
+                attached.retain(|holder| {
+                    if visible.contains(&holder.get_position()) {
+                        true
+                    } else {
+                        adapter.on_view_recycled(holder);
+                        self.recycler.recycle(holder.clone());
+                        false
+                    }
+                });
             }
 
-            // Update positions of all attached holders
+            // Update positions of the (now culled) attached holders
             for holder in self.attached_holders.borrow().iter() {
                 let pos = holder.get_position();
 

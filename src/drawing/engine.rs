@@ -206,15 +206,8 @@ impl<'a> DrawingEngine<'a> {
     /// Evaluate paint to concrete color
     fn eval_paint(&self, paint: &Paint) -> Option<Color> {
         match &paint.kind {
-            PaintKind::Color(c) => {
-                if paint.opacity < 1.0 {
-                    // Apply opacity
-                    // TODO: Properly apply opacity to color
-                    Some(*c)
-                } else {
-                    Some(*c)
-                }
-            }
+            // TODO: fold paint.opacity into the alpha channel.
+            PaintKind::Color(argb) => Some(Color::from_hex_argb(*argb)),
             PaintKind::Token(name) => Some(Color::from_hex_argb(self.palette.color(name))),
             PaintKind::Gradient(_) => {
                 // TODO: Gradient support

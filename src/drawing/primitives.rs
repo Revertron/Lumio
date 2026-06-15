@@ -1,5 +1,3 @@
-use speedy2d::color::Color;
-
 /// Expression system for dynamic values (like CSS calc())
 #[derive(Debug, Clone)]
 pub enum Expr {
@@ -100,7 +98,8 @@ pub struct Paint {
 
 #[derive(Debug, Clone)]
 pub enum PaintKind {
-    Color(Color),
+    /// A literal `0xAARRGGBB` color parsed from a `#RRGGBB`/`#AARRGGBB` attribute.
+    Color(u32),
     /// Named palette color (`color="@token"` in drawable XML), resolved at draw time.
     Token(String),
     Gradient(Gradient),
@@ -122,7 +121,8 @@ pub enum GradientKind {
 #[derive(Debug, Clone)]
 pub struct GradientStop {
     pub offset: f32,  // 0.0 to 1.0
-    pub color: Color,
+    /// `0xAARRGGBB` color of this stop.
+    pub color: u32,
 }
 
 /// Stroke styling
@@ -139,7 +139,7 @@ impl Default for Stroke {
     fn default() -> Self {
         Stroke {
             paint: Paint {
-                kind: PaintKind::Color(Color::BLACK),
+                kind: PaintKind::Color(0xff000000),
                 opacity: 1.0,
             },
             width: Expr::Literal(1.0),

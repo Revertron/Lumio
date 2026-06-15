@@ -16,13 +16,15 @@ default = ["backend-gl"]
 # The `text-*` features are the text-layer half each backend pulls in.
 backend-gl = ["text-speedy2d"]
 backend-software = ["text-software", "dep:fontdue", "dep:winit", "dep:softbuffer"]
-text-speedy2d = []
+# Pulls in speedy2d — the GL backend's only consumer of it. The software
+# backend enables neither, so speedy2d is absent from its dependency tree.
+text-speedy2d = ["dep:speedy2d"]
 text-software = []
 
 [dependencies]
 quick-xml = "0.40.1"
 downcast-rs = "2.0.2"
-speedy2d = { path="../Speedy2D" }
+speedy2d = { path="../Speedy2D", optional = true }
 image = "0.25.10"
 rand = "0.8.6"
 arboard = "3"
@@ -39,60 +41,27 @@ softbuffer = { version = "0.4", optional = true }
 [dev-dependencies]
 include_dir = "0.7"
 
-# The existing examples open a GL window (`Win`), so they need `backend-gl`.
-[[example]]
-name = "background_example"
-required-features = ["backend-gl"]
-[[example]]
-name = "edit_polish_example"
-required-features = ["backend-gl"]
-[[example]]
-name = "empty_example"
-required-features = ["backend-gl"]
-[[example]]
-name = "example"
-required-features = ["backend-gl"]
-[[example]]
-name = "grid_example"
-required-features = ["backend-gl"]
-[[example]]
-name = "label_polish_example"
-required-features = ["backend-gl"]
-[[example]]
-name = "layouts_example"
-required-features = ["backend-gl"]
-[[example]]
-name = "menubar_example"
-required-features = ["backend-gl"]
-[[example]]
-name = "messenger"
-required-features = ["backend-gl"]
-[[example]]
-name = "multiwindow_example"
-required-features = ["backend-gl"]
-[[example]]
-name = "notification_example"
-required-features = ["backend-gl"]
-[[example]]
-name = "richtext_example"
-required-features = ["backend-gl"]
-[[example]]
-name = "scroll_example"
-required-features = ["backend-gl"]
-[[example]]
-name = "tableview_example"
-required-features = ["backend-gl"]
-[[example]]
-name = "visibility_example"
-required-features = ["backend-gl"]
-
-# Headless software render demo — needs the software backend.
+# Most examples use the backend-neutral `lumio::run` launcher, so they build on
+# either backend and cargo auto-discovers them — no per-example entry needed.
+# Only the two software-specific demos need an explicit backend gate:
+#   headless_render       — uses `render::render_to_pixmap` (software-only).
+#   software_window_example — the dedicated software-window demo.
 [[example]]
 name = "headless_render"
 required-features = ["backend-software"]
 [[example]]
 name = "software_window_example"
 required-features = ["backend-software"]
+
+# The software backend (tiny-skia + fontdue) renders on the CPU, so an
+# unoptimized debug build is very slow (~30x). Optimize dependencies at full
+# level and our own crate lightly: debug builds stay responsive and still
+# debuggable. (The GL backend offloads to the GPU and isn't affected.)
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
 
 [profile.release]
 opt-level = 3

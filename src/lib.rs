@@ -2,9 +2,13 @@
 extern crate downcast_rs;
 
 // Re-export so downstream apps can use the windowing types without
-// depending on (and version-matching) speedy2d themselves.
+// depending on (and version-matching) speedy2d themselves. Only the GL
+// backend pulls in speedy2d; the software backend builds without it.
+#[cfg(feature = "backend-gl")]
 pub use speedy2d;
 
+pub mod app;
+pub use app::{run, WindowConfig};
 pub mod common;
 pub mod input;
 pub mod text;

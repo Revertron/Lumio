@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use quick_xml::events::Event;
 use quick_xml::Reader;
-use speedy2d::color::Color;
 
 use super::primitives::*;
 use super::selector::*;
@@ -489,7 +488,8 @@ impl DrawableParser {
         }
     }
 
-    fn parse_color(color_str: &str) -> Result<Color, String> {
+    /// Parse a `#RRGGBB`/`#AARRGGBB` literal to a `0xAARRGGBB` color.
+    fn parse_color(color_str: &str) -> Result<u32, String> {
         if color_str.starts_with('#') {
             let hex = &color_str[1..];
             match hex.len() {
@@ -497,13 +497,12 @@ impl DrawableParser {
                     // #RRGGBB -> add full alpha
                     let rgb = u32::from_str_radix(hex, 16)
                         .map_err(|e| format!("Invalid color: {}", e))?;
-                    Ok(Color::from_hex_rgb(0xff000000 | rgb))
+                    Ok(0xff000000 | rgb)
                 }
                 8 => {
                     // #AARRGGBB
-                    let argb = u32::from_str_radix(hex, 16)
-                        .map_err(|e| format!("Invalid color: {}", e))?;
-                    Ok(Color::from_hex_argb(argb))
+                    u32::from_str_radix(hex, 16)
+                        .map_err(|e| format!("Invalid color: {}", e))
                 }
                 _ => Err("Invalid color format (use #RRGGBB or #AARRGGBB)".to_string())
             }

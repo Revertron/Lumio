@@ -3,14 +3,37 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use speedy2d::dimen::Vector2;
-use speedy2d::Graphics2D;
+use speedy2d::{Graphics2D, Window};
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, UserEventSender, VirtualKeyCode, WindowCreationOptions, WindowHandler, WindowHelper, WindowPosition, WindowSize, WindowStartupInfo};
+use crate::app::WindowConfig;
 use crate::input::MouseCursorType;
 use crate::types::Point;
 use crate::drawing::{DrawableRegistry, Palette};
 use super::ui::{UI, WindowCommand};
 use super::themes::*;
 use super::themes::ImageCache;
+
+/// Backend entry point behind [`crate::run`] for the GL backend: build the
+/// speedy2d window from `config`, install the [`Win`] handler, and run the
+/// event loop. Never returns (the loop owns the thread until the app exits).
+pub(crate) fn run_gl(ui: UI, config: WindowConfig) -> ! {
+    let size = if config.logical_size {
+        WindowSize::ScaledPixels(Vector2::new(config.width as f32, config.height as f32))
+    } else {
+        WindowSize::PhysicalPixels(Vector2::new(config.width, config.height))
+    };
+    let position = if config.center { Some(WindowPosition::Center) } else { None };
+    let options = WindowCreationOptions::new_windowed(size, position)
+        .with_visible(config.visible)
+        .with_hide_on_close(config.hide_on_close);
+    let window: Window<WinEvent> =
+        Window::new_with_user_events(&config.title, options).expect("Failed to create the window");
+    let sender = window.create_user_event_sender();
+    let mut win = Win::new(ui, sender);
+    win.set_palette(config.palette);
+    win.set_close_hides(config.close_hides);
+    window.run_loop(win)
+}
 
 pub struct Win<T> {
     ui: UI,

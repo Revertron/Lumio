@@ -1,9 +1,6 @@
 #![windows_subsystem = "windows"]
 
 use include_dir::{Dir, include_dir};
-use speedy2d::dimen::Vector2;
-use speedy2d::Window;
-use speedy2d::window::{WindowCreationOptions, WindowPosition, WindowSize};
 
 use lumio::prelude::*;
 
@@ -71,7 +68,7 @@ fn main() {
     set_provider(Box::new(assets));
 
     let layout = include_str!("tableview_example.xml");
-    let mut ui = UI::from_xml(layout, WIDTH, HEIGHT, Classic::typeface(), 1.0).unwrap();
+    let mut ui = UI::from_xml(layout, WIDTH, HEIGHT, default_typeface(), 1.0).unwrap();
 
     // Populate the text-mode table programmatically.
     if let Some(domains_view) = ui.get_view("domains") {
@@ -108,10 +105,5 @@ fn main() {
     // Force a relayout so the freshly-set data is laid out before first paint.
     let _ = &mut ui; // silence unused-mut if any path becomes optional in the future
 
-    let window_size = WindowSize::PhysicalPixels(Vector2::new(WIDTH, HEIGHT));
-    let options = WindowCreationOptions::new_windowed(window_size, Some(WindowPosition::Center));
-    let window: Window<WinEvent> = Window::new_with_user_events(TITLE, options).unwrap();
-    let sender = window.create_user_event_sender();
-    let win = Win::new(ui, sender);
-    window.run_loop(win);
+    lumio::run(ui, WindowConfig::new(TITLE, WIDTH, HEIGHT).center());
 }

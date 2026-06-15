@@ -1,9 +1,5 @@
 #![windows_subsystem = "windows"]
 
-use speedy2d::dimen::Vector2;
-use speedy2d::Window;
-use speedy2d::window::{WindowCreationOptions, WindowPosition, WindowSize};
-
 use lumio::prelude::*;
 
 const WIDTH: u32 = 700;
@@ -14,15 +10,10 @@ const MAIN_XML: &str = include_str!("multiwindow_example.xml");
 const INFO_XML: &str = include_str!("multiwindow_info.xml");
 
 fn main() {
-    let mut ui = UI::from_xml(MAIN_XML, WIDTH, HEIGHT, Classic::typeface(), 1.0).unwrap();
+    let mut ui = UI::from_xml(MAIN_XML, WIDTH, HEIGHT, default_typeface(), 1.0).unwrap();
     wire_main(&mut ui);
 
-    let window_size = WindowSize::PhysicalPixels(Vector2::new(WIDTH, HEIGHT));
-    let options = WindowCreationOptions::new_windowed(window_size, Some(WindowPosition::Center));
-    let window: Window<WinEvent> = Window::new_with_user_events(TITLE, options).unwrap();
-    let sender = window.create_user_event_sender();
-    let win = Win::new(ui, sender);
-    window.run_loop(win);
+    lumio::run(ui, WindowConfig::new(TITLE, WIDTH, HEIGHT).center());
 }
 
 fn wire_main(ui: &mut UI) {
@@ -85,7 +76,7 @@ fn open_name_dialog(ui: &mut UI) {
 }
 
 fn build_info_ui(message: &str) -> UI {
-    let ui = UI::from_xml(INFO_XML, 380, 160, Classic::typeface(), 1.0).unwrap();
+    let ui = UI::from_xml(INFO_XML, 380, 160, default_typeface(), 1.0).unwrap();
 
     if let Some(label) = ui.get_view("info_label") {
         if let Some(l) = label.borrow_mut().downcast_mut::<Label>() {

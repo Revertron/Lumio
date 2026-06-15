@@ -1,9 +1,6 @@
 #![windows_subsystem = "windows"]
 
 use include_dir::{Dir, include_dir};
-use speedy2d::dimen::Vector2;
-use speedy2d::Window;
-use speedy2d::window::{WindowCreationOptions, WindowPosition, WindowSize};
 
 use lumio::prelude::*;
 
@@ -73,7 +70,7 @@ impl RecyclerAdapter for ContactAdapter {
     }
 
     fn create_view_holder(&mut self, view_type: i32) -> ViewHolder {
-        let ui = UI::from_xml(&self.item_layout, 360, 60, Classic::typeface(), 1.0).unwrap();
+        let ui = UI::from_xml(&self.item_layout, 360, 60, default_typeface(), 1.0).unwrap();
         let root = ui.get_view("contact_item").expect("contact_item not found");
         ViewHolder::new(root, view_type)
     }
@@ -134,7 +131,7 @@ impl RecyclerAdapter for ChatAdapter {
     }
 
     fn create_view_holder(&mut self, view_type: i32) -> ViewHolder {
-        let ui = UI::from_xml(&self.item_layout, 800, 60, Classic::typeface(), 1.0).unwrap();
+        let ui = UI::from_xml(&self.item_layout, 800, 60, default_typeface(), 1.0).unwrap();
         let root = ui.get_view("chat_msg_item").expect("chat_msg_item not found");
         ViewHolder::new(root, view_type)
     }
@@ -217,7 +214,7 @@ fn main() {
     set_provider(Box::new(assets));
 
     let layout = include_str!("messenger_layout.xml");
-    let mut ui = UI::from_xml(layout, WIDTH, HEIGHT, Classic::typeface(), 1.0).unwrap();
+    let mut ui = UI::from_xml(layout, WIDTH, HEIGHT, default_typeface(), 1.0).unwrap();
 
     // Send button click
     if let Some(btn) = ui.get_view("btn_send") {
@@ -234,12 +231,7 @@ fn main() {
 
     ui.on_start(Box::new(on_start));
 
-    let window_size = WindowSize::PhysicalPixels(Vector2::new(WIDTH, HEIGHT));
-    let options = WindowCreationOptions::new_windowed(window_size, Some(WindowPosition::Center));
-    let window: Window<WinEvent> = Window::new_with_user_events(TITLE, options).unwrap();
-    let sender = window.create_user_event_sender();
-    let win = Win::new(ui, sender);
-    window.run_loop(win);
+    lumio::run(ui, WindowConfig::new(TITLE, WIDTH, HEIGHT).center());
 }
 
 fn on_start(ui: &mut UI) {
