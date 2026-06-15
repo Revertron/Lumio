@@ -7,10 +7,19 @@ description = "A declarative XML-based GUI framework for Rust built on speedy2d"
 keywords = ["gui", "ui", "xml", "desktop", "framework"]
 categories = ["gui", "rendering"]
 
+[features]
+default = ["text-speedy2d"]
+# Selects the text shaping/measurement backend. Exactly one must be enabled.
+# speedy2d remains a normal (non-optional) dependency for windowing, graphics
+# and input; this feature only switches the text layer in `src/text` and the
+# font loader in `src/assets.rs`. A future `text-software` backend would be
+# additive here.
+text-speedy2d = []
+
 [dependencies]
 quick-xml = "0.40.1"
 downcast-rs = "2.0.2"
-speedy2d = { git="https://github.com/Revertron/Speedy2D" }
+speedy2d = { path="../Speedy2D" }
 image = "0.25.10"
 rand = "0.8.6"
 arboard = "3"

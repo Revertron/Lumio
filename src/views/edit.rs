@@ -3,7 +3,7 @@ use std::cmp::{max, min};
 use std::rc::Rc;
 use std::time::Instant;
 use speedy2d::dimen::Vector2;
-use speedy2d::font::{TextLayout, TextOptions};
+use crate::text::{TextBlock, TextOptions};
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, VirtualKeyCode};
 
 use crate::assets::get_font_family;
@@ -479,7 +479,7 @@ impl Edit {
     }
 
     /// Layout placeholder text for rendering
-    fn layout_placeholder_text(&self) -> Option<speedy2d::font::FormattedTextBlock> {
+    fn layout_placeholder_text(&self) -> Option<TextBlock> {
         let placeholder = self.placeholder.borrow();
         if placeholder.is_empty() {
             return None;

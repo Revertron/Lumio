@@ -25,7 +25,7 @@ pub mod menubar;
 use super::themes::{Typeface, ViewState};
 use super::traits::WeakElement;
 use super::types::Rect;
-use speedy2d::font::FormattedTextBlock;
+use super::text::TextBlock;
 use std::collections::HashMap;
 use std::str::FromStr;
 use super::common::random_string;
@@ -132,7 +132,7 @@ pub struct FieldsTexted {
     pub text_size: f32,
     pub line_height: f32,
     pub single_line: bool,
-    pub cached_text: Option<FormattedTextBlock>,
+    pub cached_text: Option<TextBlock>,
     pub font: FontSelector
 }
 

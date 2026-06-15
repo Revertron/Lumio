@@ -1,9 +1,9 @@
 mod classic;
 mod utils;
 
-use speedy2d::font::FormattedTextBlock;
 use super::styles::selector::MainSelector;
 use super::drawing::{Drawable, DrawableRegistry};
+use super::text::TextBlock;
 pub use self::classic::Classic;
 pub use self::classic::ImageCache;
 use super::types::Rect;
@@ -26,10 +26,10 @@ pub trait Theme {
     fn push_clip(&mut self);
     fn pop_clip(&mut self);
 
-    fn draw_text(&mut self, x: f32, y: f32, color: u32, text: &FormattedTextBlock);
+    fn draw_text(&mut self, x: f32, y: f32, color: u32, text: &TextBlock);
 
     /// Like `draw_text`, but only glyphs inside `crop` are drawn (partial glyphs cropped).
-    fn draw_text_cropped(&mut self, x: f32, y: f32, crop: Rect<i32>, color: u32, text: &FormattedTextBlock) {
+    fn draw_text_cropped(&mut self, x: f32, y: f32, crop: Rect<i32>, color: u32, text: &TextBlock) {
         self.push_clip();
         self.clip_rect(crop);
         self.draw_text(x, y, color, text);

@@ -5,12 +5,12 @@ use std::io::Cursor;
 use speedy2d::Graphics2D;
 use speedy2d::color::Color;
 use speedy2d::dimen::{UVec2, Vector2};
-use speedy2d::font::FormattedTextBlock;
 use speedy2d::image::{ImageDataType, ImageHandle, ImageSmoothingMode};
 use speedy2d::shape::Rectangle;
 
 use super::super::drawing::{Drawable, DrawableRegistry, DrawingEngine, Palette};
 use super::super::styles::selector::{DrawState, MainSelector};
+use super::super::text::TextBlock;
 use super::super::themes::{Theme, Typeface, ViewState};
 use super::super::types;
 use super::super::types::{Rect, rect};
@@ -163,15 +163,15 @@ impl<'h> Theme for Classic<'h> {
         }
     }
 
-    fn draw_text(&mut self, x: f32, y: f32, color: u32, text: &FormattedTextBlock) {
+    fn draw_text(&mut self, x: f32, y: f32, color: u32, text: &TextBlock) {
         let color = self.color_argb(color);
-        self.graphics.draw_text((x, y), color, text);
+        self.graphics.draw_text((x, y), color, text.payload());
     }
 
-    fn draw_text_cropped(&mut self, x: f32, y: f32, crop: Rect<i32>, color: u32, text: &FormattedTextBlock) {
+    fn draw_text_cropped(&mut self, x: f32, y: f32, crop: Rect<i32>, color: u32, text: &TextBlock) {
         let crop = Rectangle::from_tuples((crop.min.x as f32, crop.min.y as f32), (crop.max.x as f32, crop.max.y as f32));
         let color = self.color_argb(color);
-        self.graphics.draw_text_cropped((x, y), crop, color, text);
+        self.graphics.draw_text_cropped((x, y), crop, color, text.payload());
     }
 
     fn draw_rect(&mut self, rect: Rect<i32>, color: u32) {

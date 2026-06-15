@@ -2,7 +2,7 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use speedy2d::dimen::Vector2;
-use speedy2d::font::{FormattedTextBlock, TextLayout, TextOptions};
+use crate::text::{TextBlock, TextOptions};
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
 
 use crate::assets::get_font_family;
@@ -23,7 +23,7 @@ const CONTENT_BORDER: i32 = 2;
 
 struct TabInfo {
     title: String,
-    cached_title: Option<FormattedTextBlock>,
+    cached_title: Option<TextBlock>,
     tab_rect: Rect<i32>,
 }
 

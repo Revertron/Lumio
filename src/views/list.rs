@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use speedy2d::dimen::Vector2;
-use speedy2d::font::{FormattedTextBlock, TextLayout, TextOptions};
+use crate::text::{TextBlock, TextOptions};
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
 use super::super::assets::get_font_family;
 use super::super::common::DEFAULT_TEXT_SIZE;
@@ -15,7 +15,7 @@ use super::super::view_base::{HasMainFields, ViewBasics};
 pub struct List {
     state: RefCell<FieldsMain>,
     items: RefCell<Vec<String>>,
-    texts: RefCell<Vec<Option<FormattedTextBlock>>>,
+    texts: RefCell<Vec<Option<TextBlock>>>,
     text_size: f32,
     scroll_y: RefCell<i32>,
     selected: RefCell<Option<usize>>

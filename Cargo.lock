@@ -2382,7 +2382,6 @@ dependencies = [
 [[package]]
 name = "speedy2d"
 version = "3.0.0"
-source = "git+https://github.com/Revertron/Speedy2D#6d0d6230720d8577af0885ffd29a99010cbb6bc1"
 dependencies = [
  "backtrace",
  "cfg_aliases",

@@ -6,6 +6,7 @@ use font_kit::properties::{Properties, Style as FkStyle, Weight};
 use font_kit::source::SystemSource;
 use speedy2d::font::{Font, FontFamily};
 
+use crate::text::FontHandle;
 use crate::themes::FontStyle;
 
 pub trait AssetsProvider {
@@ -48,14 +49,20 @@ pub fn set_font_fallbacks(chain: Vec<(String, FontStyle)>) {
     FAMILIES.with(|c| c.borrow_mut().clear());
 }
 
-/// Returns a `FontFamily` whose first entry is the requested font and whose
+/// Returns a [`FontHandle`] whose first entry is the requested font and whose
 /// tail is the configured fallback chain (with missing fonts silently dropped).
 /// Returns `None` only when the primary font cannot be resolved through any
 /// path.
-pub fn get_font_family(name: &str, style: FontStyle) -> Option<FontFamily> {
+///
+/// The returned handle is backend-neutral; the speedy2d `FontFamily` it wraps
+/// is an implementation detail of the active text backend. The byte-resolution
+/// helpers below (`resolve_primary` → `try_system`/`try_assets`) are themselves
+/// backend-agnostic and are the reuse point for a future software text backend,
+/// which would build its own font objects from the same bytes.
+pub fn get_font_family(name: &str, style: FontStyle) -> Option<FontHandle> {
     let key = (name.to_owned(), style);
     if let Some(fam) = FAMILIES.with(|c| c.borrow().get(&key).cloned()) {
-        return Some(fam);
+        return Some(FontHandle::new(fam));
     }
 
     let primary = resolve_primary(name, style)?;
@@ -73,7 +80,7 @@ pub fn get_font_family(name: &str, style: FontStyle) -> Option<FontFamily> {
 
     let fam = FontFamily::new(chain);
     FAMILIES.with(|c| c.borrow_mut().insert(key, fam.clone()));
-    Some(fam)
+    Some(FontHandle::new(fam))
 }
 
 fn resolve_primary(name: &str, style: FontStyle) -> Option<Font> {

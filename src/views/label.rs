@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use speedy2d::dimen::Vector2;
-use speedy2d::font::{TextAlignment, TextLayout, TextOptions};
+use crate::text::{TextAlignment, TextBlock, TextOptions};
 use speedy2d::window::{MouseButton, MouseCursorType};
 use crate::assets::get_font_family;
 use crate::events::{EventCallback, EventData, EventType};
@@ -338,7 +338,7 @@ impl Label {
     /// block. Mirrors `Memo`: wrapped lines advance by glyph count, hard `\n`
     /// breaks are skipped (they are not glyphs), and a trailing `\n` adds a
     /// virtual empty line.
-    fn build_line_offsets(text: &speedy2d::font::FormattedTextBlock, full_text: &str) -> Vec<usize> {
+    fn build_line_offsets(text: &TextBlock, full_text: &str) -> Vec<usize> {
         let chars: Vec<char> = full_text.chars().collect();
         let mut offsets = Vec::new();
         let mut char_offset = 0usize;

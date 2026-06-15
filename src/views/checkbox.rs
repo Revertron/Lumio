@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::cmp::max;
 
 use speedy2d::dimen::Vector2;
-use speedy2d::font::{TextAlignment, TextLayout, TextOptions};
+use crate::text::{TextAlignment, TextOptions};
 use speedy2d::window::MouseButton;
 
 use crate::assets::get_font_family;

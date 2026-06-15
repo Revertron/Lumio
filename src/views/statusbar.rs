@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use speedy2d::font::{TextLayout, TextOptions};
+use crate::text::{TextBlock, TextOptions};
 
 use crate::assets::get_font_family;
 use crate::events::{EventCallback, EventData, EventType};
@@ -19,7 +19,7 @@ const SECTION_INSET: i32 = 2;
 struct Section {
     id: String,
     text: String,
-    cached_text: Option<speedy2d::font::FormattedTextBlock>,
+    cached_text: Option<TextBlock>,
     width: Dimension,
 }
 

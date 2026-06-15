@@ -4,7 +4,7 @@ use std::ops::Range;
 use std::rc::Rc;
 
 use speedy2d::dimen::Vector2;
-use speedy2d::font::{FormattedTextBlock, TextLayout, TextOptions};
+use crate::text::{TextBlock, TextOptions};
 use speedy2d::window::{MouseButton, MouseCursorType};
 
 use crate::assets::get_font_family;
@@ -124,7 +124,7 @@ impl RichContent {
 struct PlacedWord {
     x: i32,
     top: i32,
-    block: FormattedTextBlock,
+    block: TextBlock,
     byte_start: usize,
     text: String,
 }
@@ -577,7 +577,7 @@ struct WordBox {
     width: i32,
     asc: f32,
     desc: f32, // negative
-    block: FormattedTextBlock,
+    block: TextBlock,
     style: SpanStyle,
     byte_start: usize,
     text: String,
@@ -675,7 +675,7 @@ fn layout_run_block(
     text: &str,
     style: &SpanStyle,
     trim: bool,
-) -> Option<(FormattedTextBlock, f32, f32, f32)> {
+) -> Option<(TextBlock, f32, f32, f32)> {
     let fs = combine_style(base_style, style.bold, style.italic);
     let px = match style.size_abs {
         Some(dip) => dip * scale_f * style.size_scale,

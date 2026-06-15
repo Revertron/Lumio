@@ -2,7 +2,7 @@ use std::cell::{Cell, RefCell};
 use std::cmp::min;
 
 use speedy2d::dimen::Vector2;
-use speedy2d::font::{FormattedTextBlock, TextLayout, TextOptions};
+use crate::text::{TextBlock, TextOptions};
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
 
 use crate::assets::get_font_family;
@@ -123,7 +123,7 @@ pub struct TableView {
     h_scroll_visible: Cell<bool>,
     v_scroll_visible: Cell<bool>,
 
-    header_blocks: RefCell<Vec<Option<FormattedTextBlock>>>,
+    header_blocks: RefCell<Vec<Option<TextBlock>>>,
     header_height_px: Cell<i32>,
 
     // Defaults applied to columns added later (and to any column attribute the

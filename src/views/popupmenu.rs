@@ -2,7 +2,7 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use speedy2d::dimen::Vector2;
-use speedy2d::font::{TextLayout, TextOptions};
+use crate::text::{TextBlock, TextOptions};
 use speedy2d::window::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
 
 use crate::assets::get_font_family;
@@ -43,7 +43,7 @@ pub struct PopupMenu {
     items: RefCell<Vec<MenuItem>>,
     /// One slot per item; `None` for items without an icon. Parallel to `items`.
     icons: RefCell<Vec<Option<ImageSource>>>,
-    cached_texts: RefCell<Vec<Option<speedy2d::font::FormattedTextBlock>>>,
+    cached_texts: RefCell<Vec<Option<TextBlock>>>,
     hovered: RefCell<Option<usize>>,
     pressed: RefCell<Option<usize>>,
     /// The view (a MenuBar, or the root PopupMenu of a context-menu chain)

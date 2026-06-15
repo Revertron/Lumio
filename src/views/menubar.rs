@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use speedy2d::dimen::Vector2;
-use speedy2d::font::{TextLayout, TextOptions};
+use crate::text::{TextBlock, TextOptions};
 use speedy2d::window::MouseButton;
 
 use crate::assets::get_font_family;
@@ -36,7 +36,7 @@ pub struct MenuData {
 pub struct MenuBar {
     state: RefCell<FieldsMain>,
     menus: RefCell<Vec<MenuData>>,
-    cached_titles: RefCell<Vec<Option<speedy2d::font::FormattedTextBlock>>>,
+    cached_titles: RefCell<Vec<Option<TextBlock>>>,
     hovered: RefCell<Option<usize>>,
     open_index: RefCell<Option<usize>>,
     open_popup: RefCell<Option<Element>>,

@@ -3,7 +3,7 @@ use std::cmp::max;
 use std::rc::Rc;
 
 use speedy2d::dimen::Vector2;
-use speedy2d::font::{FormattedTextBlock, TextLayout, TextOptions};
+use crate::text::{TextBlock, TextOptions};
 use speedy2d::window::MouseButton;
 
 use crate::assets::get_font_family;
@@ -534,7 +534,7 @@ impl Default for ComboBox {
 struct ComboDropdown {
     state: RefCell<FieldsMain>,
     items: Vec<String>,
-    cached_texts: RefCell<Vec<Option<FormattedTextBlock>>>,
+    cached_texts: RefCell<Vec<Option<TextBlock>>>,
     hovered: RefCell<Option<usize>>,
     pressed: RefCell<Option<usize>>,
     pending_selection: Rc<RefCell<Option<usize>>>,
