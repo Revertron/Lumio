@@ -1,9 +1,36 @@
+//! Lumio — a declarative, XML-based retained-mode GUI toolkit for Rust desktop
+//! apps. Define the view tree in XML, load it with `UI::from_xml`, wire event
+//! handlers, and run with the backend-neutral `lumio::run` launcher:
+//!
+//! ```no_run
+//! use lumio::prelude::*;
+//! # fn demo() {
+//! let ui = UI::from_xml(
+//!     r#"<Frame padding="16"><Label text="Hello, Lumio!"/></Frame>"#,
+//!     400, 200, default_typeface(), 1.0,
+//! ).unwrap();
+//! lumio::run(ui, WindowConfig::new("Demo", 400, 200).center());
+//! # }
+//! ```
+//!
+//! # Rendering backends
+//!
+//! Both backends run on one Lumio-owned winit window loop; pick one at compile
+//! time via a Cargo feature (mutually exclusive):
+//!
+//! - `backend-gl` (default) — OpenGL via the vendored `speedy2d`, used as a renderer.
+//! - `backend-software` — CPU rendering via `tiny-skia` + `fontdue`, plus a headless
+//!   UI → `tiny_skia::Pixmap`/PNG path (the `render` module, software only).
+//!
+//! See the README for the full widget list and a fuller tour.
+
 #[macro_use]
 extern crate downcast_rs;
 
-// Re-export so downstream apps can use the windowing types without
-// depending on (and version-matching) speedy2d themselves. Only the GL
-// backend pulls in speedy2d; the software backend builds without it.
+// Re-export the renderer crate so GL-backend apps can name speedy2d render types
+// (e.g. `Color`) without version-matching it themselves. Only the GL backend
+// pulls in speedy2d (as a renderer — its windowing feature is off); the software
+// backend builds without it.
 #[cfg(feature = "backend-gl")]
 pub use speedy2d;
 

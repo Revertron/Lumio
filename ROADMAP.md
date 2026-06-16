@@ -10,14 +10,16 @@ The core is solid: retained view tree, XML layouts, three layout engines behind
 the `Layout` trait, virtualized lists (RecyclerView), a full-featured TableView,
 RichText, popups/dialogs/notifications/tooltips, SVG support, HiDPI awareness.
 
-**Switchable rendering backends — DONE 2026-06.** Two compile-time-selected,
-mutually-exclusive backends behind a backend-neutral seam (the `Theme`, text and
-input abstractions): `backend-gl` (default — OpenGL via the vendored speedy2d)
-and `backend-software` (CPU rendering via tiny-skia + fontdue, in a winit +
-softbuffer window, with a headless UI → `Pixmap`/PNG path). Apps launch with the
+**Switchable rendering backends — DONE 2026-06.** Both backends run on a single
+Lumio-owned winit window loop (`src/window/`); they differ only in the per-window
+`RenderSurface`. `backend-gl` (default) draws with the vendored speedy2d used as a
+*pure GL renderer* over a glutin context Lumio creates; `backend-software` renders
+on the CPU with tiny-skia + fontdue (plus a headless UI → `Pixmap`/PNG path). The
+seam is the backend-neutral `Theme`/text/input abstractions; apps launch with the
 neutral `lumio::run(ui, WindowConfig)` and switch backends by Cargo feature, no
-source edits. `speedy2d` is now an optional dependency (absent from the software
-build).
+source edits. `speedy2d` is an optional, renderer-only dependency (its windowing
+feature is off; absent entirely from the software build). See
+`docs/unified_window_loop.md`.
 
 The gaps cluster into five areas:
 
@@ -124,13 +126,14 @@ Gates everything else; cheap and high leverage:
   on the multi-window support (auto-sized modal child window, Enter/Esc wired).
 - Native OS file open/save dialogs via the `rfd` crate (small, cross-platform,
   the ecosystem standard) — still pending.
-- Window title/icon/min-size/fullscreen setters on `WindowHelper` — speedy2d is
-  already vendored (cursor support), so the pattern is established.
+- Window title/icon/min-size/fullscreen setters — Lumio now owns the winit window
+  (`src/window/`), so these are direct winit calls on our `Window` (the Windows
+  exe-resource icon is already wired); title/min-size/fullscreen still pending.
 
 ### 7. Render-on-demand
 
-`win.rs` ticks every 15 ms regardless; an idle app burns CPU repainting an
-unchanged screen. Switch to redraw-on-dirty (views already have
+The window loop (`src/window/`) ticks every 15 ms regardless; an idle app burns
+CPU repainting an unchanged screen. Switch to redraw-on-dirty (views already have
 `request_redraw` plumbing) with the timer running only while animations are
 active. Matters for long-running apps like a node/wallet.
 
