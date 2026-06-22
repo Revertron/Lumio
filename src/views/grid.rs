@@ -22,6 +22,13 @@ use crate::views::{Borders, ColumnWidth, Dimension, FieldsMain, Gravity, Visibil
 
 const DEFAULT_MIN_COL_WIDTH: i32 = 32;
 
+/// A lightweight non-scrolling 2D grid. Children are added in row-major order
+/// and flow into cells; the number of columns equals the number of entries in
+/// `widths`. Column widths are fixed dip or `*` star-proportional (the same
+/// `ColumnWidth` syntax `TableView` uses); each row's height is its tallest
+/// cell. Wrap the grid in a `ScrollView` if its content can overflow.
+///
+/// XML: `<Grid widths="100,*,50"> ...children... </Grid>`.
 pub struct Grid {
     state: RefCell<FieldsMain>,
     /// Column widths, one per column. Number of columns = `widths.len()`.
@@ -45,6 +52,7 @@ impl ViewBasics for Grid {}
 
 #[allow(dead_code)]
 impl Grid {
+    /// Create an empty grid with the given bounds and no columns.
     pub fn new(rect_: Rect<i32>) -> Grid {
         Grid {
             state: RefCell::new(FieldsMain::with_rect(rect_, Dimension::Min, Dimension::Min)),
@@ -57,15 +65,20 @@ impl Grid {
         }
     }
 
+    /// Replace the column definitions. The grid then has `widths.len()`
+    /// columns and existing cells re-flow into them row-major.
     pub fn set_widths(&self, widths: Vec<ColumnWidth>) {
         *self.widths.borrow_mut() = widths;
         self.needs_relayout.set(true);
     }
 
+    /// The current column-width definitions.
     pub fn widths(&self) -> Vec<ColumnWidth> { self.widths.borrow().clone() }
 
+    /// Number of columns (the number of width entries).
     pub fn column_count(&self) -> usize { self.widths.borrow().len() }
 
+    /// Number of rows, counting a trailing partially-filled row.
     pub fn row_count(&self) -> usize {
         let n_cols = self.column_count().max(1);
         let n_cells = self.cells.borrow().len();

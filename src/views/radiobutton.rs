@@ -16,6 +16,15 @@ use crate::styles::selector::FontSelector;
 use crate::views::{FieldsMain, FieldsTexted};
 use crate::views::{BUTTON_MIN_HEIGHT, BUTTON_MIN_WIDTH};
 
+/// A mutually-exclusive selection control: a circular radio button with a
+/// text label. Radio buttons that share the same `group` string are mutually
+/// exclusive — checking one unchecks the others in that group among its
+/// siblings. Clicking always selects (there is no toggle-off); when the state
+/// actually changes it fires [`CheckedChanged`](EventType::CheckedChanged)
+/// before [`Click`](EventType::Click).
+///
+/// XML: `<RadioButton text="Red" group="color"/>`. Query the current choice in
+/// a group with [`RadioButton::get_selected`].
 pub struct RadioButton {
     state: RefCell<FieldsTexted>,
     text_margin: i32,
@@ -36,6 +45,8 @@ const DEFAULT_TEXT_MARGIN: i32 = 6;
 
 #[allow(dead_code)]
 impl RadioButton {
+    /// Create a radio button with the given bounds, label text and text size
+    /// (in dip). It starts unchecked and ungrouped.
     pub fn new(rect: Rect<i32>, text: &str, text_size: f32) -> RadioButton {
         let main = FieldsMain::with_rect(rect, Dimension::Min, Dimension::Min);
         RadioButton {
@@ -53,6 +64,7 @@ impl RadioButton {
         }
     }
 
+    /// Set the label text and re-lay out.
     pub fn set_text(&self, text: &str) {
         {
             let mut state = self.state.borrow_mut();
@@ -65,22 +77,31 @@ impl RadioButton {
         self.layout_text(self.get_rect_width(), single_line, scale);
     }
 
+    /// Whether this radio button is currently selected.
     pub fn is_checked(&self) -> bool {
         self.state.borrow().main.state.checked
     }
 
+    /// Set the checked state directly. This does **not** uncheck group
+    /// siblings or fire events — it is a raw state setter; user clicks (or
+    /// `click`) perform the group-aware selection.
     pub fn set_checked(&self, checked: bool) {
         self.state.borrow_mut().main.state.checked = checked;
     }
 
+    /// The group name this radio button belongs to (empty if ungrouped).
     pub fn get_group(&self) -> String {
         self.group.borrow().clone()
     }
 
+    /// Set the group name. Radio buttons that share a group are mutually
+    /// exclusive within their parent container.
     pub fn set_group(&self, group: &str) {
         *self.group.borrow_mut() = group.to_owned();
     }
 
+    /// When `true` (the default) the label stays on one line; when `false` it
+    /// wraps to the available width.
     pub fn set_single_line(&self, single_line: bool) {
         let mut state = self.state.borrow_mut();
         state.single_line = single_line;

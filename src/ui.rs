@@ -368,6 +368,20 @@ impl UI {
         }
     }
 
+    /// Recursively search the entire view tree — every overlay plus the root
+    /// hierarchy — and collect every view for which `predicate` returns `true`.
+    ///
+    /// The predicate receives each view as `&dyn View`; downcast inside it to
+    /// inspect a concrete type. Matches are returned as cloned [`Element`]
+    /// handles in pre-order, so a matching container precedes its children.
+    ///
+    /// ```ignore
+    /// // Every checked RadioButton in the "color" group.
+    /// let checked = ui.find_with(&|v| {
+    ///     v.as_any().downcast_ref::<RadioButton>()
+    ///         .is_some_and(|rb| rb.get_group() == "color" && rb.is_checked())
+    /// });
+    /// ```
     pub fn find_with(&self, predicate: &dyn Fn(&dyn View) -> bool) -> Vec<Element> {
         let mut result = Vec::new();
         // Search overlays

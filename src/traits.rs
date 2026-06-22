@@ -212,7 +212,7 @@ pub trait Container: View {
     fn get_views(&self) -> Vec<Element> { Vec::new() }
 
     /// Children exposed to coordinate-based hit testing (DoubleClick,
-    /// ContextMenu, Hover). Defaults to [`get_views`], but a container that
+    /// ContextMenu, Hover). Defaults to [`get_views`](Self::get_views), but a container that
     /// shows only a subset of its children at a time (e.g. `TabView`) should
     /// override this to return just the currently interactive ones, so the
     /// generic hit test in `UI` does not match views that are laid out but

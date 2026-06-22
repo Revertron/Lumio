@@ -1,5 +1,6 @@
 //! Headless software rendering: lay out a UI and paint it into a
-//! `tiny_skia::Pixmap` with the [`SoftwareTheme`], no window required. Useful
+//! `tiny_skia::Pixmap` with the [`SoftwareTheme`](crate::themes::SoftwareTheme),
+//! no window required. Useful
 //! for tests, screenshots, and as the foundation the software window loop will
 //! reuse. Only available under the `backend-software` feature.
 

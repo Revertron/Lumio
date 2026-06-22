@@ -282,19 +282,32 @@ impl FromStr for Direction {
 pub struct Gravity(u8);
 
 impl Gravity {
+    /// Align to the parent's left edge.
     pub const LEFT: Gravity              = Gravity(0b0000_0001);
+    /// Align to the parent's right edge.
     pub const RIGHT: Gravity             = Gravity(0b0000_0010);
+    /// Center horizontally within the parent.
     pub const CENTER_HORIZONTAL: Gravity = Gravity(0b0000_0100);
+    /// Align to the parent's top edge.
     pub const TOP: Gravity               = Gravity(0b0000_1000);
+    /// Align to the parent's bottom edge.
     pub const BOTTOM: Gravity            = Gravity(0b0001_0000);
+    /// Center vertically within the parent.
     pub const CENTER_VERTICAL: Gravity   = Gravity(0b0010_0000);
 
+    /// Top-left corner (`TOP | LEFT`); the default gravity.
     pub const TOP_LEFT: Gravity     = Gravity(Self::TOP.0 | Self::LEFT.0);
+    /// Top-right corner (`TOP | RIGHT`).
     pub const TOP_RIGHT: Gravity    = Gravity(Self::TOP.0 | Self::RIGHT.0);
+    /// Bottom-left corner (`BOTTOM | LEFT`).
     pub const BOTTOM_LEFT: Gravity  = Gravity(Self::BOTTOM.0 | Self::LEFT.0);
+    /// Bottom-right corner (`BOTTOM | RIGHT`).
     pub const BOTTOM_RIGHT: Gravity = Gravity(Self::BOTTOM.0 | Self::RIGHT.0);
+    /// Centered on both axes (`CENTER_HORIZONTAL | CENTER_VERTICAL`).
     pub const CENTER: Gravity       = Gravity(Self::CENTER_HORIZONTAL.0 | Self::CENTER_VERTICAL.0);
 
+    /// The horizontal component as an `HAlign` (`Left` when no horizontal
+    /// bit is set).
     pub fn horizontal(self) -> HAlign {
         if self.0 & Self::CENTER_HORIZONTAL.0 != 0 {
             HAlign::Center
@@ -305,6 +318,8 @@ impl Gravity {
         }
     }
 
+    /// The vertical component as a `VAlign` (`Top` when no vertical bit is
+    /// set).
     pub fn vertical(self) -> VAlign {
         if self.0 & Self::CENTER_VERTICAL.0 != 0 {
             VAlign::Center

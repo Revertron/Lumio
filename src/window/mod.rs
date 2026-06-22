@@ -1,10 +1,10 @@
 //! Backend-neutral window loop: a winit 0.30 `ApplicationHandler` that owns the
 //! window map, app-modal stack, input dispatch, escape/cursor policy, and the
 //! per-tick UI command pump. The only backend-specific piece is the per-window
-//! [`RenderSurface`] (how a laid-out UI is painted and presented); today the sole
-//! impl is the tiny-skia/softbuffer [`surface_software::SoftwareSurface`], with a
-//! GL surface planned (see docs/unified_window_loop.md). Gated to
-//! `backend-software` until the GL surface lands.
+//! `RenderSurface` (how a laid-out UI is painted and presented): `GlSurface`
+//! (glutin + `speedy2d::GLRenderer`) under `backend-gl`, or `SoftwareSurface`
+//! (tiny-skia + softbuffer) under `backend-software`. See
+//! docs/unified_window_loop.md.
 
 mod input_winit;
 #[cfg(feature = "backend-software")]

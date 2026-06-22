@@ -100,6 +100,23 @@ fn parse_h_align(s: &str) -> HAlign {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum DragKind { None, ResizeColumn, DragVThumb, DragHThumb }
 
+/// A scrollable, sortable data table with a sticky header and resizable
+/// columns. Supports vertical and horizontal scrolling, single-row selection,
+/// click-to-sort headers, and drag-to-resize column dividers. Rows share a
+/// uniform height.
+///
+/// There are two ways to fill it:
+/// - **Text mode** — [`set_data`](TableView::set_data) /
+///   [`add_row_text`](TableView::add_row_text) take plain strings and the
+///   table builds single-line `Label` cells for you.
+/// - **View mode** — [`add_row`](TableView::add_row) /
+///   [`set_cell`](TableView::set_cell) take arbitrary cell `Element`s.
+///   Populate the sort-key cache with
+///   [`set_cell_text`](TableView::set_cell_text) for columns that should sort.
+///
+/// XML tags: `<TableView>` with `<TableColumn>` column defs and (view mode)
+/// `<TableRow>` rows. Columns are sized in dip or `*` star units — see
+/// [`ColumnWidth`].
 pub struct TableView {
     state: RefCell<FieldsMain>,
 
@@ -151,6 +168,7 @@ impl ViewBasics for TableView {}
 
 #[allow(dead_code)]
 impl TableView {
+    /// Create an empty table with the given bounds and no columns or rows.
     pub fn new(rect_: Rect<i32>) -> TableView {
         let mut main = FieldsMain::with_rect(rect_, Dimension::Min, Dimension::Min);
         main.state.focusable = true;
@@ -189,20 +207,25 @@ impl TableView {
 
     // --- Public API ---
 
+    /// Replace all column definitions.
     pub fn set_columns(&self, defs: Vec<ColumnDef>) {
         *self.columns.borrow_mut() = defs;
         self.needs_relayout.set(true);
     }
 
+    /// Append one column definition.
     pub fn add_column(&self, def: ColumnDef) {
         self.columns.borrow_mut().push(def);
         self.needs_relayout.set(true);
     }
 
+    /// A clone of the current column definitions, including each column's
+    /// resolved pixel width.
     pub fn columns(&self) -> Vec<ColumnDef> {
         self.columns.borrow().clone()
     }
 
+    /// Override one column's width, clearing any user drag-resize on it.
     pub fn set_column_width(&self, col: usize, width: ColumnWidth) {
         if let Some(c) = self.columns.borrow_mut().get_mut(col) {
             c.width = width;
@@ -211,6 +234,10 @@ impl TableView {
         self.needs_relayout.set(true);
     }
 
+    /// Fill the table from headers plus string rows (text mode). Existing
+    /// column defs are reused where present — preserving user-sized widths and
+    /// explicit `<TableColumn>` declarations — and missing slots are
+    /// synthesized; any existing rows are cleared first.
     pub fn set_data(&self, headers: Vec<String>, rows: Vec<Vec<String>>) {
         // Reuse existing column defs where possible (preserves user-sized widths
         // and explicit Column declarations); only synthesize missing slots.
@@ -237,6 +264,8 @@ impl TableView {
         self.needs_relayout.set(true);
     }
 
+    /// Append one text-mode row; each string becomes a single-line `Label`
+    /// cell.
     pub fn add_row_text(&self, cells: Vec<String>) {
         let row_idx = self.row_text.borrow().len();
         self.row_text.borrow_mut().push(cells.clone());
@@ -264,6 +293,9 @@ impl TableView {
         self.needs_relayout.set(true);
     }
 
+    /// Append one view-mode row of arbitrary cell `Element`s. Sort keys start
+    /// empty — call [`set_cell_text`](TableView::set_cell_text) per cell if
+    /// those columns should sort.
     pub fn add_row(&self, cells: Vec<Element>) {
         let row_idx = self.rows.borrow().len();
         // Sort-key cache starts empty for view-mode rows; callers can populate
@@ -276,6 +308,8 @@ impl TableView {
         self.needs_relayout.set(true);
     }
 
+    /// Replace the cell view at `(row, col)`, growing the row with blank cells
+    /// if it is shorter than `col`.
     pub fn set_cell(&self, row: usize, col: usize, cell: Element) {
         if let Some(r) = self.rows.borrow_mut().get_mut(row) {
             while r.len() <= col { r.push(std::rc::Rc::new(RefCell::new(Label::new(rect((0,0),(0,0)), "", crate::drawing::current_text_size("text"))))); }
@@ -284,6 +318,8 @@ impl TableView {
         self.needs_relayout.set(true);
     }
 
+    /// Set the sort-key text for the cell at `(row, col)`. This feeds sorting
+    /// only; it does not change what a view-mode cell displays.
     pub fn set_cell_text(&self, row: usize, col: usize, text: &str) {
         if let Some(r) = self.row_text.borrow_mut().get_mut(row) {
             while r.len() <= col { r.push(String::new()); }
@@ -292,6 +328,7 @@ impl TableView {
         self.needs_relayout.set(true);
     }
 
+    /// Remove all rows and clear the selection. Columns are kept.
     pub fn clear_rows(&self) {
         self.rows.borrow_mut().clear();
         self.row_text.borrow_mut().clear();
@@ -301,18 +338,24 @@ impl TableView {
         self.needs_relayout.set(true);
     }
 
+    /// Number of rows.
     pub fn row_count(&self) -> usize { self.row_count.get() }
 
+    /// The selected row as a raw index (stable across sorting), or `None`.
     pub fn selected_row(&self) -> Option<usize> { self.selected_raw.get() }
 
+    /// Select a row by raw index. Out-of-range indices are ignored.
     pub fn select_row(&self, raw_row: usize) {
         if raw_row < self.row_count.get() {
             self.selected_raw.set(Some(raw_row));
         }
     }
 
+    /// Clear the row selection.
     pub fn clear_selection(&self) { self.selected_raw.set(None); }
 
+    /// Sort by `col` in the given direction and rebuild the display order.
+    /// Ignored if `col` is out of range.
     pub fn set_sort(&self, col: usize, dir: SortDirection) {
         if col < self.columns.borrow().len() {
             self.sort_state.set(Some((col, dir)));
@@ -321,20 +364,25 @@ impl TableView {
         }
     }
 
+    /// Remove sorting, restoring insertion order.
     pub fn clear_sort(&self) {
         self.sort_state.set(None);
         self.rebuild_display_order();
         self.needs_relayout.set(true);
     }
 
+    /// The active sort as `(column, direction)`, or `None` when unsorted.
     pub fn sort_state(&self) -> Option<(usize, SortDirection)> { self.sort_state.get() }
 
+    /// Scroll so the content offset is `(x, y)`. Offsets are non-positive
+    /// (content moves up/left) and clamped to the scrollable range.
     pub fn scroll_to(&self, x: i32, y: i32) {
         self.scroll_x.set(x.min(0));
         self.scroll_y.set(y.min(0));
         self.clamp_scroll();
     }
 
+    /// Scroll vertically so the given raw row is brought into the body view.
     pub fn scroll_to_row(&self, raw_row: usize) {
         let display_idx = self.raw_to_display(raw_row);
         if let Some(d) = display_idx {
