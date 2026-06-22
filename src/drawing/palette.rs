@@ -136,6 +136,9 @@ impl Palette {
             ("radio.box_size".to_string(), 16.0),
             ("radio.left_inset".to_string(), 4.0),
             ("menu.min_width".to_string(), 120.0),
+            ("slider.track_height".to_string(), 4.0),
+            ("slider.thumb_size".to_string(), 16.0),
+            ("slider.label_gap".to_string(), 4.0),
         ])
     }
 

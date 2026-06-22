@@ -21,6 +21,7 @@ pub mod tableview;
 pub mod grid;
 pub mod richtext;
 pub mod menubar;
+pub mod slider;
 
 use super::themes::{Typeface, ViewState};
 use super::traits::WeakElement;
@@ -55,6 +56,7 @@ pub use self::tableview::{TableView, TableColumn, TableRow, ColumnDef, ColumnWid
 pub use self::grid::Grid;
 pub use self::richtext::{RichText, SpanStyle};
 pub use self::menubar::{MenuBar, Menu, MenuItemTag, MenuData};
+pub use self::slider::{Slider, LabelStyle};
 
 pub const BUTTON_MIN_WIDTH: i32 = 80;
 pub const BUTTON_MIN_HEIGHT: i32 = 24;

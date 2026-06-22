@@ -1,0 +1,22 @@
+<Frame id="root" direction="vertical" width="max" height="max" padding="16">
+    <Label text="Slider demo" font_style="Bold" font_size="18" width="max" height="24" margin_bottom="12"/>
+
+    <Label text="Volume (ends + current, default colours):" width="max" height="18" font_size="14"/>
+    <Slider id="vol" min="0" max="100" value="42" label_style="ends|current" width="max" margin_bottom="4"/>
+    <Label id="vol_value" text="value: 42" width="max" height="18" font_size="14" margin_bottom="16"/>
+
+    <Label text="Discrete steps (0..10 by 2):" width="max" height="18" font_size="14"/>
+    <Slider id="steps" min="0" max="10" step="2" value="4" label_style="ends|steps" width="max" margin_bottom="16"/>
+
+    <Label text="Custom colours (current bubble):" width="max" height="18" font_size="14"/>
+    <Slider id="custom" min="0" max="100" value="70" label_style="current"
+            track_color="#dddddd" fill_color="#e0529c" thumb_color="#ffffff" width="max" margin_bottom="16"/>
+
+    <Label text="Continuous, no labels (0.0 .. 1.0):" width="max" height="18" font_size="14"/>
+    <Slider id="plain" min="0" max="1" step="0.05" value="0.3" width="max" margin_bottom="16"/>
+
+    <Label text="Disabled:" width="max" height="18" font_size="14"/>
+    <Slider id="disabled" min="0" max="100" value="60" label_style="ends" enabled="false" width="max" margin_bottom="16"/>
+
+    <CheckBox id="dark_mode" text="Dark mode" width="max" height="22"/>
+</Frame>

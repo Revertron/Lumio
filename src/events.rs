@@ -21,6 +21,7 @@ pub enum EventType {
     DoubleClick,
     KeyDown,
     ContextMenu,
+    ValueChanged,
 }
 
 /// Payload passed to every event listener. Variants are keyed by payload
@@ -28,12 +29,14 @@ pub enum EventType {
 /// the view for its text), `CheckedChanged` carries `Checked`, selection
 /// events carry `Selected`, pointer events (`HoverEnter`, `DoubleClick`,
 /// `ContextMenu`, `MouseMove`) carry `Position` in absolute window
-/// coordinates, and `KeyDown` carries `Key`.
+/// coordinates, `KeyDown` carries `Key`, and `ValueChanged` (Slider) carries
+/// the new numeric `Value`.
 #[derive(Clone, Debug, PartialEq)]
 pub enum EventData {
     None,
     Checked(bool),
     Selected(usize),
+    Value(f32),
     Position { x: i32, y: i32 },
     Key { code: Option<VirtualKeyCode>, modifiers: ModifiersState },
 }
