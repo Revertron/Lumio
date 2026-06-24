@@ -40,7 +40,9 @@ font-kit = "0.14"
 fontdue = { version = "0.9", optional = true }
 # winit drives the window loop for BOTH backends (shared, 0.30 to match the
 # vendored speedy2d's winit — no duplicate in the tree).
-winit = { version = "0.30", optional = true, default-features = false, features = ["rwh_06", "x11", "wayland"] }
+# `wayland-csd-adwaita` lets winit draw client-side decorations on Wayland
+# compositors that don't provide server-side ones (e.g. WSLg's Weston).
+winit = { version = "0.30", optional = true, default-features = false, features = ["rwh_06", "x11", "wayland", "wayland-csd-adwaita"] }
 softbuffer = { version = "0.4", optional = true }
 # GL backend only: create the GL context Lumio hands to speedy2d's GLRenderer.
 # Versions pinned to match the vendored speedy2d (glutin 0.32 / rwh 0.6).
