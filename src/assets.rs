@@ -1,8 +1,11 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 
+#[cfg(feature = "system-fonts")]
 use font_kit::family_name::FamilyName;
+#[cfg(feature = "system-fonts")]
 use font_kit::properties::{Properties, Style as FkStyle, Weight};
+#[cfg(feature = "system-fonts")]
 use font_kit::source::SystemSource;
 
 use crate::text::FontHandle;
@@ -15,6 +18,7 @@ pub trait AssetsProvider {
 thread_local! {
     static PROVIDER: RefCell<Option<Box<dyn AssetsProvider>>> = const { RefCell::new(None) };
     static FALLBACKS: RefCell<Vec<(String, FontStyle)>> = const { RefCell::new(Vec::new()) };
+    #[cfg(feature = "system-fonts")]
     static SYSTEM: RefCell<Option<SystemSource>> = const { RefCell::new(None) };
 }
 
@@ -66,6 +70,7 @@ fn resolve_font_bytes(name: &str, style: FontStyle) -> Option<Vec<u8>> {
         })
 }
 
+#[cfg(feature = "system-fonts")]
 fn system_font_bytes(name: &str, style: FontStyle) -> Option<Vec<u8>> {
     SYSTEM.with(|s| {
         if s.borrow().is_none() {
@@ -80,6 +85,13 @@ fn system_font_bytes(name: &str, style: FontStyle) -> Option<Vec<u8>> {
         let bytes = fk_font.copy_font_data()?;
         Some(bytes.as_ref().clone())
     })
+}
+
+// No native system-font source in the headless `software` core: fonts come solely
+// from the `AssetsProvider` bundle (and the configured fallback chain).
+#[cfg(not(feature = "system-fonts"))]
+fn system_font_bytes(_name: &str, _style: FontStyle) -> Option<Vec<u8>> {
+    None
 }
 
 fn asset_font_bytes(name: &str, style: FontStyle) -> Option<Vec<u8>> {
@@ -98,6 +110,7 @@ fn asset_font_bytes(name: &str, style: FontStyle) -> Option<Vec<u8>> {
     })
 }
 
+#[cfg(feature = "system-fonts")]
 fn properties_for(style: FontStyle) -> Properties {
     let mut p = Properties::new();
     match style {
@@ -116,6 +129,7 @@ fn properties_for(style: FontStyle) -> Properties {
     p
 }
 
+#[cfg(feature = "system-fonts")]
 fn family_name_for(name: &str) -> FamilyName {
     match name {
         "sans-serif" => FamilyName::SansSerif,

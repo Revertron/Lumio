@@ -837,9 +837,7 @@ impl Edit {
             return;
         }
         if let Some(text) = self.get_selected_text() {
-            if let Ok(mut clipboard) = arboard::Clipboard::new() {
-                let _ = clipboard.set_text(text);
-            }
+            crate::clipboard::set_text(&text);
         }
     }
 
@@ -847,16 +845,14 @@ impl Edit {
         if *self.read_only.borrow() {
             return false;
         }
-        if let Ok(mut clipboard) = arboard::Clipboard::new() {
-            if let Ok(text) = clipboard.get_text() {
-                // Filter to single line if single_line mode
-                let text = if self.state.borrow().single_line {
-                    text.replace('\n', " ").replace('\r', "")
-                } else {
-                    text
-                };
-                return self.insert_text_at_caret(ui, &text);
-            }
+        if let Some(text) = crate::clipboard::get_text() {
+            // Filter to single line if single_line mode
+            let text = if self.state.borrow().single_line {
+                text.replace('\n', " ").replace('\r', "")
+            } else {
+                text
+            };
+            return self.insert_text_at_caret(ui, &text);
         }
         false
     }

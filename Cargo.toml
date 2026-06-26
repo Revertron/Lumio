@@ -10,18 +10,30 @@ categories = ["gui", "rendering"]
 [features]
 default = ["backend-gl"]
 # Selects the rendering + text backend. Exactly one `backend-*` must be enabled.
-# Both backends share the winit window loop in `src/window/`; they differ only in
-# the per-window `RenderSurface`:
+# Both windowed backends share the winit window loop in `src/window/`; they differ
+# only in the per-window `RenderSurface`:
 # - backend-gl: speedy2d as a GL renderer (its `windowing` feature OFF) painting
 #   `Classic`, over a glutin-created GL context Lumio owns.
-# - backend-software: tiny-skia software renderer + fontdue text.
+# - backend-software: tiny-skia software renderer + fontdue text, in a winit window.
 # The `text-*` features are the text-layer half each backend pulls in.
-backend-gl = ["text-speedy2d", "dep:winit", "dep:glutin", "dep:glutin-winit", "dep:raw-window-handle"]
-backend-software = ["text-software", "dep:fontdue", "dep:winit", "dep:softbuffer"]
+backend-gl = ["text-speedy2d", "system-fonts", "clipboard",
+              "dep:winit", "dep:glutin", "dep:glutin-winit", "dep:raw-window-handle"]
+# Desktop software backend = the software core + a winit/softbuffer window + the
+# native niceties (system fonts, clipboard).
+backend-software = ["software", "system-fonts", "clipboard", "dep:winit", "dep:softbuffer"]
+# The software render + text CORE: tiny-skia + fontdue, exposing `render_to_pixmap`
+# and `SoftwareTheme` with NO window loop and NO native system-font/clipboard deps.
+# An embedder (e.g. a host that drives the UI externally and presents the pixmap
+# itself) enables exactly this, with `default-features = false`.
+software = ["text-software", "dep:fontdue"]
 # Pulls in speedy2d (renderer only). The software backend enables neither, so
 # speedy2d is absent from its dependency tree.
 text-speedy2d = ["dep:speedy2d"]
 text-software = []
+# Native system-font enumeration via font-kit. Off in the headless `software` core.
+system-fonts = ["dep:font-kit"]
+# Native clipboard via arboard. Off in the headless `software` core.
+clipboard = ["dep:arboard"]
 
 [dependencies]
 quick-xml = "0.40.1"
@@ -32,11 +44,11 @@ downcast-rs = "2.0.2"
 speedy2d = { git="https://github.com/Revertron/Speedy2D", rev="4304b683", optional = true, default-features = false, features = ["image-loading"] }
 image = "0.25.10"
 rand = "0.8.6"
-arboard = "3"
+arboard = { version = "3", optional = true }
 resvg = { version = "0.47.0", default-features = false }
 usvg = { version = "0.47.0", default-features = false }
 tiny-skia = "0.12.0"
-font-kit = "0.14"
+font-kit = { version = "0.14", optional = true }
 fontdue = { version = "0.9", optional = true }
 # winit drives the window loop for BOTH backends (shared, 0.30 to match the
 # vendored speedy2d's winit — no duplicate in the tree).

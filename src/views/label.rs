@@ -391,10 +391,8 @@ impl Label {
     }
 
     fn copy_to_clipboard(&self) {
-        if let Some(text) = self.get_selected_text()
-            && let Ok(mut clipboard) = arboard::Clipboard::new()
-        {
-            let _ = clipboard.set_text(text);
+        if let Some(text) = self.get_selected_text() {
+            crate::clipboard::set_text(&text);
         }
     }
 

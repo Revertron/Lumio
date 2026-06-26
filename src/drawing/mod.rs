@@ -6,7 +6,7 @@ pub mod parser;
 #[cfg(feature = "backend-gl")]
 pub mod engine;
 /// The tiny-skia (software) drawable renderer.
-#[cfg(feature = "backend-software")]
+#[cfg(feature = "software")]
 pub mod engine_software;
 pub mod registry;
 pub mod palette;

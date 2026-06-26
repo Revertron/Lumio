@@ -2,7 +2,7 @@
 mod classic;
 #[cfg(feature = "backend-gl")]
 mod utils;
-#[cfg(feature = "backend-software")]
+#[cfg(feature = "software")]
 mod software;
 
 use super::styles::selector::{DrawState, MainSelector};
@@ -12,7 +12,7 @@ use super::text::TextBlock;
 pub use self::classic::Classic;
 #[cfg(feature = "backend-gl")]
 pub use self::classic::ImageCache;
-#[cfg(feature = "backend-software")]
+#[cfg(feature = "software")]
 pub use self::software::{GlyphCache, SoftwareImageCache, SoftwareTheme};
 use super::types::Rect;
 

@@ -1,7 +1,11 @@
 pub use crate::ui::{UI, UiHandle, UiTask, PopupMode, PopupDirection, WindowRequest, WindowCommand};
 // Backend-neutral window launcher: `lumio::run(ui, WindowConfig::new(..))` works
-// the same whether the GL or software backend is compiled in.
-pub use crate::app::{run, WindowConfig};
+// the same whether the GL or software backend is compiled in. `WindowConfig` stays
+// available headless; `run`/`run_software_window` need a windowed backend.
+pub use crate::app::WindowConfig;
+#[cfg(any(feature = "backend-gl", feature = "backend-software"))]
+pub use crate::app::run;
+#[cfg(any(feature = "backend-gl", feature = "backend-software"))]
 pub use crate::window::run as run_software_window;
 pub use crate::traits::{View, Container, Element};
 pub use crate::events::{EventCallback, EventData, EventType};

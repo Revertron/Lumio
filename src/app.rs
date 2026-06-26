@@ -8,6 +8,7 @@
 //! superset of the window options both backends understand.
 
 use crate::drawing::Palette;
+#[cfg(any(feature = "backend-gl", feature = "backend-software"))]
 use crate::ui::UI;
 
 /// Backend-neutral window configuration passed to [`run`]. Build it fluently:
@@ -122,6 +123,7 @@ impl WindowConfig {
 /// backends share Lumio's winit window loop ([`crate::window`]); the compiled-in
 /// backend only picks the per-window render surface. Blocks until the last
 /// window closes.
+#[cfg(any(feature = "backend-gl", feature = "backend-software"))]
 pub fn run(ui: UI, config: WindowConfig) {
     if let Err(e) = crate::window::run_with_config(ui, config) {
         panic!("window event loop failed: {e}");

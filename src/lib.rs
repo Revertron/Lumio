@@ -35,7 +35,12 @@ extern crate downcast_rs;
 pub use speedy2d;
 
 pub mod app;
-pub use app::{run, WindowConfig};
+pub use app::WindowConfig;
+// `run` opens a window, so it exists only with a windowed backend; `WindowConfig`
+// is windowing-neutral and stays available to headless embedders.
+#[cfg(any(feature = "backend-gl", feature = "backend-software"))]
+pub use app::run;
+mod clipboard;
 pub mod common;
 pub mod input;
 pub mod text;
@@ -55,8 +60,8 @@ pub mod styles;
 pub mod view_base;
 pub mod shortcut;
 pub mod drawing;
-/// Headless software rendering (UI → `tiny_skia::Pixmap`). Software backend only.
-#[cfg(feature = "backend-software")]
+/// Headless software rendering (UI → `tiny_skia::Pixmap`). Software core only.
+#[cfg(feature = "software")]
 pub mod render;
 /// Backend-neutral winit window loop, shared by both backends; the per-window
 /// paint sits behind a `RenderSurface` (GL or software). See
