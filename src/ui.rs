@@ -52,7 +52,29 @@ struct PopupEntry {
     x: i32,
     y: i32,
     mode: PopupMode,
+    /// Stable identity for embedders that mirror overlays into their own surfaces
+    /// (see [`UI::overlay_snapshot`]); assigned from a per-UI monotonic counter.
+    token: u64,
 }
+
+/// One overlay's geometry for an embedder that presents overlays in its own surfaces (an
+/// "external popups" host, see [`UI::set_external_popups`]). Coordinates are in window space:
+/// the overlay's on-screen rect is `(x, y, width, height)`; paint it via
+/// [`crate::render::render_overlay_to_pixmap`] and route its input through
+/// [`UI::overlay_origin`]-translated coordinates.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct OverlayDesc {
+    /// Stable identity of the overlay across snapshots (a new popup = a new token).
+    pub token: u64,
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub height: i32,
+}
+
+/// The reserved [`OverlayDesc::token`] for the tooltip (it is not an overlay entry internally,
+/// but external-popup embedders present it the same way).
+pub const TOOLTIP_TOKEN: u64 = u64::MAX;
 
 const TOOLTIP_DELAY_MS: u128 = 700;
 const TOOLTIP_ID: &str = "__tooltip__";
@@ -165,6 +187,13 @@ pub struct UI {
     /// Runs once when this UI is dropped (the window handler is dropped on
     /// window close). Set it on the main window's UI for app shutdown work.
     on_close: Option<Box<dyn FnOnce()>>,
+    /// External-popups mode ([`UI::set_external_popups`]): the embedder presents
+    /// non-`Transparent` overlays and the tooltip in its own surfaces — `paint()` draws the
+    /// root (+ transparent overlays) only, and popup/tooltip geometry is NOT clamped to the
+    /// window (it may extend past it; that's the point).
+    external_popups: bool,
+    /// Monotonic source of [`PopupEntry::token`]s.
+    next_overlay_token: u64,
 }
 
 /// A request to open a new OS window, queued via [`UI::open_window`] and
@@ -242,6 +271,8 @@ impl UI {
             tasks: Arc::new(Mutex::new(VecDeque::new())),
             deferred_events: Vec::new(),
             on_close: None,
+            external_popups: false,
+            next_overlay_token: 0,
         };
         ui.register::<Label>("Label");
         ui.register::<Button>("Button");
@@ -505,11 +536,14 @@ impl UI {
 
     /// Shows a popup at the given anchor point, expanding in the given direction.
     pub fn show_popup(&mut self, popup: Element, x: i32, y: i32, direction: PopupDirection, mode: PopupMode) {
-        // Layout the popup to determine its size
+        // Layout the popup to determine its size. In external-popups mode the popup lives in its
+        // own surface and may be larger than this window (a menu on a thin taskbar), so measure
+        // against a generous bound instead of the window.
         let typeface = self.typeface.clone();
         let w = self.width as i32;
         let h = self.height as i32;
-        popup.borrow_mut().layout_content(0, 0, w, h, &typeface, self.scale);
+        let (bw, bh) = if self.external_popups { (8192, 8192) } else { (w, h) };
+        popup.borrow_mut().layout_content(0, 0, bw, bh, &typeface, self.scale);
 
         let rect = popup.borrow().get_rect();
         let pw = rect.width();
@@ -524,16 +558,103 @@ impl UI {
             PopupDirection::Center => (x - pw / 2, y - ph / 2),
         };
 
-        // Clamp to window bounds
-        ox = ox.max(0).min(w - pw);
-        oy = oy.max(0).min(h - ph);
+        // Clamp to window bounds — unless the embedder presents popups in its own surfaces
+        // (external mode), where extending past the window is exactly the intent and any
+        // screen-edge clamping is the host's job.
+        if !self.external_popups {
+            ox = ox.max(0).min(w - pw);
+            oy = oy.max(0).min(h - ph);
+        }
 
+        let token = self.next_overlay_token;
+        self.next_overlay_token += 1;
         self.overlays.push(PopupEntry {
             element: popup,
             x: ox,
             y: oy,
             mode,
+            token,
         });
+    }
+
+    /// Switch the UI into "external popups" mode: an embedder that composites windows itself
+    /// (rather than winit) presents every non-`Transparent` overlay and the tooltip in its own
+    /// surface. In this mode `paint()` draws only the root and `Transparent` overlays (e.g. the
+    /// notification stack), and popup/tooltip positions are not clamped to the window — they
+    /// may extend past it. Enumerate the overlays each frame via [`UI::overlay_snapshot`] /
+    /// [`UI::tooltip_snapshot`], paint them with
+    /// [`crate::render::render_overlay_to_pixmap`], and feed their input back through
+    /// window-space coordinates (surface-local + the overlay's `(x, y)`).
+    pub fn set_external_popups(&mut self, external: bool) {
+        self.external_popups = external;
+    }
+
+    /// The non-`Transparent` overlays (popups, menus, modals), bottom to top, for an
+    /// external-popups embedder: window-space rects with stable tokens. The tooltip is separate
+    /// ([`UI::tooltip_snapshot`]).
+    pub fn overlay_snapshot(&self) -> Vec<OverlayDesc> {
+        self.overlays
+            .iter()
+            .filter(|e| e.mode != PopupMode::Transparent)
+            .map(|e| {
+                let r = e.element.borrow().get_rect();
+                OverlayDesc {
+                    token: e.token,
+                    x: e.x + r.min.x,
+                    y: e.y + r.min.y,
+                    width: r.width(),
+                    height: r.height(),
+                }
+            })
+            .collect()
+    }
+
+    /// The tooltip's window-space rect for an external-popups embedder (token =
+    /// [`TOOLTIP_TOKEN`]), or `None` when no tooltip is showing.
+    pub fn tooltip_snapshot(&self) -> Option<OverlayDesc> {
+        self.tooltip_popup.as_ref().map(|t| {
+            let r = t.element.borrow().get_rect();
+            OverlayDesc {
+                token: TOOLTIP_TOKEN,
+                x: t.x + r.min.x,
+                y: t.y + r.min.y,
+                width: r.width(),
+                height: r.height(),
+            }
+        })
+    }
+
+    /// The window-space top-left of a live overlay's rect by token ([`TOOLTIP_TOKEN`] for the
+    /// tooltip) — for translating surface-local input back into window space. `None` if the
+    /// overlay is gone.
+    pub fn overlay_origin(&self, token: u64) -> Option<(i32, i32)> {
+        if token == TOOLTIP_TOKEN {
+            return self.tooltip_snapshot().map(|d| (d.x, d.y));
+        }
+        self.overlays.iter().find(|e| e.token == token).map(|e| {
+            let r = e.element.borrow().get_rect();
+            (e.x + r.min.x, e.y + r.min.y)
+        })
+    }
+
+    /// Paint one overlay (or the tooltip, token = [`TOOLTIP_TOKEN`]) with its rect's top-left
+    /// at the theme's origin — for an external-popups embedder rendering it into its own
+    /// surface. `false` if the token is gone.
+    pub fn paint_overlay(&self, token: u64, theme: &mut dyn Theme) -> bool {
+        if token == TOOLTIP_TOKEN {
+            if let Some(t) = &self.tooltip_popup {
+                let r = t.element.borrow().get_rect();
+                t.element.borrow().paint(Point::from((-r.min.x, -r.min.y)), theme);
+                return true;
+            }
+            return false;
+        }
+        if let Some(e) = self.overlays.iter().find(|e| e.token == token) {
+            let r = e.element.borrow().get_rect();
+            e.element.borrow().paint(Point::from((-r.min.x, -r.min.y)), theme);
+            return true;
+        }
+        false
     }
 
     /// Closes a popup by its view ID.
@@ -614,11 +735,14 @@ impl UI {
         // Lay out at full window size so it can place items at absolute coords.
         let typeface = self.typeface.clone();
         stack.borrow_mut().layout_content(0, 0, self.width as i32, self.height as i32, &typeface, self.scale);
+        let token = self.next_overlay_token;
+        self.next_overlay_token += 1;
         self.overlays.push(PopupEntry {
             element: Rc::clone(&stack),
             x: 0,
             y: 0,
             mode: PopupMode::Transparent,
+            token,
         });
         self.notification_stack = Some(Rc::clone(&stack));
         stack
@@ -771,12 +895,19 @@ impl UI {
         if let Some(root) = &self.root {
             root.borrow().paint(Point::from((0, 0)), theme);
         }
-        // Paint overlays on top, in order (last = topmost)
+        // Paint overlays on top, in order (last = topmost). In external-popups mode the
+        // embedder paints non-Transparent overlays and the tooltip into its own surfaces
+        // (paint_overlay); only Transparent overlays (notification stack) stay in-window.
         for entry in &self.overlays {
+            if self.external_popups && entry.mode != PopupMode::Transparent {
+                continue;
+            }
             entry.element.borrow().paint(Point::from((entry.x, entry.y)), theme);
         }
         // Paint tooltip on top of everything
-        if let Some(tooltip) = &self.tooltip_popup {
+        if !self.external_popups
+            && let Some(tooltip) = &self.tooltip_popup
+        {
             tooltip.element.borrow().paint(Point::from((tooltip.x, tooltip.y)), theme);
         }
     }
@@ -1145,11 +1276,13 @@ impl UI {
             f.as_container_mut().unwrap().add_view(label);
         }
 
-        // Layout to determine size
+        // Layout to determine size. Like popups, a tooltip in external mode lives in its own
+        // surface and must not be size-bounded by a small window (e.g. a thin taskbar).
         let typeface = self.typeface.clone();
         let w = self.width as i32;
         let h = self.height as i32;
-        frame.borrow_mut().layout_content(0, 0, w, h, &typeface, self.scale);
+        let (bw, bh) = if self.external_popups { (8192, 8192) } else { (w, h) };
+        frame.borrow_mut().layout_content(0, 0, bw, bh, &typeface, self.scale);
 
         let rect = frame.borrow().get_rect();
         let pw = rect.width();
@@ -1159,9 +1292,12 @@ impl UI {
         let mut ox = self.mouse_pos.x;
         let mut oy = self.mouse_pos.y + (self.scale * 15f64).round() as i32;
 
-        // Clamp to window bounds
-        ox = ox.max(0).min(w - pw);
-        oy = oy.max(0).min(h - ph);
+        // Clamp to window bounds — not in external-popups mode, where the tooltip lives in its
+        // own surface and may extend past the window (the host clamps to the screen).
+        if !self.external_popups {
+            ox = ox.max(0).min(w - pw);
+            oy = oy.max(0).min(h - ph);
+        }
 
         self.tooltip_popup = Some(TooltipPopup { element: frame, x: ox, y: oy });
         self.tooltip_showing = true;
