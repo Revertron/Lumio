@@ -235,6 +235,47 @@ impl LinearLayout {
             }
         }
 
+        // Max children are not laid out in pass 1 (only their margins are
+        // reserved), so their rects are still whatever a previous layout left
+        // behind. Lay them out now — each at its resolved main-axis slot — so
+        // the cross-axis extent used below reflects their real current size.
+        // Without this, a stale (often window-tall) rect inflates the parent's
+        // Min cross size, e.g. a `gravity="center_vertical"` column stretching a
+        // `height="min"` row until the next relayout happens to correct it.
+        for (i, v) in children.iter().enumerate() {
+            if !child_is_max[i] {
+                continue;
+            }
+            let mut v = v.try_borrow_mut().unwrap();
+            if v.get_visibility() == Visibility::Gone {
+                continue;
+            }
+            let margins = v.get_margin(scale);
+            let (margin_before, margin_after) = if is_vertical {
+                (margins.top, margins.bottom)
+            } else {
+                (margins.left, margins.right)
+            };
+            let avail = slots[i] + margin_before + margin_after;
+            if is_vertical {
+                v.layout_content(
+                    padding.left + margins.left,
+                    padding.top + margins.top,
+                    new_width - padding.left - padding.right,
+                    avail,
+                    typeface, scale,
+                );
+            } else {
+                v.layout_content(
+                    padding.left + margins.left,
+                    padding.top + margins.top,
+                    avail,
+                    new_height - padding.top - padding.bottom,
+                    typeface, scale,
+                );
+            }
+        }
+
         // When the parent shrinks to its content on the cross axis (Min), gravity
         // should align children inside the resolved content width — not the full
         // available width — otherwise a right-gravity child would expand the

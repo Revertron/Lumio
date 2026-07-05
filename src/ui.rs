@@ -127,6 +127,14 @@ pub struct UI {
     root: Option<Element>,
     types: HashMap<String, fn() -> Element>,
     on_start: Option<Box<dyn FnMut(&mut UI)>>,
+    /// Handler for OS file drag-and-drop onto this window; returns true to
+    /// request a redraw. One path per call (winit delivers drops one by one).
+    on_file_drop: Option<Box<dyn FnMut(&mut UI, std::path::PathBuf) -> bool>>,
+    /// Global left-button-release hook, called before positional dispatch.
+    /// Lets app code implement press-and-hold interactions that must see the
+    /// release wherever it happens (e.g. hold-to-record). Returns true to
+    /// request a redraw; the event still reaches views afterwards.
+    on_mouse_up: Option<Box<dyn FnMut(&mut UI, Point<i32>) -> bool>>,
     overlays: Vec<PopupEntry>,
     mouse_pos: Point<i32>,
     tooltip_view_id: Option<String>,
@@ -253,7 +261,7 @@ impl UI {
     pub fn new(width: u32, height: u32, typeface: Typeface, scale: f64) -> Self {
         let mut ui = UI {
             width, height, typeface, scale, root: None, types: HashMap::new(),
-            on_start: None, overlays: Vec::new(), mouse_pos: Point::new(0, 0),
+            on_start: None, on_file_drop: None, on_mouse_up: None, overlays: Vec::new(), mouse_pos: Point::new(0, 0),
             tooltip_view_id: None, tooltip_hover_start: None, tooltip_showing: false, tooltip_popup: None, needs_relayout: false,
             notification_stack: None,
             pending_removals: Vec::new(),
@@ -473,6 +481,34 @@ impl UI {
 
     pub fn on_start(&mut self, func: Box<dyn FnMut(&mut UI)>) {
         self.on_start = Some(func);
+    }
+
+    /// Register a handler for OS file drops onto this window. The handler
+    /// returns `true` to request a redraw.
+    pub fn set_on_file_drop(&mut self, func: impl FnMut(&mut UI, std::path::PathBuf) -> bool + 'static) {
+        self.on_file_drop = Some(Box::new(func));
+    }
+
+    /// Register a hook invoked on every left-button release, before the event
+    /// is dispatched to views (which happens regardless of the hook's result).
+    /// Return true to request a redraw. Use for press-and-hold interactions
+    /// that must observe the release even outside the pressed view.
+    pub fn set_on_mouse_up(&mut self, func: impl FnMut(&mut UI, Point<i32>) -> bool + 'static) {
+        self.on_mouse_up = Some(Box::new(func));
+    }
+
+    /// Dispatch one dropped file to the registered handler (called by the
+    /// window loop). Take-call-restore so the handler can use `&mut UI`.
+    pub fn on_file_dropped(&mut self, path: std::path::PathBuf) -> bool {
+        if let Some(mut f) = self.on_file_drop.take() {
+            let redraw = f(self, path);
+            if self.on_file_drop.is_none() {
+                self.on_file_drop = Some(f);
+            }
+            redraw
+        } else {
+            false
+        }
     }
 
     /// Returns a `Send + Sync + Clone` handle for posting closures to this
@@ -1384,12 +1420,14 @@ impl UI {
             return false;
         }
         self.requested_cursor = None;
-        // Over a covering overlay the cursor is the default arrow; elsewhere
-        // re-evaluate it from the views now under the pointer.
-        if self.has_modal_overlay() || self.pointer_over_opaque_overlay(position) {
-            return false;
+        // The overlay set changed, so the painted scene changed — a redraw is
+        // always needed. Over a covering overlay the cursor is the default arrow
+        // and no move dispatch is required; elsewhere re-evaluate the cursor from
+        // the views now under the pointer (which may itself request a redraw).
+        if !(self.has_modal_overlay() || self.pointer_over_opaque_overlay(position)) {
+            self.dispatch_mouse_move(position);
         }
-        self.dispatch_mouse_move(position)
+        true
     }
 
     /// Detects which view with a hover listener is under the cursor and fires
@@ -1562,6 +1600,11 @@ impl UI {
         } else {
             Some((Instant::now(), position, dc_target.clone()))
         };
+        // Snapshot before firing ContextMenu: a handler may open a popup right
+        // here (not only during dispatch), and that overlay change must still be
+        // seen by the redraw/cursor refresh below — otherwise a context menu
+        // opened on right-click is not painted until the next input event.
+        let overlays_before = self.overlays.len();
         // ContextMenu fires BEFORE dispatch so a consuming handler can
         // suppress the built-in menus that open during dispatch.
         if matches!(button, MouseButton::Right) {
@@ -1572,7 +1615,6 @@ impl UI {
                 self.context_menu_suppressed = el.borrow().fire_event(self, EventType::ContextMenu, &data);
             }
         }
-        let overlays_before = self.overlays.len();
         let mut redraw = self.dispatch_mouse_button_down(position, button);
         self.context_menu_suppressed = false;
         if is_double {
@@ -1664,8 +1706,16 @@ impl UI {
     }
 
     pub fn on_mouse_button_up(&mut self, position: Point<i32>, button: MouseButton) -> bool {
+        let mut redraw = false;
+        if matches!(button, MouseButton::Left)
+            && let Some(mut f) = self.on_mouse_up.take() {
+                redraw = f(self, position);
+                if self.on_mouse_up.is_none() {
+                    self.on_mouse_up = Some(f);
+                }
+            }
         let overlays_before = self.overlays.len();
-        let mut redraw = self.dispatch_mouse_button_up(position, button);
+        redraw |= self.dispatch_mouse_button_up(position, button);
         redraw |= self.refresh_cursor_if_overlays_changed(position, overlays_before);
         redraw
     }

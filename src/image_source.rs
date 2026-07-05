@@ -12,7 +12,6 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::io::Cursor;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use image::GenericImageView;
@@ -76,8 +75,14 @@ pub struct ImageSource {
     bytes: Option<Vec<u8>>,
     is_svg: bool,
     natural_size: (u32, u32),
-    /// SVG only: the rasterized RGBA at the last drawn size `(w, h)`.
+    /// The rasterized RGBA at the last drawn size `(w, h)`. Used for SVG
+    /// always, and for raster images when a corner radius is set (the mask is
+    /// applied to decoded pixels, so it works identically on both backends).
     rasterized: Option<(u32, u32, Vec<u8>)>,
+    /// Corner radius in physical px at draw size; 0 = square.
+    corner_radius: f32,
+    /// The radius the cached `rasterized` buffer was masked with.
+    rasterized_radius: f32,
     loaded: bool,
 }
 
@@ -90,8 +95,16 @@ impl ImageSource {
             is_svg: false,
             natural_size: (0, 0),
             rasterized: None,
+            corner_radius: 0.0,
+            rasterized_radius: 0.0,
             loaded: false,
         }
+    }
+
+    /// Set the corner radius (physical px at draw size). The next `draw`
+    /// re-rasterizes if the radius changed.
+    pub fn set_corner_radius(&mut self, radius_px: f32) {
+        self.corner_radius = radius_px.max(0.0);
     }
 
     /// `None` for an empty path, else `Some(ImageSource::new(path))`. For optional
@@ -125,10 +138,9 @@ impl ImageSource {
                 println!("ImageSource: failed to parse SVG: {}", self.path);
             }
         } else {
-            match image::load(
-                Cursor::new(&bytes),
-                image::ImageFormat::from_path(&self.path).unwrap_or(image::ImageFormat::Png),
-            ) {
+            // Sniff the format from the content — user files (avatars,
+            // downloads) often carry non-image extensions.
+            match image::load_from_memory(&bytes) {
                 Ok(img) => self.natural_size = img.dimensions(),
                 Err(e) => println!("ImageSource: failed to decode image: {}", e),
             }
@@ -160,15 +172,33 @@ impl ImageSource {
             return;
         }
 
-        if self.is_svg {
+        let radius = self.corner_radius;
+        if self.is_svg || radius > 0.0 {
             let needs_render = match &self.rasterized {
-                Some((cw, ch, _)) => *cw != w || *ch != h,
+                Some((cw, ch, _)) => {
+                    *cw != w || *ch != h || (radius - self.rasterized_radius).abs() > 0.01
+                }
                 None => true,
             };
             if needs_render {
                 // Render first (borrowing `bytes`), then mutate `rasterized`/`id`.
-                let rendered = self.bytes.as_ref().and_then(|src| svg::rasterize(src, w, h));
-                if let Some(rgba) = rendered {
+                let rendered = if self.is_svg {
+                    self.bytes.as_ref().and_then(|src| svg::rasterize(src, w, h))
+                } else {
+                    // Raster image with rounded corners: decode + scale to the
+                    // draw size so the mask applies in physical pixels.
+                    self.bytes.as_ref().and_then(|src| {
+                        image::load_from_memory(src).ok().map(|img| {
+                            img.resize_exact(w, h, image::imageops::FilterType::CatmullRom)
+                                .to_rgba8()
+                                .into_raw()
+                        })
+                    })
+                };
+                if let Some(mut rgba) = rendered {
+                    if radius > 0.0 {
+                        apply_round_mask(&mut rgba, w, h, radius);
+                    }
                     // A previous texture for this source existed at a different
                     // size: retire its id so the cache frees it, and take a fresh
                     // id so the upload below is a cache miss.
@@ -177,6 +207,7 @@ impl ImageSource {
                         self.id = NEXT_IMAGE_ID.fetch_add(1, Ordering::Relaxed);
                     }
                     self.rasterized = Some((w, h, rgba));
+                    self.rasterized_radius = radius;
                 }
             }
             if let Some((cw, ch, rgba)) = &self.rasterized {
@@ -184,6 +215,43 @@ impl ImageSource {
             }
         } else if let Some(bytes) = &self.bytes {
             theme.draw_image_tinted(rect, bytes, self.id, tint);
+        }
+    }
+}
+
+/// Zero out pixels outside the rounded-rect outline, with a ~1px anti-aliased
+/// edge. Scales all four channels by the coverage, which is exact for
+/// premultiplied buffers (tiny-skia SVG output) and visually identical for
+/// straight-alpha ones (decoded raster images).
+fn apply_round_mask(rgba: &mut [u8], w: u32, h: u32, radius: f32) {
+    let r = radius.min(w as f32 / 2.0).min(h as f32 / 2.0);
+    if r <= 0.0 {
+        return;
+    }
+    for y in 0..h {
+        let fy = y as f32 + 0.5;
+        let in_top = fy < r;
+        let in_bottom = fy > h as f32 - r;
+        if !in_top && !in_bottom {
+            continue;
+        }
+        let cy = if in_top { r } else { h as f32 - r };
+        for x in 0..w {
+            let fx = x as f32 + 0.5;
+            let in_left = fx < r;
+            let in_right = fx > w as f32 - r;
+            if !in_left && !in_right {
+                continue;
+            }
+            let cx = if in_left { r } else { w as f32 - r };
+            let dist = ((fx - cx).powi(2) + (fy - cy).powi(2)).sqrt();
+            let coverage = (r - dist + 0.5).clamp(0.0, 1.0);
+            if coverage < 1.0 {
+                let idx = ((y * w + x) * 4) as usize;
+                for c in 0..4 {
+                    rgba[idx + c] = (rgba[idx + c] as f32 * coverage) as u8;
+                }
+            }
         }
     }
 }

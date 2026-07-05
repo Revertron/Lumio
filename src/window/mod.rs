@@ -381,6 +381,11 @@ impl ApplicationHandler for App {
                         ws.window.request_redraw();
                     }
                 }
+                WindowEvent::DroppedFile(path) => {
+                    if ws.ui.on_file_dropped(path) {
+                        ws.window.request_redraw();
+                    }
+                }
                 WindowEvent::KeyboardInput { event: ke, .. } => {
                     let mut redraw = false;
                     if let (ElementState::Pressed, Some(text)) = (ke.state, &ke.text) {

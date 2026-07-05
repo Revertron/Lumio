@@ -21,6 +21,9 @@ pub struct ImageView {
     /// Optional ARGB tint multiplied with the image at draw time (`0xFFFFFFFF`
     /// = no change). Monochrome icons should be authored white to recolor.
     tint: RefCell<Option<u32>>,
+    /// Corner radius in dips; > 0 clips the image to a rounded rectangle
+    /// (applied to the decoded pixels, so it works on both backends).
+    corner_radius: RefCell<f32>,
 }
 
 impl HasMainFields for ImageView {
@@ -42,6 +45,11 @@ impl ImageView {
     /// `None` for no tint. Monochrome icons should be authored white to recolor.
     pub fn set_tint(&mut self, color: Option<u32>) {
         *self.tint.borrow_mut() = color;
+    }
+
+    /// Corner radius in dips; 0 disables rounding.
+    pub fn set_corner_radius(&mut self, radius: f32) {
+        *self.corner_radius.borrow_mut() = radius.max(0.0);
     }
 
     /// Natural image size, loading the asset if needed (returns `(0, 0)` when
@@ -66,6 +74,11 @@ impl View for ImageView {
             }
             "tint" => {
                 *self.tint.borrow_mut() = crate::view_base::parse_hex_color(value);
+            }
+            "corner_radius" => {
+                if let Ok(r) = value.parse::<f32>() {
+                    *self.corner_radius.borrow_mut() = r.max(0.0);
+                }
             }
             _ => {}
         }
@@ -124,7 +137,9 @@ impl View for ImageView {
 
             if img_w > 0 && img_h > 0 {
                 let tint = self.tint.borrow().unwrap_or(0xFFFFFFFF);
+                let radius_px = *self.corner_radius.borrow() * state.scale as f32;
                 if let Some(img) = self.image.borrow_mut().as_mut() {
+                    img.set_corner_radius(radius_px);
                     img.draw(theme, img_rect, tint);
                 }
             }
@@ -359,6 +374,7 @@ impl Default for ImageView {
             state: RefCell::new(main),
             image: RefCell::new(None),
             tint: RefCell::new(None),
+            corner_radius: RefCell::new(0.0),
         }
     }
 }

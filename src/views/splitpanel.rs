@@ -616,7 +616,22 @@ impl View for SplitPanel {
 
         // Forward to children
         for v in self.views.iter().rev() {
+            let was_focused = v.borrow().is_focused();
             if v.borrow().on_mouse_button_down(ui, local, button) {
+                // If this panel newly gained focus, clear it on the other panels
+                // so only one panel holds focus. A `Frame` does this for its
+                // children; without it here a focused view in the other panel
+                // stays focused and, being earlier in tree order, wins the
+                // `focus_owner` sweep — so KeyDown listeners (e.g. Enter-to-send
+                // on a composer) fire against the wrong view or not at all.
+                if !was_focused && v.borrow().is_focused() {
+                    let id = v.borrow().get_id();
+                    for other in self.views.iter() {
+                        if other.borrow().get_id() != id {
+                            other.borrow().set_focused(false);
+                        }
+                    }
+                }
                 return true;
             }
         }

@@ -37,6 +37,14 @@ pub fn get_asset(path: &str) -> Option<Vec<u8>> {
             }
         }
     });
+    // Absolute paths the provider doesn't know fall through to the filesystem,
+    // so apps can display user files (avatars, downloads) without bundling them.
+    if result.is_none() {
+        let p = std::path::Path::new(path);
+        if p.is_absolute() {
+            result = std::fs::read(p).ok();
+        }
+    }
     result
 }
 

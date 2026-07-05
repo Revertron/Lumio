@@ -298,15 +298,22 @@ impl View for ImageButton {
         self.state.borrow().state != old_state
     }
 
-    fn on_mouse_button_down(&self, _ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_down(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
         let hit = self.state.borrow().rect.hit((position.x, position.y));
         if hit {
-            let mut state = self.state.borrow_mut();
-            if matches!(button, MouseButton::Left) {
-                state.state.pressed = true;
+            {
+                let mut state = self.state.borrow_mut();
+                if matches!(button, MouseButton::Left) {
+                    state.state.pressed = true;
+                }
+                state.state.focused = true;
             }
-            state.state.focused = true;
+            if matches!(button, MouseButton::Left) {
+                // Press notification for hold-style interactions; Click still
+                // fires separately on release inside the button.
+                self.fire_event(ui, EventType::MouseDown, &EventData::None);
+            }
             return true;
         }
         false

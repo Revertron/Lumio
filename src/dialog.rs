@@ -65,14 +65,18 @@ struct DialogButton {
     id: String,
     label: String,
     side: ButtonSide,
+    /// When `true`, clicking fires the result but leaves the dialog open (a
+    /// "sticky" button); when `false` (the default) the click closes it.
+    keep_open: bool,
 }
 
 /// Called with the pressed button's id when the dialog is dismissed.
 type ResultCallback = Box<dyn FnMut(&mut UI, &str)>;
 
-/// The shared result callback. A single dialog fires exactly one result, so it
-/// is stored in an `Option` and `take`n by whichever button (or shortcut) fires
-/// first — every other handler then finds it empty and only closes the window.
+/// The shared result callback, stored in an `Option`. A normal (closing) button
+/// or shortcut `take`s it, fires it once and closes the window — every later
+/// handler then finds it empty and only closes. A [`sticky_button`](Dialog::sticky_button)
+/// instead fires it in place (without taking or closing), so it can fire again.
 type ResultSlot = Rc<RefCell<Option<ResultCallback>>>;
 
 /// A builder for an application-modal dialog window.
@@ -171,12 +175,34 @@ impl Dialog {
         self.button_id(label, label, ButtonSide::Right)
     }
 
-    /// Adds a button with an explicit id, label and side.
+    /// Adds a button with an explicit id, label and side. Clicking it fires the
+    /// result and closes the dialog; for a button that leaves the dialog open,
+    /// use [`sticky_button`](Self::sticky_button).
     pub fn button_id(mut self, id: &str, label: &str, side: ButtonSide) -> Self {
         self.buttons.push(DialogButton {
             id: id.to_owned(),
             label: label.to_owned(),
             side,
+            keep_open: false,
+        });
+        self
+    }
+
+    /// Adds a "sticky" button: identical to [`button_id`](Self::button_id) except
+    /// that clicking it fires the result callback with its id **without closing
+    /// the dialog**, so the dialog survives the click and the button can be
+    /// pressed again. Use it for in-dialog actions that shouldn't dismiss the
+    /// dialog (copy a value, apply a change, open a file picker). Because such a
+    /// button can fire repeatedly, the result callback may run more than once —
+    /// see [`on_result`](Self::on_result). `default_button`/`cancel_button`
+    /// (Enter/Esc) always close, so pointing them at a sticky button is not
+    /// recommended.
+    pub fn sticky_button(mut self, id: &str, label: &str, side: ButtonSide) -> Self {
+        self.buttons.push(DialogButton {
+            id: id.to_owned(),
+            label: label.to_owned(),
+            side,
+            keep_open: true,
         });
         self
     }
@@ -197,7 +223,9 @@ impl Dialog {
 
     /// Sets the callback invoked with the pressed button's id when the dialog
     /// is dismissed by a button (or by Enter/Esc mapped to one). It runs
-    /// against the dialog's own `UI`, just before the window closes.
+    /// against the dialog's own `UI`, just before the window closes. A
+    /// [`sticky_button`](Self::sticky_button) invokes it too, but without closing
+    /// — so with sticky buttons the callback may run more than once.
     pub fn on_result(mut self, f: impl FnMut(&mut UI, &str) + 'static) -> Self {
         self.on_result = Some(Box::new(f));
         self
@@ -362,10 +390,15 @@ fn wire(
         if let Some(view) = ui.get_view(&button.id) {
             let slot = Rc::clone(slot);
             let id = button.id.clone();
+            let keep_open = button.keep_open;
             view.borrow_mut().on_event(
                 EventType::Click,
                 Box::new(move |dlg_ui, _, _| {
-                    fire_and_close(&slot, dlg_ui, &id);
+                    if keep_open {
+                        fire(&slot, dlg_ui, &id);
+                    } else {
+                        fire_and_close(&slot, dlg_ui, &id);
+                    }
                     true
                 }),
             );
@@ -405,6 +438,19 @@ fn fire_and_close(slot: &ResultSlot, ui: &mut UI, id: &str) {
         callback(ui, id);
     }
     ui.close_window();
+}
+
+/// Fires the result with `id` for a sticky button, leaving the dialog open. The
+/// callback is taken out for the call and put back afterwards (mirroring the
+/// shortcut dispatcher) so the borrow is not held across user code and the
+/// button can fire again. A no-op once a closing button has consumed the slot.
+fn fire(slot: &ResultSlot, ui: &mut UI, id: &str) {
+    let taken = slot.borrow_mut().take();
+    if let Some(mut callback) = taken {
+        callback(ui, id);
+        // Restore only if a re-entrant close didn't already take/replace it.
+        slot.borrow_mut().get_or_insert(callback);
+    }
 }
 
 fn make_frame(direction: &str, width: &str) -> Element {
@@ -507,5 +553,36 @@ mod tests {
         ok.borrow().fire_event(&mut ui, EventType::Click, &EventData::None);
         ok.borrow().fire_event(&mut ui, EventType::Click, &EventData::None);
         assert_eq!(*count.borrow(), 1);
+    }
+
+    /// A sticky button fires the result without closing and can fire repeatedly;
+    /// a normal button afterwards still fires once and closes.
+    #[test]
+    fn sticky_button_fires_without_closing() {
+        let hits: Rc<RefCell<Vec<String>>> = Rc::new(RefCell::new(Vec::new()));
+        let sink = Rc::clone(&hits);
+        let (mut ui, _title, _w, _h) = Dialog::new("Sticky")
+            .message("Body")
+            .sticky_button("copy", "Copy", ButtonSide::Left)
+            .button("Close")
+            .size(320, 160)
+            .on_result(move |_ui, id| sink.borrow_mut().push(id.to_owned()))
+            .build_window();
+
+        // Two clicks on the sticky button fire twice and leave the dialog open.
+        let copy = ui.get_view("copy").unwrap();
+        copy.borrow().fire_event(&mut ui, EventType::Click, &EventData::None);
+        copy.borrow().fire_event(&mut ui, EventType::Click, &EventData::None);
+        assert_eq!(*hits.borrow(), vec!["copy".to_owned(), "copy".to_owned()]);
+        assert!(!ui.take_close_request());
+
+        // A normal button still fires once and requests the close.
+        let close = ui.get_view("Close").unwrap();
+        close.borrow().fire_event(&mut ui, EventType::Click, &EventData::None);
+        assert_eq!(
+            *hits.borrow(),
+            vec!["copy".to_owned(), "copy".to_owned(), "Close".to_owned()]
+        );
+        assert!(ui.take_close_request());
     }
 }

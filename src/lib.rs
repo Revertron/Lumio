@@ -40,7 +40,7 @@ pub use app::WindowConfig;
 // is windowing-neutral and stays available to headless embedders.
 #[cfg(any(feature = "backend-gl", feature = "backend-software"))]
 pub use app::run;
-mod clipboard;
+pub mod clipboard;
 pub mod common;
 pub mod input;
 pub mod text;

@@ -553,6 +553,7 @@ impl View for Frame {
     }
 
     fn on_mouse_button_up(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
+        let hit = self.state.borrow().rect.hit((position.x, position.y));
         let position = (position.x - self.state.borrow().rect.min.x, position.y - self.state.borrow().rect.min.y);
         for v in self.views.iter().rev() {
             {
@@ -564,6 +565,11 @@ impl View for Frame {
             if v.borrow().on_mouse_button_up(ui, Point::from(position), button) {
                 return true;
             }
+        }
+        // A Frame with its own Click listener is a click target when no child
+        // consumed the release (e.g. a clickable header bar).
+        if hit && matches!(button, MouseButton::Left) && self.has_listener(EventType::Click) {
+            return self.fire_event(ui, EventType::Click, &EventData::None);
         }
         false
     }

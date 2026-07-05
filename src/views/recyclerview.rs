@@ -798,15 +798,96 @@ impl RecyclerView {
         *scroll = (*scroll + delta).clamp(-max, 0);
     }
 
-    /// Get item at position
+    /// Adapter position of the item under absolute window coordinates —
+    /// e.g. the `Position` payload of a `ContextMenu` event. `None` when the
+    /// point is outside every attached item. Rects are parent-relative, so
+    /// the window coordinates are translated down the ancestor chain first.
+    pub fn item_at(&self, x: i32, y: i32) -> Option<usize> {
+        let (mut ox, mut oy) = {
+            let r = self.state.borrow().rect;
+            (r.min.x, r.min.y)
+        };
+        let mut parent = self.get_parent();
+        while let Some(p) = parent {
+            let r = p.borrow().get_rect();
+            ox += r.min.x;
+            oy += r.min.y;
+            parent = p.borrow().get_parent();
+        }
+        self.get_item_at_position(x - ox, y - oy)
+    }
+
+    /// Get item at position (view-local coordinates). Holder rects live in
+    /// content space, so the point is translated first.
     fn get_item_at_position(&self, x: i32, y: i32) -> Option<usize> {
+        let (cx, cy) = self.local_to_content(x, y);
         for holder in self.attached_holders.borrow().iter() {
             let rect = holder.item_view.borrow().get_rect();
-            if rect.hit((x, y)) {
+            if rect.hit((cx, cy)) {
                 return Some(holder.get_position());
             }
         }
         None
+    }
+
+    /// Translate view-local coordinates into item content space — the inverse
+    /// of the padding + scroll translation `paint` applies to holder rects.
+    fn local_to_content(&self, x: i32, y: i32) -> (i32, i32) {
+        let padding = self.get_padding(self.state.borrow().scale);
+        (
+            x - padding.left - *self.scroll_x.borrow(),
+            y - padding.top - *self.scroll_y.borrow(),
+        )
+    }
+
+    /// Dispatch a Click to the deepest view inside the item under `(cx, cy)`
+    /// (content space) that has a Click listener. Returns true when a listener
+    /// consumed the click — the row-level `on_item_click` should then be
+    /// skipped. This is what lets per-row buttons inside recycled item layouts
+    /// receive clicks.
+    ///
+    /// NOTE for listeners: dispatch still holds borrows up the view tree, so
+    /// a listener must not `borrow_mut()` this RecyclerView or its ancestors
+    /// directly — defer via `ui.handle().run_on_ui_thread(..)` instead.
+    fn fire_child_click(&self, ui: &mut UI, cx: i32, cy: i32) -> bool {
+        let item = self
+            .attached_holders
+            .borrow()
+            .iter()
+            .find(|h| h.item_view.borrow().get_rect().hit((cx, cy)))
+            .map(|h| h.item_view.clone());
+        match item {
+            Some(item) => Self::click_descend(ui, &item, cx, cy),
+            None => false,
+        }
+    }
+
+    /// Depth-first Click dispatch; `(px, py)` is in the view's parent space.
+    fn click_descend(ui: &mut UI, view: &Element, px: i32, py: i32) -> bool {
+        {
+            let v = view.borrow();
+            if v.get_visibility() != Visibility::Visible || !v.get_rect().hit((px, py)) {
+                return false;
+            }
+        }
+        let rect = view.borrow().get_rect();
+        let (lx, ly) = (px - rect.min.x, py - rect.min.y);
+        let children = view
+            .borrow()
+            .as_container()
+            .map(|c| c.get_views())
+            .unwrap_or_default();
+        for child in children.iter().rev() {
+            if Self::click_descend(ui, child, lx, ly) {
+                return true;
+            }
+        }
+        let v = view.borrow();
+        if v.has_listener(EventType::Click) {
+            v.fire_event(ui, EventType::Click, &EventData::Position { x: lx, y: ly })
+        } else {
+            false
+        }
     }
 
     /// Internal: Recycle off-screen views and bind visible ones
@@ -1256,7 +1337,7 @@ impl View for RecyclerView {
         *self.needs_layout.borrow()
     }
 
-    fn on_mouse_button_down(&self, _ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_down(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
         if !self.state.borrow().rect.hit((position.x, position.y)) {
             return false;
@@ -1273,9 +1354,13 @@ impl View for RecyclerView {
             if let Some(pos) = self.get_item_at_position(local_x, local_y) {
                 *self.selected_position.borrow_mut() = Some(pos);
 
-                if let Some(ref callback) = *self.on_item_click.borrow() {
-                    callback(pos);
-                }
+                // Child views with Click listeners (per-row buttons) get first
+                // shot; the row-level callback fires only when none consumed it.
+                let (cx, cy) = self.local_to_content(local_x, local_y);
+                if !self.fire_child_click(ui, cx, cy)
+                    && let Some(ref callback) = *self.on_item_click.borrow() {
+                        callback(pos);
+                    }
             }
 
             return true;
