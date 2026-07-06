@@ -98,6 +98,7 @@ pub struct Dialog {
     typeface: Typeface,
     size: Option<(u32, u32)>,
     resizable: bool,
+    modal: bool,
     on_result: Option<ResultCallback>,
 }
 
@@ -116,8 +117,17 @@ impl Dialog {
             typeface: default_typeface(),
             size: None,
             resizable: false,
+            modal: true,
             on_result: None,
         }
+    }
+
+    /// Opens the dialog as a modeless child window: the main window keeps
+    /// taking input while it is open (e.g. an ongoing-call window that must
+    /// not block chatting).
+    pub fn modeless(mut self) -> Self {
+        self.modal = false;
+        self
     }
 
     /// Sets the message text shown above the buttons.
@@ -236,13 +246,14 @@ impl Dialog {
         // Dialogs are fixed by default: a fixed dialog disables resize and the
         // minimize/maximize buttons; `.resizable(true)` opens a normal window.
         let resizable = self.resizable;
+        let modal = self.modal;
         let (dialog_ui, title, width, height) = self.build_window();
         ui.open_window(WindowRequest {
             title,
             width,
             height,
             ui: dialog_ui,
-            modal: true,
+            modal,
             resizable,
             minimizable: resizable,
             maximizable: resizable,
