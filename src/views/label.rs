@@ -319,7 +319,7 @@ impl Label {
         self.state.borrow_mut().main.font_manager.set_font_style(style);
     }
 
-    fn set_font_size(&self, size: f32) {
+    pub fn set_font_size(&self, size: f32) {
         let mut state = self.state.borrow_mut();
         state.main.font_manager.set_font_size(size);
         state.cached_text = None;
