@@ -41,6 +41,17 @@ impl ImageView {
         *self.image.borrow_mut() = Some(ImageSource::new(path));
     }
 
+    /// Show an in-memory RGBA frame (live video). Reuses the existing raw
+    /// source when there is one, so per-frame updates don't reallocate the
+    /// view state; any path-based image is replaced.
+    pub fn set_raw_frame(&mut self, w: u32, h: u32, rgba: Vec<u8>) {
+        let mut image = self.image.borrow_mut();
+        match image.as_mut() {
+            Some(src) if src.is_raw() => src.set_rgba(w, h, rgba),
+            _ => *image = Some(ImageSource::from_rgba(w, h, rgba)),
+        }
+    }
+
     /// Set or clear an ARGB tint multiplied with the image at draw time. Pass
     /// `None` for no tint. Monochrome icons should be authored white to recolor.
     pub fn set_tint(&mut self, color: Option<u32>) {

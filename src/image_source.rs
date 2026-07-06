@@ -107,6 +107,37 @@ impl ImageSource {
         self.corner_radius = radius_px.max(0.0);
     }
 
+    /// An in-memory RGBA source — for live content like video frames. There
+    /// is no path or encoded form; the buffer IS the image.
+    pub fn from_rgba(w: u32, h: u32, rgba: Vec<u8>) -> Self {
+        ImageSource {
+            id: NEXT_IMAGE_ID.fetch_add(1, Ordering::Relaxed),
+            path: String::new(),
+            bytes: None,
+            is_svg: false,
+            natural_size: (w, h),
+            rasterized: Some((w, h, rgba)),
+            corner_radius: 0.0,
+            rasterized_radius: -1.0, // force the mask pass on first draw
+            loaded: true,
+        }
+    }
+
+    /// Whether this is an in-memory RGBA source (created by [`from_rgba`]).
+    pub fn is_raw(&self) -> bool {
+        self.loaded && self.bytes.is_none() && self.rasterized.is_some()
+    }
+
+    /// Replace the pixels of a raw source (the next frame). Retires the old
+    /// texture so the draw below is a cache miss.
+    pub fn set_rgba(&mut self, w: u32, h: u32, rgba: Vec<u8>) {
+        push_pending(self.id);
+        self.id = NEXT_IMAGE_ID.fetch_add(1, Ordering::Relaxed);
+        self.natural_size = (w, h);
+        self.rasterized = Some((w, h, rgba));
+        self.rasterized_radius = -1.0;
+    }
+
     /// `None` for an empty path, else `Some(ImageSource::new(path))`. For optional
     /// slots (icons) where an empty path means "no image".
     pub fn for_path(path: &str) -> Option<Self> {
@@ -168,7 +199,27 @@ impl ImageSource {
         self.ensure_loaded();
         let w = rect.width().max(0) as u32;
         let h = rect.height().max(0) as u32;
-        if self.bytes.is_none() || w == 0 || h == 0 {
+        if w == 0 || h == 0 {
+            return;
+        }
+
+        // Raw (in-memory) sources draw their buffer directly; the rounded
+        // mask is applied in source space, scaled to match the draw size.
+        if self.is_raw() {
+            if self.corner_radius > 0.0 && (self.corner_radius - self.rasterized_radius).abs() > 0.01
+                && let Some((cw, ch, rgba)) = &mut self.rasterized
+            {
+                let scale = *cw as f32 / w.max(1) as f32;
+                apply_round_mask(rgba, *cw, *ch, self.corner_radius * scale);
+                self.rasterized_radius = self.corner_radius;
+            }
+            if let Some((cw, ch, rgba)) = &self.rasterized {
+                theme.draw_raw_image_tinted(rect, rgba, (*cw, *ch), self.id, tint);
+            }
+            return;
+        }
+
+        if self.bytes.is_none() {
             return;
         }
 

@@ -123,7 +123,7 @@ mod tests {
         let fired_clone = Arc::clone(&fired);
         {
             let mut ui = test_ui();
-            ui.set_on_close(move || {
+            ui.set_on_close(move |_| {
                 fired_clone.store(true, Ordering::SeqCst);
             });
             assert!(!fired.load(Ordering::SeqCst));

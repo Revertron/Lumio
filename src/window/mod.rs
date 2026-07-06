@@ -184,9 +184,15 @@ impl App {
             return;
         };
         // Position the (still-hidden) window before revealing it, so a centered
-        // window never flashes at the corner first.
-        if pw.config.center {
+        // window never flashes at the corner first. An explicit position (a
+        // persisted window rect) wins over centering.
+        if let Some((x, y)) = pw.config.position {
+            window.set_outer_position(PhysicalPosition::new(x, y));
+        } else if pw.config.center {
             center_on_primary(event_loop, &window);
+        }
+        if pw.config.maximized {
+            window.set_maximized(true);
         }
         // Now that it's positioned, reveal it (honoring the requested visibility;
         // a tray app stays hidden until it asks to be shown).
@@ -194,7 +200,11 @@ impl App {
             window.set_visible(true);
             // Some Linux WMs ignore a position set before the window is shown;
             // re-apply it after showing (speedy2d does the same).
-            if pw.config.center {
+            if let Some((x, y)) = pw.config.position {
+                if !pw.config.maximized {
+                    window.set_outer_position(PhysicalPosition::new(x, y));
+                }
+            } else if pw.config.center {
                 center_on_primary(event_loop, &window);
             }
         }
@@ -284,6 +294,8 @@ impl App {
             match ws.ui.take_window_command() {
                 Some(WindowCommand::Show) => {
                     ws.window.set_visible(true);
+                    // Tray "show": also bring the window to front and focus it.
+                    ws.window.focus_window();
                     ws.window.request_redraw();
                 }
                 Some(WindowCommand::Hide) => ws.window.set_visible(false),
@@ -350,7 +362,16 @@ impl ApplicationHandler for App {
         {
             let Some(ws) = self.windows.get_mut(&window_id) else { return };
             match event {
-                WindowEvent::Resized(size) => ws.on_resize(size),
+                WindowEvent::Resized(size) => {
+                    let maximized = ws.window.is_maximized();
+                    ws.ui.update_window_geometry(None, Some((size.width, size.height)), maximized);
+                    ws.on_resize(size)
+                }
+                WindowEvent::Moved(pos) => {
+                    let maximized = ws.window.is_maximized();
+                    ws.ui.update_window_geometry(Some((pos.x, pos.y)), None, maximized);
+                }
+                WindowEvent::Focused(focused) => ws.ui.set_window_focused(focused),
                 WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
                     ws.scale = scale_factor;
                     ws.pending_layout = true;

@@ -114,7 +114,7 @@ impl UiHandle {
 impl Drop for UI {
     fn drop(&mut self) {
         if let Some(on_close) = self.on_close.take() {
-            on_close();
+            on_close(self);
         }
     }
 }
@@ -194,7 +194,14 @@ pub struct UI {
     deferred_events: Vec<(String, EventType, EventData)>,
     /// Runs once when this UI is dropped (the window handler is dropped on
     /// window close). Set it on the main window's UI for app shutdown work.
-    on_close: Option<Box<dyn FnOnce()>>,
+    on_close: Option<Box<dyn FnOnce(&mut UI)>>,
+    /// Last known window geometry, kept current by the window loop:
+    /// outer position + inner size while un-maximized, plus the maximized
+    /// flag. Lets apps persist window state from `on_close`.
+    window_pos: (i32, i32),
+    window_normal_size: (u32, u32),
+    window_maximized: bool,
+    window_focused: bool,
     /// External-popups mode ([`UI::set_external_popups`]): the embedder presents
     /// non-`Transparent` overlays and the tooltip in its own surfaces — `paint()` draws the
     /// root (+ transparent overlays) only, and popup/tooltip geometry is NOT clamped to the
@@ -279,6 +286,10 @@ impl UI {
             tasks: Arc::new(Mutex::new(VecDeque::new())),
             deferred_events: Vec::new(),
             on_close: None,
+            window_pos: (0, 0),
+            window_normal_size: (0, 0),
+            window_maximized: false,
+            window_focused: true,
             external_popups: false,
             next_overlay_token: 0,
         };
@@ -526,8 +537,52 @@ impl UI {
     /// handler's close-hides policy), the X button / Escape only *hide* the
     /// window and do not drop the UI, so this fires only on a real terminate
     /// (e.g. a tray "Quit" → [`UI::request_quit`]).
-    pub fn set_on_close(&mut self, func: impl FnOnce() + 'static) {
+    pub fn set_on_close(&mut self, func: impl FnOnce(&mut UI) + 'static) {
         self.on_close = Some(Box::new(func));
+    }
+
+    /// Last known window geometry: outer position + inner size (both frozen
+    /// while the window is maximized) and the maximized flag. Kept current by
+    /// the window loop; use from `set_on_close` to persist window state.
+    pub fn window_state(&self) -> (i32, i32, u32, u32, bool) {
+        (
+            self.window_pos.0,
+            self.window_pos.1,
+            self.window_normal_size.0,
+            self.window_normal_size.1,
+            self.window_maximized,
+        )
+    }
+
+    /// Whether this UI's window currently has input focus (kept current by
+    /// the window loop). Lets apps suppress notifications for the open chat.
+    pub fn window_focused(&self) -> bool {
+        self.window_focused
+    }
+
+    /// Window-loop plumbing for [`UI::window_focused`] — not for app code.
+    #[doc(hidden)]
+    pub fn set_window_focused(&mut self, focused: bool) {
+        self.window_focused = focused;
+    }
+
+    /// Window-loop plumbing for [`UI::window_state`] — not for app code.
+    #[doc(hidden)]
+    pub fn update_window_geometry(
+        &mut self,
+        pos: Option<(i32, i32)>,
+        size: Option<(u32, u32)>,
+        maximized: bool,
+    ) {
+        self.window_maximized = maximized;
+        if !maximized {
+            if let Some(p) = pos {
+                self.window_pos = p;
+            }
+            if let Some(s) = size {
+                self.window_normal_size = s;
+            }
+        }
     }
 
     pub fn layout(&mut self, width: u32, height: u32, scale: f64) {

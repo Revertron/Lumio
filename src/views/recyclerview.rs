@@ -1153,8 +1153,13 @@ impl View for RecyclerView {
         theme.push_clip();
         theme.clip_rect(rect);
 
-        // Step 1: Draw background (before items)
-        theme.draw_component("edit.back", rect, self.get_state().unwrap());
+        // Step 1: Draw background (before items). An explicit `background`
+        // attribute overrides the default sunken-edit surface, letting apps
+        // give a list its own pane color (e.g. a chat timeline).
+        match self.get_background() {
+            Some(color) => theme.draw_rect(rect, color),
+            None => theme.draw_component("edit.back", rect, self.get_state().unwrap()),
+        }
 
         let padding = self.get_padding(self.state.borrow().scale);
         let scroll_x = *self.scroll_x.borrow();

@@ -32,6 +32,11 @@ pub struct WindowConfig {
     pub logical_size: bool,
     /// Center the window on the primary monitor at creation (default `false`).
     pub center: bool,
+    /// Explicit initial outer position (physical pixels). Takes precedence
+    /// over `center`. Use to restore a persisted window position.
+    pub position: Option<(i32, i32)>,
+    /// Start the window maximized (default `false`).
+    pub maximized: bool,
     /// Whether the window is shown on creation (default `true`). Start hidden
     /// for tray apps that boot minimized.
     pub visible: bool,
@@ -59,6 +64,8 @@ impl WindowConfig {
             height,
             logical_size: false,
             center: false,
+            position: None,
+            maximized: false,
             visible: true,
             hide_on_close: false,
             resizable: true,
@@ -77,6 +84,19 @@ impl WindowConfig {
     /// Center the window on the primary monitor at creation.
     pub fn center(mut self) -> Self {
         self.center = true;
+        self
+    }
+
+    /// Place the window at an explicit outer position (physical pixels);
+    /// overrides `center`. Use to restore a persisted window position.
+    pub fn position(mut self, x: i32, y: i32) -> Self {
+        self.position = Some((x, y));
+        self
+    }
+
+    /// Start the window maximized.
+    pub fn maximized(mut self, value: bool) -> Self {
+        self.maximized = value;
         self
     }
 

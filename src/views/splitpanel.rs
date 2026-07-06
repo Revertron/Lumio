@@ -56,6 +56,7 @@ pub struct SplitPanel {
     needs_relayout: Cell<bool>,
     last_typeface: RefCell<Option<Typeface>>,
     last_layout: Cell<(i32, i32, i32, i32)>,
+    last_scale: Cell<f64>,
 }
 
 impl HasMainFields for SplitPanel {
@@ -73,6 +74,13 @@ impl SplitPanel {
 
     fn set_font_style(&mut self, style: &str) {
         self.state.borrow_mut().font_manager.set_font_style(style);
+    }
+
+    /// Current split position in logical (unscaled) pixels — the same unit
+    /// the XML `split_pos` attribute uses. Lets apps persist a dragged split.
+    pub fn split_dip(&self) -> i32 {
+        let scale = self.last_scale.get().max(0.01);
+        (self.split_pos_px.get() as f64 / scale).round() as i32
     }
 
     /// Get the divider rect in local coordinates (relative to the panel's own rect)
@@ -231,6 +239,7 @@ impl View for SplitPanel {
         };
         let split = split.max(min_pane).min(available - min_pane);
         self.split_pos_px.set(split);
+        self.last_scale.set(scale);
 
         // Store for relayout during drag
         *self.last_typeface.borrow_mut() = Some(typeface.clone());
@@ -711,6 +720,7 @@ impl Default for SplitPanel {
             views: Vec::new(),
             split_pos: Cell::new(SplitPos::default()),
             split_pos_px: Cell::new(0),
+            last_scale: Cell::new(1.0),
             divider_size: Cell::new(DEFAULT_DIVIDER_SIZE),
             divider_dragging: Cell::new(false),
             drag_start_mouse: Cell::new(0),
