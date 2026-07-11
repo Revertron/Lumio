@@ -6,6 +6,9 @@ authors = ["Revertron <lumio@revertron.com>"]
 description = "A declarative, XML-based retained-mode GUI toolkit for Rust desktop apps (GL or software rendering backend)"
 keywords = ["gui", "ui", "xml", "desktop", "framework"]
 categories = ["gui", "rendering"]
+license = "MIT"
+repository = "https://github.com/Revertron/Lumio"
+readme = "README.md"
 
 [features]
 default = ["backend-gl"]
@@ -36,12 +39,13 @@ system-fonts = ["dep:font-kit"]
 clipboard = ["dep:arboard"]
 
 [dependencies]
-quick-xml = "0.40.1"
+quick-xml = "0.41.0"
 downcast-rs = "2.0.2"
 # speedy2d is used as a pure GL renderer: `windowing` (winit/glutin) is off;
 # `image-loading` stays on for `Classic`'s texture decoding. Lumio owns the
 # window + GL context (see the `dep:glutin*` deps below).
-speedy2d = { git="https://github.com/Revertron/Speedy2D", rev="4304b683", optional = true, default-features = false, features = ["image-loading"] }
+# Published fork of speedy2d, pulled in under the `speedy2d` name via `package`.
+speedy2d = { package = "speedy2d-rev", version = "1.0.0", optional = true, default-features = false, features = ["image-loading"] }
 image = "0.25.10"
 rand = "0.8.6"
 arboard = { version = "3", optional = true }

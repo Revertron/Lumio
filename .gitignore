@@ -4,3 +4,5 @@
 _other/
 .claude/
 *.log
+# headless_render example output
+/headless_out.png
