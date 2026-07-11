@@ -6,8 +6,10 @@ Lumio lets you describe a window's UI in XML, load it into a retained view tree,
 wire up event handlers in Rust, and run it — on either an OpenGL or a pure-CPU
 rendering backend, selected at compile time with no source changes.
 
-> **Status:** early-stage and in active development. Not yet published to
-> crates.io; use it as a path/git dependency. APIs may still shift.
+> **Status:** early-stage and in active development. Published on crates.io as
+> [`lumio-gui`](https://crates.io/crates/lumio-gui) (the `lumio` name was taken);
+> the library itself is still `lumio`, so you `use lumio::…` in code. APIs may
+> still shift.
 
 ## Highlights
 
@@ -43,11 +45,11 @@ from a software build. Design notes: `docs/unified_window_loop.md`.
 ## Quick start
 
 ```toml
-# Cargo.toml — not yet on crates.io, so use a path (or git) dependency.
+# Cargo.toml — the crate is published as `lumio-gui`, but imported as `lumio`.
 [dependencies]
-lumio = { path = "../lumio" }                 # GL backend (default)
+lumio-gui = "0.1"                             # GL backend (default)
 # software backend instead:
-# lumio = { path = "../lumio", default-features = false, features = ["backend-software"] }
+# lumio-gui = { version = "0.1", default-features = false, features = ["backend-software"] }
 ```
 
 ```rust

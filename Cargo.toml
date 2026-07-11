@@ -1,5 +1,5 @@
 [package]
-name = "lumio"
+name = "lumio-gui"
 version = "0.1.0"
 edition = "2024"
 authors = ["Revertron <lumio@revertron.com>"]
@@ -9,6 +9,11 @@ categories = ["gui", "rendering"]
 license = "MIT"
 repository = "https://github.com/Revertron/Lumio"
 readme = "README.md"
+
+# Published on crates.io as `lumio-gui` (the plain `lumio` name is taken), but the
+# library keeps the `lumio` name: consumers add `lumio-gui` yet still `use lumio::…`.
+[lib]
+name = "lumio"
 
 [features]
 default = ["backend-gl"]
