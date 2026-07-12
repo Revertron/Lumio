@@ -60,7 +60,7 @@ struct PopupEntry {
 /// One overlay's geometry for an embedder that presents overlays in its own surfaces (an
 /// "external popups" host, see [`UI::set_external_popups`]). Coordinates are in window space:
 /// the overlay's on-screen rect is `(x, y, width, height)`; paint it via
-/// [`crate::render::render_overlay_to_pixmap`] and route its input through
+/// `crate::render::render_overlay_to_pixmap` (software builds) and route its input through
 /// [`UI::overlay_origin`]-translated coordinates.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OverlayDesc {
@@ -674,8 +674,8 @@ impl UI {
     /// notification stack), and popup/tooltip positions are not clamped to the window — they
     /// may extend past it. Enumerate the overlays each frame via [`UI::overlay_snapshot`] /
     /// [`UI::tooltip_snapshot`], paint them with
-    /// [`crate::render::render_overlay_to_pixmap`], and feed their input back through
-    /// window-space coordinates (surface-local + the overlay's `(x, y)`).
+    /// `crate::render::render_overlay_to_pixmap` (software builds), and feed their input back
+    /// through window-space coordinates (surface-local + the overlay's `(x, y)`).
     pub fn set_external_popups(&mut self, external: bool) {
         self.external_popups = external;
     }

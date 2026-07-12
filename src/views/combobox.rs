@@ -694,8 +694,9 @@ impl View for ComboDropdown {
             y += item_h;
         }
 
-        // Border
-        theme.draw_component("edit.body", r, state.state);
+        // Border: plain solid outline (a dropdown is a floating popup, not a
+        // sunken field).
+        theme.draw_component("popup.body", r, state.state);
 
         theme.pop_clip();
     }

@@ -11,8 +11,9 @@ files* and a handful of behavior divergences.
   `WindowConfig` is the neutral superset of window options.
 - `Theme` trait (`src/themes/mod.rs`) — the rendering abstraction;
   `UI::paint(&mut dyn Theme)` drives both.
-- `crate::text` — `TextBlock`/`TextLine`/`Glyph`/`FontHandle`/`TextShaper` with
-  an opaque per-backend draw payload.
+- `crate::text` — `TextBlock`/`TextLine`/`Glyph`/`FontHandle` with an opaque
+  per-backend draw payload; each `FontHandle` carries its backend and shapes
+  with the matching per-backend `shape` function.
 - `crate::input` — `MouseButton`/`MouseScrollDistance`/`MouseCursorType`/
   `ModifiersState`/`VirtualKeyCode`; each backend converts *into* these at its
   boundary (`input/from_speedy2d.rs`, `software_window/input_winit.rs`).

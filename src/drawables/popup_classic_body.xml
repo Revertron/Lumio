@@ -1,0 +1,13 @@
+<!-- Plain solid 1px border for popup surfaces (e.g. the ComboBox dropdown),
+     drawn after the content. Same edge offsets as the outer ring of
+     edit_field_classic_body.xml, but one flat color instead of a bevel. -->
+<selector>
+    <item>
+        <shape type="rect">
+            <stroke width="1" color="@outline" top="0"/>
+            <stroke width="1" color="@outline" bottom="1"/>
+            <stroke width="1" color="@outline" left="0"/>
+            <stroke width="1" color="@outline" right="1"/>
+        </shape>
+    </item>
+</selector>

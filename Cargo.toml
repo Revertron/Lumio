@@ -1,6 +1,6 @@
 [package]
 name = "lumio-gui"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = ["Revertron <lumio@revertron.com>"]
 description = "A declarative, XML-based retained-mode GUI toolkit for Rust desktop apps (GL or software rendering backend)"
@@ -17,12 +17,15 @@ name = "lumio"
 
 [features]
 default = ["backend-gl"]
-# Selects the rendering + text backend. Exactly one `backend-*` must be enabled.
+# Selects the rendering + text backend(s). At least one `backend-*` must be enabled.
 # Both windowed backends share the winit window loop in `src/window/`; they differ
 # only in the per-window `RenderSurface`:
 # - backend-gl: speedy2d as a GL renderer (its `windowing` feature OFF) painting
 #   `Classic`, over a glutin-created GL context Lumio owns.
 # - backend-software: tiny-skia software renderer + fontdue text, in a winit window.
+# - BOTH together: the runtime tries GL first and falls back to software rendering
+#   if GL init fails (emulated framebuffer, missing driver). LUMIO_BACKEND=gl|software
+#   forces one; see src/backend.rs.
 # The `text-*` features are the text-layer half each backend pulls in.
 backend-gl = ["text-speedy2d", "system-fonts", "clipboard",
               "dep:winit", "dep:glutin", "dep:glutin-winit", "dep:raw-window-handle"]

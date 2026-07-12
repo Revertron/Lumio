@@ -24,18 +24,19 @@ use winit::window::{Window, WindowAttributes, WindowButtons, WindowId};
 
 use self::input_winit::{key_event_to_vk, to_cursor_icon};
 #[cfg(feature = "backend-software")]
-use self::surface_software::{SoftwareBackend as Backend, SoftwareSurface as Surface};
+use self::surface_software::{SoftwareBackend, SoftwareSurface};
 #[cfg(feature = "backend-gl")]
-use self::surface_gl::{GlBackend as Backend, GlSurface as Surface};
+use self::surface_gl::{GlBackend, GlSurface};
 use crate::app::WindowConfig;
+use crate::backend::RenderBackend;
 use crate::drawing::{DrawableRegistry, Palette};
 use crate::input::{ModifiersState, MouseCursorType, VirtualKeyCode};
 use crate::types::Point;
 use crate::ui::{EscapeAction, WindowCommand, UI};
 
 /// Per-window render target: how a laid-out UI is painted into this window's
-/// backing store and presented. The backend (software / GL) chooses the concrete
-/// type via a `cfg` alias; the loop only ever calls these two methods.
+/// backing store and presented. The loop holds the concrete surfaces in the
+/// private `Surface` enum and only ever calls these two methods.
 pub trait RenderSurface {
     /// Resize the backing store to `width`×`height` physical pixels.
     fn resize(&mut self, width: u32, height: u32);
@@ -46,6 +47,73 @@ pub trait RenderSurface {
 
 /// UI update cadence (matches the GL backend's 15ms ticker).
 const TICK: Duration = Duration::from_millis(15);
+
+/// The window + surface factory for the active backend. A single-feature build
+/// compiles a one-variant enum (a zero-overhead newtype); a dual build picks
+/// the variant at runtime — GL first, with a software fallback on GL init
+/// failure (see [`App::create_surface`]).
+enum Backend {
+    #[cfg(feature = "backend-gl")]
+    Gl(GlBackend),
+    #[cfg(feature = "backend-software")]
+    Software(SoftwareBackend),
+}
+
+impl Backend {
+    fn new() -> Self {
+        match crate::backend::active_backend() {
+            #[cfg(feature = "backend-gl")]
+            RenderBackend::Gl => Backend::Gl(GlBackend::new()),
+            #[cfg(feature = "backend-software")]
+            RenderBackend::Software => Backend::Software(SoftwareBackend::new()),
+            // Reachable only when the selected backend's window feature isn't
+            // compiled in (e.g. `backend-gl` + headless `software`, forced to
+            // Software) — a clear panic beats opening the wrong renderer.
+            #[allow(unreachable_patterns)]
+            other => panic!("render backend {other:?} is not compiled into this binary"),
+        }
+    }
+
+    fn create(&mut self, event_loop: &ActiveEventLoop, attrs: WindowAttributes) -> Option<(Rc<Window>, Surface)> {
+        match self {
+            #[cfg(feature = "backend-gl")]
+            Backend::Gl(b) => b.create(event_loop, attrs).map(|(w, s)| (w, Surface::Gl(s))),
+            #[cfg(feature = "backend-software")]
+            Backend::Software(b) => b.create(event_loop, attrs).map(|(w, s)| (w, Surface::Software(s))),
+        }
+    }
+}
+
+/// Per-window render surface for the active backend; delegates
+/// [`RenderSurface`] to the wrapped concrete surface. The variant size
+/// difference in dual builds is irrelevant: one instance per open window.
+#[allow(clippy::large_enum_variant)]
+enum Surface {
+    #[cfg(feature = "backend-gl")]
+    Gl(GlSurface),
+    #[cfg(feature = "backend-software")]
+    Software(SoftwareSurface),
+}
+
+impl RenderSurface for Surface {
+    fn resize(&mut self, width: u32, height: u32) {
+        match self {
+            #[cfg(feature = "backend-gl")]
+            Surface::Gl(s) => s.resize(width, height),
+            #[cfg(feature = "backend-software")]
+            Surface::Software(s) => s.resize(width, height),
+        }
+    }
+
+    fn paint(&mut self, ui: &UI, palette: &Palette, registry: &DrawableRegistry, scale: f64) {
+        match self {
+            #[cfg(feature = "backend-gl")]
+            Surface::Gl(s) => s.paint(ui, palette, registry, scale),
+            #[cfg(feature = "backend-software")]
+            Surface::Software(s) => s.paint(ui, palette, registry, scale),
+        }
+    }
+}
 
 /// A window awaiting creation (the main window before `resumed`, or a child from
 /// `take_window_requests`). Wraps the public [`WindowConfig`] (title/size/center/
@@ -180,7 +248,7 @@ impl App {
         // The backend creates the window and its render surface together: the GL
         // backend must create the window alongside a matching GL config, so window
         // creation can't be hoisted out of the backend.
-        let Some((window, surface)) = self.backend.create(event_loop, attrs) else {
+        let Some((window, surface)) = self.create_surface(event_loop, attrs) else {
             return;
         };
         // Position the (still-hidden) window before revealing it, so a centered
@@ -241,6 +309,34 @@ impl App {
             self.modal_stack.push(id);
         }
         self.windows.insert(id, ws);
+    }
+
+    /// Create a window + render surface with the active backend. In a
+    /// dual-backend build, a GL failure at the FIRST window falls back to
+    /// software rendering for the whole app (unless `LUMIO_BACKEND=gl` pins
+    /// GL). The decision is made before the first `ui.layout(..)`, so all fonts
+    /// and text are shaped by the backend that will draw them.
+    fn create_surface(&mut self, event_loop: &ActiveEventLoop, attrs: WindowAttributes) -> Option<(Rc<Window>, Surface)> {
+        #[cfg(all(feature = "backend-gl", feature = "backend-software"))]
+        {
+            let first = self.main_window.is_none();
+            let result = self.backend.create(event_loop, attrs.clone());
+            if result.is_some() || !first || !matches!(self.backend, Backend::Gl(_)) {
+                return result;
+            }
+            if crate::backend::env_backend() == Some(RenderBackend::Gl) {
+                eprintln!("window: GL init failed and LUMIO_BACKEND=gl forbids the software fallback");
+                return None;
+            }
+            eprintln!("window: OpenGL initialization failed; falling back to software rendering");
+            crate::backend::set_active_backend(RenderBackend::Software);
+            self.backend = Backend::Software(SoftwareBackend::new());
+            self.backend.create(event_loop, attrs)
+        }
+        #[cfg(not(all(feature = "backend-gl", feature = "backend-software")))]
+        {
+            self.backend.create(event_loop, attrs)
+        }
     }
 
     /// Close a window. Closing the main window (or the last window) exits.

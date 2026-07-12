@@ -1347,7 +1347,7 @@ dependencies = [
 
 [[package]]
 name = "lumio-gui"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "arboard",
  "downcast-rs 2.0.2",

@@ -50,6 +50,7 @@ impl DrawableRegistry {
         self.load_drawable("scrollbar.arrow.left", include_str!("../drawables/scrollbar_classic_arrow_left.xml"));
         self.load_drawable("scrollbar.arrow.right", include_str!("../drawables/scrollbar_classic_arrow_right.xml"));
         self.load_drawable("menu.arrow", include_str!("../drawables/menu_classic_arrow.xml"));
+        self.load_drawable("popup.body", include_str!("../drawables/popup_classic_body.xml"));
     }
 
     /// Load a single drawable from XML string

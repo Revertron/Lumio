@@ -151,8 +151,9 @@ fn family_name_for(name: &str) -> FamilyName {
 // speedy2d text backend: build `FontFamily` from the resolved bytes.
 // ---------------------------------------------------------------------------
 #[cfg(feature = "text-speedy2d")]
-mod backend {
+mod backend_speedy {
     use super::*;
+    use crate::text::BackendFont;
     use speedy2d::font::{Font, FontFamily};
 
     thread_local! {
@@ -167,7 +168,7 @@ mod backend {
     pub(super) fn get_font_family(name: &str, style: FontStyle) -> Option<FontHandle> {
         let key = (name.to_owned(), style);
         if let Some(fam) = FAMILIES.with(|c| c.borrow().get(&key).cloned()) {
-            return Some(FontHandle::new(fam));
+            return Some(FontHandle::new(BackendFont::Speedy(fam)));
         }
 
         let mut chain = vec![resolve_primary(name, style)?];
@@ -182,7 +183,7 @@ mod backend {
 
         let fam = FontFamily::new(chain);
         FAMILIES.with(|c| c.borrow_mut().insert(key, fam.clone()));
-        Some(FontHandle::new(fam))
+        Some(FontHandle::new(BackendFont::Speedy(fam)))
     }
 
     fn resolve_primary(name: &str, style: FontStyle) -> Option<Font> {
@@ -200,8 +201,9 @@ mod backend {
 // fontdue software text backend: build `Rc<Vec<fontdue::Font>>` from the bytes.
 // ---------------------------------------------------------------------------
 #[cfg(feature = "text-software")]
-mod backend {
+mod backend_soft {
     use super::*;
+    use crate::text::BackendFont;
     use std::rc::Rc;
     use fontdue::{Font, FontSettings};
 
@@ -216,7 +218,7 @@ mod backend {
     pub(super) fn get_font_family(name: &str, style: FontStyle) -> Option<FontHandle> {
         let key = (name.to_owned(), style);
         if let Some(fam) = FAMILIES.with(|c| c.borrow().get(&key).cloned()) {
-            return Some(FontHandle::new(fam));
+            return Some(FontHandle::new(BackendFont::Soft(fam)));
         }
 
         let mut chain = vec![build_font(name, style)?];
@@ -231,7 +233,7 @@ mod backend {
 
         let fam = Rc::new(chain);
         FAMILIES.with(|c| c.borrow_mut().insert(key, Rc::clone(&fam)));
-        Some(FontHandle::new(fam))
+        Some(FontHandle::new(BackendFont::Soft(fam)))
     }
 
     fn build_font(name: &str, style: FontStyle) -> Option<Font> {
@@ -241,14 +243,28 @@ mod backend {
 }
 
 fn clear_family_cache() {
-    backend::clear_family_cache();
+    #[cfg(feature = "text-speedy2d")]
+    backend_speedy::clear_family_cache();
+    #[cfg(feature = "text-software")]
+    backend_soft::clear_family_cache();
 }
 
 /// Returns a [`FontHandle`] whose first entry is the requested font and whose
 /// tail is the configured fallback chain (missing fonts silently dropped).
 /// Returns `None` only when the primary font cannot be resolved through any
 /// path. The wrapped object is the active text backend's font (speedy2d
-/// `FontFamily` or `Rc<Vec<fontdue::Font>>`) — an implementation detail.
+/// `FontFamily` or `Rc<Vec<fontdue::Font>>`) — an implementation detail. In
+/// dual-backend builds the backend is picked at runtime via
+/// [`crate::backend::active_backend`].
 pub fn get_font_family(name: &str, style: FontStyle) -> Option<FontHandle> {
-    backend::get_font_family(name, style)
+    match crate::backend::active_backend() {
+        #[cfg(feature = "text-speedy2d")]
+        crate::backend::RenderBackend::Gl => backend_speedy::get_font_family(name, style),
+        #[cfg(feature = "text-software")]
+        crate::backend::RenderBackend::Software => backend_soft::get_font_family(name, style),
+        // The selected backend isn't compiled in — unreachable through `run`
+        // (single-feature `active_backend` is a matching constant).
+        #[allow(unreachable_patterns)]
+        _ => None,
+    }
 }

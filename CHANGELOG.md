@@ -5,13 +5,34 @@ All notable changes to Lumio are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project aims to adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.1] - 2026-07-12
 
-This is the first changelog. It captures the 2026 development cycle, which
-turned an early retained-mode prototype into a switchable-backend desktop GUI
-toolkit. The pre-2026 foundation — the retained view tree, XML layout parsing,
-the initial widget set, and the original Win95-style `Classic` theme (then built
-directly on speedy2d) — predates this log and is treated as the starting point.
+### Changed
+
+- **ComboBox dropdown border** is now a plain 1px solid outline (new `popup.body`
+  drawable, palette `@outline`) instead of the sunken edit-field bevel.
+
+### Added
+
+- **Runtime GL → software fallback.** Enabling both backend features in one
+  binary makes the runtime try GL first and automatically fall back to software
+  rendering when GL initialization fails (VMs / emulated framebuffers).
+  `LUMIO_BACKEND=gl|software` forces a backend; `lumio::active_backend()`
+  reports the one in use.
+
+### Removed
+
+- The `TextShaper` trait (public in the `text` module, unused) — shaping is now
+  dispatched per `FontHandle`, following the backend each font was loaded for.
+
+## [0.1.0] - 2026-07-11
+
+First crates.io release (as `lumio-gui`; the library is still imported as
+`lumio`). This entry captures the 2026 development cycle, which turned an early
+retained-mode prototype into a switchable-backend desktop GUI toolkit. The
+pre-2026 foundation — the retained view tree, XML layout parsing, the initial
+widget set, and the original Win95-style `Classic` theme (then built directly
+on speedy2d) — predates this log and is treated as the starting point.
 
 ### Added
 

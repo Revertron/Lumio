@@ -15,12 +15,17 @@
 //!
 //! # Rendering backends
 //!
-//! Both backends run on one Lumio-owned winit window loop; pick one at compile
-//! time via a Cargo feature (mutually exclusive):
+//! Both backends run on one Lumio-owned winit window loop; pick them via Cargo
+//! features:
 //!
 //! - `backend-gl` (default) — OpenGL via the vendored `speedy2d`, used as a renderer.
 //! - `backend-software` — CPU rendering via `tiny-skia` + `fontdue`, plus a headless
 //!   UI → `tiny_skia::Pixmap`/PNG path (the `render` module, software only).
+//! - **Both together** — the runtime tries GL first and automatically falls back
+//!   to software rendering if GL initialization fails (e.g. a VM with only an
+//!   emulated framebuffer). The `LUMIO_BACKEND` environment variable (`gl` or
+//!   `software`) forces a backend; [`backend::active_backend`] reports the one
+//!   in use.
 //!
 //! See the README for the full widget list and a fuller tour.
 
@@ -36,6 +41,9 @@ pub use speedy2d;
 
 pub mod app;
 pub use app::WindowConfig;
+/// Runtime render-backend selection (GL → software fallback in dual builds).
+pub mod backend;
+pub use backend::{RenderBackend, active_backend};
 // `run` opens a window, so it exists only with a windowed backend; `WindowConfig`
 // is windowing-neutral and stays available to headless embedders.
 #[cfg(any(feature = "backend-gl", feature = "backend-software"))]

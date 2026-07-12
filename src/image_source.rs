@@ -123,7 +123,7 @@ impl ImageSource {
         }
     }
 
-    /// Whether this is an in-memory RGBA source (created by [`from_rgba`]).
+    /// Whether this is an in-memory RGBA source (created by [`Self::from_rgba`]).
     pub fn is_raw(&self) -> bool {
         self.loaded && self.bytes.is_none() && self.rasterized.is_some()
     }

@@ -120,13 +120,23 @@ impl<'h> Theme for Classic<'h> {
 
     fn draw_text(&mut self, x: f32, y: f32, color: u32, text: &TextBlock) {
         let color = self.color_argb(color);
-        self.graphics.draw_text((x, y), color, text.payload());
+        match text.payload() {
+            crate::text::BackendBlock::Speedy(block) => self.graphics.draw_text((x, y), color, block),
+            // Shaped by the other backend (only possible around a runtime
+            // backend switch); skip — the next layout re-shapes.
+            #[cfg(feature = "text-software")]
+            _ => {}
+        }
     }
 
     fn draw_text_cropped(&mut self, x: f32, y: f32, crop: Rect<i32>, color: u32, text: &TextBlock) {
         let crop = Rectangle::from_tuples((crop.min.x as f32, crop.min.y as f32), (crop.max.x as f32, crop.max.y as f32));
         let color = self.color_argb(color);
-        self.graphics.draw_text_cropped((x, y), crop, color, text.payload());
+        match text.payload() {
+            crate::text::BackendBlock::Speedy(block) => self.graphics.draw_text_cropped((x, y), crop, color, block),
+            #[cfg(feature = "text-software")]
+            _ => {}
+        }
     }
 
     fn draw_rect(&mut self, rect: Rect<i32>, color: u32) {

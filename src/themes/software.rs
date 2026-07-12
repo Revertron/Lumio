@@ -176,7 +176,13 @@ impl<'h> Theme for SoftwareTheme<'h> {
     }
 
     fn draw_text(&mut self, x: f32, y: f32, color: u32, text: &TextBlock) {
-        let block = text.payload();
+        let block = match text.payload() {
+            crate::text::BackendBlock::Soft(block) => block,
+            // Shaped by the other backend (only possible around a runtime
+            // backend switch); skip — the next layout re-shapes.
+            #[cfg(feature = "text-speedy2d")]
+            _ => return,
+        };
         let opacity = self.current_opacity();
         let cr = ((color >> 16) & 0xff) as u32;
         let cg = ((color >> 8) & 0xff) as u32;

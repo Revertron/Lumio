@@ -29,18 +29,18 @@ rendering backend, selected at compile time with no source changes.
 ## Rendering backends
 
 Both backends run on a single Lumio-owned `winit` window loop (`src/window/`);
-they differ only in the per-window `RenderSurface`. Pick one at compile time via a
-Cargo feature (mutually exclusive):
+they differ only in the per-window `RenderSurface`. Pick them via Cargo features:
 
 | Feature | Renderer | Notes |
 | --- | --- | --- |
 | `backend-gl` *(default)* | OpenGL via the vendored `speedy2d` used as a pure renderer, over a `glutin` GL context Lumio creates | GPU-accelerated |
 | `backend-software` | CPU rendering via `tiny-skia` + `fontdue`, blitted with `softbuffer` | also supports headless UI → `Pixmap`/PNG |
+| *both together* | GL first, **automatic software fallback** if GL init fails (VMs / emulated framebuffers) | `LUMIO_BACKEND=gl\|software` forces one; `lumio::active_backend()` reports the one in use |
 
 Apps launch with the backend-neutral `lumio::run(ui, WindowConfig)` and never name
 a backend in source — switching is a Cargo-feature change. `speedy2d` is an
 optional, renderer-only dependency (its windowing feature is off), absent entirely
-from a software build. Design notes: `docs/unified_window_loop.md`.
+from a software-only build. Design notes: `docs/unified_window_loop.md`.
 
 ## Quick start
 
@@ -50,6 +50,8 @@ from a software build. Design notes: `docs/unified_window_loop.md`.
 lumio-gui = "0.1"                             # GL backend (default)
 # software backend instead:
 # lumio-gui = { version = "0.1", default-features = false, features = ["backend-software"] }
+# GL with automatic software fallback (e.g. for apps that must run in GPU-less VMs):
+# lumio-gui = { version = "0.1", features = ["backend-software"] }
 ```
 
 ```rust
@@ -100,9 +102,14 @@ cargo run --example example
 cargo build --no-default-features --features backend-software
 cargo run --example example --no-default-features --features backend-software
 
+# both backends: GL with runtime software fallback
+cargo build --features backend-software
+LUMIO_BACKEND=software cargo run --features backend-software --example example
+
 # tests (per backend) and linter
 cargo test
 cargo test --no-default-features --features backend-software
+cargo test --features backend-software
 cargo clippy
 ```
 

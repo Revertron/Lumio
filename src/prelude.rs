@@ -7,6 +7,7 @@ pub use crate::app::WindowConfig;
 pub use crate::app::run;
 #[cfg(any(feature = "backend-gl", feature = "backend-software"))]
 pub use crate::window::run as run_software_window;
+pub use crate::backend::{RenderBackend, active_backend};
 pub use crate::traits::{View, Container, Element};
 pub use crate::events::{EventCallback, EventData, EventType};
 pub use crate::shortcut::Shortcut;

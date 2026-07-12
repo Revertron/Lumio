@@ -1,8 +1,11 @@
 //! Backend-neutral text layer.
 //!
 //! Views and the [`Theme`](crate::themes::Theme) trait depend only on the types
-//! here; the actual shaping and measurement is delegated to a backend selected
-//! at compile time (currently speedy2d, behind the `text-speedy2d` feature).
+//! here; the actual shaping and measurement is delegated to a backend — speedy2d
+//! (`text-speedy2d`) and/or fontdue (`text-software`). With both compiled in,
+//! the backend a font shapes with is decided at load time by
+//! [`crate::backend::active_backend`]; each [`FontHandle`] carries its backend,
+//! so a shaped [`TextBlock`] always matches the fonts it was shaped from.
 //!
 //! The geometry accessors deliberately mirror speedy2d's
 //! `FormattedTextBlock` / `FormattedTextLine` / `FormattedGlyph` method names
@@ -14,41 +17,38 @@
 #[cfg(feature = "text-speedy2d")]
 mod speedy;
 
-#[cfg(feature = "text-speedy2d")]
-use speedy::SHAPER as ACTIVE_SHAPER;
-
-/// The backend-specific draw payload carried by every [`TextBlock`]. Only the
-/// matching [`Theme`](crate::themes::Theme) backend reads it (via
-/// [`TextBlock::payload`]).
-#[cfg(feature = "text-speedy2d")]
-pub(crate) type BackendBlock = speedy2d::font::FormattedTextBlock;
-
-/// The backend-specific resolved font wrapped by [`FontHandle`].
-#[cfg(feature = "text-speedy2d")]
-type BackendFont = speedy2d::font::FontFamily;
-
 // --- fontdue software text backend (pulled in by `backend-software`) ---
 #[cfg(feature = "text-software")]
 mod software;
 
-#[cfg(feature = "text-software")]
-use software::SHAPER as ACTIVE_SHAPER;
-
-#[cfg(feature = "text-software")]
-pub(crate) type BackendBlock = software::SwBlock;
-
-#[cfg(feature = "text-software")]
-type BackendFont = software::SwFont;
-
 #[cfg(not(any(feature = "text-speedy2d", feature = "text-software")))]
 compile_error!(
-    "Enable exactly one rendering backend feature: `backend-gl` (default) or `backend-software`."
+    "Enable at least one rendering backend feature: `backend-gl` (default) or `backend-software`."
 );
 
-#[cfg(all(feature = "text-speedy2d", feature = "text-software"))]
-compile_error!(
-    "Enable only one rendering backend: `backend-gl` and `backend-software` are mutually exclusive."
-);
+/// The backend-specific draw payload carried by every [`TextBlock`]. Only the
+/// matching [`Theme`](crate::themes::Theme) backend reads it (via
+/// [`TextBlock::payload`]); a mismatched theme skips the block (only possible
+/// around a runtime backend switch — the next layout re-shapes). Single-backend
+/// builds compile a one-variant enum: a zero-overhead newtype.
+#[derive(Clone)]
+pub(crate) enum BackendBlock {
+    #[cfg(feature = "text-speedy2d")]
+    Speedy(speedy2d::font::FormattedTextBlock),
+    #[cfg(feature = "text-software")]
+    Soft(software::SwBlock),
+}
+
+/// The backend-specific resolved font wrapped by [`FontHandle`]. The variant
+/// decides which shaper [`FontHandle::layout_text`] uses, so a shaped block
+/// always matches its fonts.
+#[derive(Clone)]
+pub(crate) enum BackendFont {
+    #[cfg(feature = "text-speedy2d")]
+    Speedy(speedy2d::font::FontFamily),
+    #[cfg(feature = "text-software")]
+    Soft(software::SwFont),
+}
 
 /// A single laid-out glyph. `position_x` is the glyph's x offset within its
 /// line; `advance_width` is how far the pen advances past it. Mirrors
@@ -173,15 +173,14 @@ impl FontHandle {
 
     /// Lay out `text` at `size_px` (already scaled to physical pixels) with the
     /// given options. Same name/signature as speedy2d's
-    /// `FontFamily::layout_text`, so existing call sites are unchanged.
+    /// `FontFamily::layout_text`, so existing call sites are unchanged. The
+    /// shaper follows the font's backend (see `BackendFont`).
     pub fn layout_text(&self, text: &str, size_px: f32, options: TextOptions) -> TextBlock {
-        ACTIVE_SHAPER.shape(self, text, size_px, &options)
+        match &self.inner {
+            #[cfg(feature = "text-speedy2d")]
+            BackendFont::Speedy(family) => speedy::shape(family, text, size_px, &options),
+            #[cfg(feature = "text-software")]
+            BackendFont::Soft(fonts) => software::shape(fonts, text, size_px, &options),
+        }
     }
-}
-
-/// Contract implemented by each text backend: turn a font + string into a
-/// laid-out [`TextBlock`]. Exactly one implementation is selected at compile
-/// time (see the `text-speedy2d` feature).
-pub trait TextShaper {
-    fn shape(&self, font: &FontHandle, text: &str, size_px: f32, options: &TextOptions) -> TextBlock;
 }

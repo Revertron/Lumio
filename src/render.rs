@@ -13,6 +13,11 @@ use crate::ui::UI;
 /// Paint an already-laid-out `ui` into a fresh `width`×`height` pixmap at the
 /// given DPI `scale`. Returns `None` only if the pixmap could not be allocated
 /// (zero or absurd dimensions).
+///
+/// In a dual-backend build (`backend-gl` + `backend-software`), call
+/// `lumio::backend::set_render_backend(RenderBackend::Software)` **before**
+/// building and laying out the UI: text is shaped when the UI lays out, and
+/// only software-shaped text can be painted here.
 pub fn render_to_pixmap(
     ui: &UI,
     width: u32,

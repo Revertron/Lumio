@@ -28,6 +28,35 @@ const LAYOUT: &str = r#"
 </Frame>
 "#;
 
+/// Dual-backend build only: after `set_render_backend(Software)`, fonts load
+/// through the software backend and text actually renders headless. Compares
+/// against an empty-text render — if the text were shaped by the GL backend,
+/// `SoftwareTheme::draw_text` would skip it and both renders would be identical.
+#[cfg(feature = "backend-gl")]
+#[test]
+fn dual_build_software_text_renders() {
+    lumio::backend::set_render_backend(RenderBackend::Software);
+    assert_eq!(active_backend(), RenderBackend::Software);
+
+    set_provider(Box::new(Provider { dir: ASSETS }));
+    let palette = Palette::classic();
+    set_current_palette(palette.clone());
+    let registry = DrawableRegistry::new();
+
+    let (w, h) = (300u32, 100u32);
+    let render = |text: &str| {
+        let xml = format!(
+            r#"<Frame width="max" height="max" padding="10" font="Noto Sans"><Label text="{text}"/></Frame>"#
+        );
+        let mut ui = UI::from_xml(&xml, w, h, default_typeface(), 1.0).unwrap();
+        ui.layout(w, h, 1.0);
+        render_to_pixmap(&ui, w, h, 1.0, &palette, &registry).expect("pixmap").take()
+    };
+    let with_text = render("Software text");
+    let without_text = render("");
+    assert_ne!(with_text, without_text, "text did not render in the dual-backend build");
+}
+
 #[test]
 fn renders_non_blank() {
     set_provider(Box::new(Provider { dir: ASSETS }));

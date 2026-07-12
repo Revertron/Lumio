@@ -46,17 +46,29 @@ impl GlBackend {
     /// renderer. Returns `None` (logging the cause) on any GL setup failure.
     pub fn create(&mut self, event_loop: &ActiveEventLoop, attrs: WindowAttributes) -> Option<(Rc<Window>, GlSurface)> {
         let template = ConfigTemplateBuilder::new().with_alpha_size(8);
-        let (mut window, gl_config) = match DisplayBuilder::new()
-            .with_window_attributes(Some(attrs.clone()))
-            .build(event_loop, template, |configs| {
-                // Prefer the config with the most MSAA samples.
-                configs
-                    .reduce(|a, b| if b.num_samples() > a.num_samples() { b } else { a })
-                    .expect("no GL config")
-            }) {
-            Ok(r) => r,
-            Err(e) => {
+        // glutin-winit's config picker must return a `Config` by value, so an
+        // empty config list (e.g. a VM with only an emulated framebuffer) can
+        // only surface as a panic — catch it and fail gracefully like every
+        // other GL setup error, so a dual-backend build can fall back to
+        // software rendering.
+        let built = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            DisplayBuilder::new()
+                .with_window_attributes(Some(attrs.clone()))
+                .build(event_loop, template, |configs| {
+                    // Prefer the config with the most MSAA samples.
+                    configs
+                        .reduce(|a, b| if b.num_samples() > a.num_samples() { b } else { a })
+                        .expect("no GL config")
+                })
+        }));
+        let (mut window, gl_config) = match built {
+            Ok(Ok(r)) => r,
+            Ok(Err(e)) => {
                 eprintln!("window: GL display build failed: {e}");
+                return None;
+            }
+            Err(_) => {
+                eprintln!("window: no suitable GL config found");
                 return None;
             }
         };
@@ -87,7 +99,13 @@ impl GlBackend {
             },
         };
 
-        let surf_attrs = window.build_surface_attributes(SurfaceAttributesBuilder::default()).ok()?;
+        let surf_attrs = match window.build_surface_attributes(SurfaceAttributesBuilder::default()) {
+            Ok(a) => a,
+            Err(e) => {
+                eprintln!("window: build_surface_attributes failed: {e}");
+                return None;
+            }
+        };
         let surface = match unsafe { gl_display.create_window_surface(&gl_config, &surf_attrs) } {
             Ok(s) => s,
             Err(e) => {

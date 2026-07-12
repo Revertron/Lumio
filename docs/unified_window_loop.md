@@ -124,7 +124,9 @@ the move takes on.
    policy, command pump) + `surface_software.rs` (`SoftwareBackend` +
    `SoftwareSurface: RenderSurface`, the only place softbuffer/tiny-skia is
    touched) + the moved `input_winit.rs`. `WindowState` now holds a `Surface`
-   (cfg alias) instead of inline pixmap/caches; rendering is `surface.paint(...)`.
+   (then a cfg alias; today an enum over the compiled backends, enabling the
+   runtime GL → software fallback) instead of inline pixmap/caches; rendering
+   is `surface.paint(...)`.
    Still gated `backend-software`. No behavior change: GL + software both build,
    all 78 software tests pass, and `software_window_example` opens + renders a
    real window without crashing. References updated in `lib.rs`/`app.rs`/`prelude.rs`.
