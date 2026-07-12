@@ -74,6 +74,18 @@ impl List {
         None
     }
 
+    pub fn get_selected(&self) -> Option<usize> {
+        *self.selected.borrow()
+    }
+
+    pub fn item_count(&self) -> usize {
+        self.items.borrow().len()
+    }
+
+    pub fn item_text(&self, index: usize) -> Option<String> {
+        self.items.borrow().get(index).cloned()
+    }
+
     pub fn select_item(&self, index: usize) -> bool {
         if index > self.items.borrow().len() {
             return false;
@@ -310,6 +322,22 @@ impl View for List {
     fn get_tooltip(&self) -> Option<String> {
         self.base_get_tooltip()
     }
+
+    fn get_content_description(&self) -> Option<String> {
+        self.base_get_content_description()
+    }
+
+    fn set_content_description(&mut self, description: Option<String>) {
+        self.base_set_content_description(description);
+    }
+
+    fn get_labelled_by(&self) -> Option<String> {
+        self.base_get_labelled_by()
+    }
+
+    fn set_labelled_by(&mut self, view_id: Option<String>) {
+        self.base_set_labelled_by(view_id);
+    }
     fn set_tooltip(&mut self, tooltip: Option<String>) {
         self.base_set_tooltip(tooltip);
     }
@@ -352,13 +380,46 @@ impl View for List {
         self.base_fire_event(ui, event, data)
     }
 
+    fn accessibility_node(&self) -> accesskit::Node {
+        accesskit::Node::new(accesskit::Role::ListBox)
+    }
+
+    fn accessibility_children(&self) -> Vec<(accesskit::NodeId, accesskit::Node)> {
+        let id = self.get_id();
+        let selected = *self.selected.borrow();
+        let scroll_y = *self.scroll_y.borrow();
+        let width = self.get_rect_width();
+        let texts = self.texts.borrow();
+        let mut result = Vec::new();
+        let mut yy = 0;
+        for (i, item) in self.items.borrow().iter().enumerate() {
+            let height = texts.get(i)
+                .and_then(|t| t.as_ref())
+                .map(|t| t.height().ceil() as i32)
+                .unwrap_or(DEFAULT_TEXT_SIZE as i32);
+            let mut node = accesskit::Node::new(accesskit::Role::ListBoxOption);
+            node.set_label(item.clone());
+            node.set_selected(selected == Some(i));
+            node.add_action(accesskit::Action::Click);
+            // View-local; the tree builder translates to window space.
+            node.set_bounds(accesskit::Rect {
+                x0: 0.0,
+                y0: (yy + scroll_y) as f64,
+                x1: width as f64,
+                y1: (yy + scroll_y + height) as f64,
+            });
+            result.push((crate::accessibility::item_node_id(&id, i), node));
+            yy += height;
+        }
+        result
+    }
+
     fn click(&self, _ui: &mut UI) -> bool {
         todo!()
     }
 
     fn on_mouse_button_down(&self, _ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
-        println!("Mouse down in {}", self.get_id());
         if self.state.borrow().rect.hit((position.x, position.y)) {
             println!("hit list");
             if matches!(button, MouseButton::Left) {

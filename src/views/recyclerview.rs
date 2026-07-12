@@ -759,6 +759,12 @@ impl RecyclerView {
         *self.needs_layout.borrow_mut() = true;
     }
 
+    /// The selected adapter position, if any (kept consistent across
+    /// insert/remove/move notifications).
+    pub fn get_selected_position(&self) -> Option<usize> {
+        *self.selected_position.borrow()
+    }
+
     /// Scroll so the item at `position` is at the top of the viewport.
     /// `scroll_y` is stored as a non-positive offset (0 = top, -max_scroll = bottom)
     /// to match the convention used by paint and the wheel handler.
@@ -1303,6 +1309,22 @@ impl View for RecyclerView {
     fn get_tooltip(&self) -> Option<String> {
         self.base_get_tooltip()
     }
+
+    fn get_content_description(&self) -> Option<String> {
+        self.base_get_content_description()
+    }
+
+    fn set_content_description(&mut self, description: Option<String>) {
+        self.base_set_content_description(description);
+    }
+
+    fn get_labelled_by(&self) -> Option<String> {
+        self.base_get_labelled_by()
+    }
+
+    fn set_labelled_by(&mut self, view_id: Option<String>) {
+        self.base_set_labelled_by(view_id);
+    }
     fn set_tooltip(&mut self, tooltip: Option<String>) {
         self.base_set_tooltip(tooltip);
     }
@@ -1330,6 +1352,32 @@ impl View for RecyclerView {
 
     fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool {
         self.base_fire_event(ui, event, data)
+    }
+
+    fn accessibility_node(&self) -> accesskit::Node {
+        let mut node = accesskit::Node::new(accesskit::Role::List);
+        if let Some(adapter) = self.adapter.borrow().as_ref() {
+            node.set_size_of_set(adapter.get_item_count());
+        }
+        node
+    }
+
+    /// Expose the currently realized rows (RecyclerView is virtualized: only
+    /// attached holders exist as views). Their rects are content-space, so
+    /// the offset carries padding + scroll, mirroring paint.
+    fn accessibility_child_elements(&self) -> Vec<(Element, Point<i32>)> {
+        let padding = self.get_padding(self.state.borrow().scale);
+        let offset = Point::new(
+            padding.left + *self.scroll_x.borrow(),
+            padding.top + *self.scroll_y.borrow(),
+        );
+        let mut holders: Vec<(usize, Element)> = self.attached_holders.borrow()
+            .iter()
+            .map(|h| (h.get_position(), Rc::clone(&h.item_view)))
+            .collect();
+        // Attachment order is recycling order; ATs want adapter order.
+        holders.sort_by_key(|(position, _)| *position);
+        holders.into_iter().map(|(_, element)| (element, offset)).collect()
     }
 
     fn click(&self, _ui: &mut UI) -> bool {

@@ -458,6 +458,51 @@ impl UI {
         }
     }
 
+    /// The root element of the view tree, for the accessibility tree builder.
+    pub(crate) fn root_element(&self) -> Option<Element> {
+        self.root.clone()
+    }
+
+    /// Overlay elements with their window-space origins (bottom-to-top order),
+    /// for the accessibility tree builder. Child rects inside an overlay are
+    /// parent-relative; the returned `(x, y)` is the offset its subtree is
+    /// painted and hit-tested at.
+    pub(crate) fn overlay_elements(&self) -> Vec<(Element, Point<i32>)> {
+        self.overlays.iter()
+            .map(|e| (Rc::clone(&e.element), Point::from((e.x, e.y))))
+            .collect()
+    }
+
+    /// Id of the view holding focus, as observed by the last `sync_focus()`.
+    pub(crate) fn access_focus_owner(&self) -> Option<String> {
+        self.focus_owner.clone()
+    }
+
+    /// Move keyboard focus to `element`, clearing it everywhere else (root
+    /// and overlays) and firing the usual `FocusLost`/`FocusGained` events.
+    /// The target must be focusable, enabled and visible; returns whether
+    /// focus actually changed. Used by assistive-technology focus requests;
+    /// also the programmatic-focus primitive for app code.
+    pub fn set_focus_to(&mut self, element: &Element) -> bool {
+        {
+            let view = element.borrow();
+            let focusable = view.get_state().map(|s| s.focusable && s.enabled).unwrap_or(false);
+            if !focusable || view.get_visibility() != Visibility::Visible {
+                return false;
+            }
+        }
+        // Containers cascade `set_focused(false)` to their children, so
+        // clearing the roots clears the whole tree.
+        for entry in &self.overlays {
+            entry.element.borrow().set_focused(false);
+        }
+        if let Some(root) = &self.root {
+            root.borrow().set_focused(false);
+        }
+        element.borrow().set_focused(true);
+        self.sync_focus()
+    }
+
     /// Clear the text selection in every view (overlays + root). Selectable
     /// views (`Label`, `RichText`) drop their highlight; everything else is a
     /// no-op. Called when a view starts a new selection so only one view holds

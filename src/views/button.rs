@@ -1,4 +1,4 @@
-﻿use std::cell::RefCell;
+use std::cell::RefCell;
 use std::cmp::max;
 
 use crate::text::{TextAlignment, TextOptions};
@@ -58,6 +58,10 @@ impl Button {
         let scale = self.state.borrow().main.scale;
         let single_line = self.state.borrow().single_line;
         self.layout_text(self.get_rect_width(), single_line, scale);
+    }
+
+    pub fn get_text(&self) -> String {
+        self.state.borrow().text.clone()
     }
 
     pub fn set_single_line(&self, single_line: bool) {
@@ -282,6 +286,22 @@ impl View for Button {
     fn get_tooltip(&self) -> Option<String> {
         self.base_get_tooltip()
     }
+
+    fn get_content_description(&self) -> Option<String> {
+        self.base_get_content_description()
+    }
+
+    fn set_content_description(&mut self, description: Option<String>) {
+        self.base_set_content_description(description);
+    }
+
+    fn get_labelled_by(&self) -> Option<String> {
+        self.base_get_labelled_by()
+    }
+
+    fn set_labelled_by(&mut self, view_id: Option<String>) {
+        self.base_set_labelled_by(view_id);
+    }
     fn set_tooltip(&mut self, tooltip: Option<String>) {
         self.base_set_tooltip(tooltip);
     }
@@ -327,6 +347,13 @@ impl View for Button {
     fn click(&self, ui: &mut UI) -> bool {
         if !self.base_is_enabled() { return false; }
         self.base_fire_event(ui, EventType::Click, &EventData::None)
+    }
+
+    fn accessibility_node(&self) -> accesskit::Node {
+        let mut node = accesskit::Node::new(accesskit::Role::Button);
+        node.set_label(self.get_text());
+        node.add_action(accesskit::Action::Click);
+        node
     }
 
     fn on_mouse_move(&self, _ui: &mut UI, position: Point<i32>) -> bool {

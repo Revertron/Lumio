@@ -19,7 +19,7 @@ use std::time::{Duration, Instant};
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalSize, PhysicalPosition, PhysicalSize, Size};
 use winit::event::{ElementState, WindowEvent};
-use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
 use winit::window::{Window, WindowAttributes, WindowButtons, WindowId};
 
 use self::input_winit::{key_event_to_vk, to_cursor_icon};
@@ -129,6 +129,10 @@ struct WindowState {
     window: Rc<Window>,
     surface: Surface,
     ui: UI,
+    /// Per-window AccessKit adapter: exposes this window's UI to screen
+    /// readers via the platform accessibility API. Inert (near-zero cost)
+    /// until an assistive technology actually connects.
+    access_adapter: accesskit_winit::Adapter,
     drawable_registry: DrawableRegistry,
     palette: Palette,
     width: u32,
@@ -182,6 +186,12 @@ impl WindowState {
         }
 
         self.surface.paint(&self.ui, &self.palette, &self.drawable_registry, self.scale);
+
+        // Mirror the freshly laid-out UI into the accessibility tree. Every
+        // visual change funnels through a redraw, so this keeps screen readers
+        // current; the closure only runs while one is connected.
+        let ui = &self.ui;
+        self.access_adapter.update_if_active(|| crate::accessibility::build_tree(ui));
     }
 }
 
@@ -192,6 +202,10 @@ struct App {
     modal_stack: Vec<WindowId>,
     next_tick: Instant,
     pending_main: Option<PendingWindow>,
+    /// Delivers AccessKit adapter events (initial-tree requests, AT action
+    /// requests) back to the loop as user events, keeping all accessibility
+    /// work on the main thread (the UI is `Rc`/`RefCell`, not `Send`).
+    proxy: EventLoopProxy<accesskit_winit::Event>,
     /// A child/dialog window that an Escape *press* asked to close, executed on
     /// the Escape *release*. Destroying the focused window while Esc is still
     /// physically held makes the OS move focus to the next window and
@@ -251,6 +265,11 @@ impl App {
         let Some((window, surface)) = self.create_surface(event_loop, attrs) else {
             return;
         };
+        // The AccessKit adapter must exist before the window becomes visible so
+        // no accessibility events are missed. Events it produces are marshalled
+        // to the main thread via the loop proxy (see `user_event`).
+        let access_adapter =
+            accesskit_winit::Adapter::with_event_loop_proxy(event_loop, &window, self.proxy.clone());
         // Position the (still-hidden) window before revealing it, so a centered
         // window never flashes at the corner first. An explicit position (a
         // persisted window rect) wins over centering.
@@ -290,6 +309,7 @@ impl App {
             window,
             surface,
             ui,
+            access_adapter,
             drawable_registry: DrawableRegistry::new(),
             palette: pw.config.palette,
             width: w,
@@ -412,7 +432,7 @@ impl App {
     }
 }
 
-impl ApplicationHandler for App {
+impl ApplicationHandler<accesskit_winit::Event> for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if !self.windows.is_empty() {
             return;
@@ -423,6 +443,13 @@ impl ApplicationHandler for App {
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
+        // AccessKit must see every window event before the app handles it —
+        // including the self-routed arms below and events for modal-blocked
+        // windows — so this stays the very first thing that runs.
+        if let Some(ws) = self.windows.get_mut(&window_id) {
+            ws.access_adapter.process_event(&ws.window, &event);
+        }
+
         // Self-routed events (need the window map / event loop, not a held borrow).
         match event {
             WindowEvent::RedrawRequested => {
@@ -558,6 +585,28 @@ impl ApplicationHandler for App {
         }
     }
 
+    /// AccessKit adapter events, marshalled onto the loop by the proxy given to
+    /// each per-window adapter (so all accessibility work stays on this thread).
+    fn user_event(&mut self, _event_loop: &ActiveEventLoop, event: accesskit_winit::Event) {
+        let Some(ws) = self.windows.get_mut(&event.window_id) else { return };
+        match event.window_event {
+            // A screen reader connected: it needs a full tree right away
+            // (don't wait for the next redraw — there may not be one).
+            accesskit_winit::WindowEvent::InitialTreeRequested => {
+                let ui = &ws.ui;
+                ws.access_adapter.update_if_active(|| crate::accessibility::build_tree(ui));
+            }
+            // The AT asked us to do something (click, focus, set a value).
+            accesskit_winit::WindowEvent::ActionRequested(request) => {
+                if crate::accessibility::perform_action(&mut ws.ui, &request) {
+                    // render() re-pushes the tree after the change.
+                    ws.window.request_redraw();
+                }
+            }
+            accesskit_winit::WindowEvent::AccessibilityDeactivated => {}
+        }
+    }
+
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         let now = Instant::now();
         if now >= self.next_tick {
@@ -593,14 +642,18 @@ fn center_on_primary(event_loop: &ActiveEventLoop, window: &Window) {
 /// This is the backend implementation behind the neutral [`crate::run`]; prefer
 /// calling that. Provided for direct/advanced use.
 pub fn run_with_config(ui: UI, config: WindowConfig) -> Result<(), winit::error::EventLoopError> {
-    let event_loop = EventLoop::new()?;
+    // The user-event channel carries AccessKit adapter events (see
+    // `App::user_event`); winit's default `()` loop has no channel at all.
+    let event_loop = EventLoop::<accesskit_winit::Event>::with_user_event().build()?;
     event_loop.set_control_flow(ControlFlow::Wait);
+    let proxy = event_loop.create_proxy();
     let mut app = App {
         backend: Backend::new(),
         windows: HashMap::new(),
         main_window: None,
         modal_stack: Vec::new(),
         next_tick: Instant::now(),
+        proxy,
         esc_pending_close: None,
         pending_main: Some(PendingWindow { config, ui, is_child: false, modal: false }),
     };

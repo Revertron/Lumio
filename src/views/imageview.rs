@@ -288,6 +288,22 @@ impl View for ImageView {
     fn get_tooltip(&self) -> Option<String> {
         self.base_get_tooltip()
     }
+
+    fn get_content_description(&self) -> Option<String> {
+        self.base_get_content_description()
+    }
+
+    fn set_content_description(&mut self, description: Option<String>) {
+        self.base_set_content_description(description);
+    }
+
+    fn get_labelled_by(&self) -> Option<String> {
+        self.base_get_labelled_by()
+    }
+
+    fn set_labelled_by(&mut self, view_id: Option<String>) {
+        self.base_set_labelled_by(view_id);
+    }
     fn set_tooltip(&mut self, tooltip: Option<String>) {
         self.base_set_tooltip(tooltip);
     }
@@ -328,6 +344,19 @@ impl View for ImageView {
 
     fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool {
         self.base_fire_event(ui, event, data)
+    }
+
+    fn accessibility_node(&self) -> accesskit::Node {
+        let mut node = accesskit::Node::new(accesskit::Role::Image);
+        // Alt-text convention: an image with no description is decorative and
+        // stays out of the accessibility tree. content_description wins over
+        // the tooltip (the walker would apply it anyway; doing it here keeps
+        // the decorative check in one place).
+        match self.get_content_description().or_else(|| self.get_tooltip()) {
+            Some(text) if !text.is_empty() => node.set_label(text),
+            _ => node.set_hidden(),
+        }
+        node
     }
 
     fn click(&self, ui: &mut UI) -> bool {

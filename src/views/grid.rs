@@ -314,6 +314,10 @@ impl View for Grid {
     fn get_id(&self) -> String { self.base_get_id() }
     fn get_tooltip(&self) -> Option<String> { self.base_get_tooltip() }
     fn set_tooltip(&mut self, t: Option<String>) { self.base_set_tooltip(t); }
+    fn get_content_description(&self) -> Option<String> { self.base_get_content_description() }
+    fn set_content_description(&mut self, d: Option<String>) { self.base_set_content_description(d); }
+    fn get_labelled_by(&self) -> Option<String> { self.base_get_labelled_by() }
+    fn set_labelled_by(&mut self, v: Option<String>) { self.base_set_labelled_by(v); }
     fn get_background(&self) -> Option<u32> { self.base_get_background() }
     fn set_background(&mut self, c: Option<u32>) { self.base_set_background(c); }
     fn get_border_color(&self) -> Option<u32> { self.base_get_border_color() }

@@ -483,6 +483,22 @@ impl View for SplitPanel {
         self.base_get_tooltip()
     }
 
+    fn get_content_description(&self) -> Option<String> {
+        self.base_get_content_description()
+    }
+
+    fn set_content_description(&mut self, description: Option<String>) {
+        self.base_set_content_description(description);
+    }
+
+    fn get_labelled_by(&self) -> Option<String> {
+        self.base_get_labelled_by()
+    }
+
+    fn set_labelled_by(&mut self, view_id: Option<String>) {
+        self.base_set_labelled_by(view_id);
+    }
+
     fn set_tooltip(&mut self, tooltip: Option<String>) {
         self.base_set_tooltip(tooltip);
     }

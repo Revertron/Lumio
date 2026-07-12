@@ -62,6 +62,10 @@ impl CheckBox {
         self.layout_text(self.get_rect_width(), single_line, scale);
     }
 
+    pub fn get_text(&self) -> String {
+        self.state.borrow().text.clone()
+    }
+
     pub fn is_checked(&self) -> bool {
         self.state.borrow().main.state.checked
     }
@@ -309,6 +313,22 @@ impl View for CheckBox {
     fn get_tooltip(&self) -> Option<String> {
         self.base_get_tooltip()
     }
+
+    fn get_content_description(&self) -> Option<String> {
+        self.base_get_content_description()
+    }
+
+    fn set_content_description(&mut self, description: Option<String>) {
+        self.base_set_content_description(description);
+    }
+
+    fn get_labelled_by(&self) -> Option<String> {
+        self.base_get_labelled_by()
+    }
+
+    fn set_labelled_by(&mut self, view_id: Option<String>) {
+        self.base_set_labelled_by(view_id);
+    }
     fn set_tooltip(&mut self, tooltip: Option<String>) {
         self.base_set_tooltip(tooltip);
     }
@@ -359,6 +379,14 @@ impl View for CheckBox {
         result |= self.base_fire_event(ui, EventType::CheckedChanged, &EventData::Checked(!checked));
         result |= self.base_fire_event(ui, EventType::Click, &EventData::None);
         result
+    }
+
+    fn accessibility_node(&self) -> accesskit::Node {
+        let mut node = accesskit::Node::new(accesskit::Role::CheckBox);
+        node.set_label(self.get_text());
+        node.set_toggled(if self.is_checked() { accesskit::Toggled::True } else { accesskit::Toggled::False });
+        node.add_action(accesskit::Action::Click);
+        node
     }
 
     fn on_mouse_move(&self, _ui: &mut UI, position: Point<i32>) -> bool {

@@ -1160,6 +1160,10 @@ impl View for TableView {
     fn get_id(&self) -> String { self.base_get_id() }
     fn get_tooltip(&self) -> Option<String> { self.base_get_tooltip() }
     fn set_tooltip(&mut self, t: Option<String>) { self.base_set_tooltip(t); }
+    fn get_content_description(&self) -> Option<String> { self.base_get_content_description() }
+    fn set_content_description(&mut self, d: Option<String>) { self.base_set_content_description(d); }
+    fn get_labelled_by(&self) -> Option<String> { self.base_get_labelled_by() }
+    fn set_labelled_by(&mut self, v: Option<String>) { self.base_set_labelled_by(v); }
     fn get_background(&self) -> Option<u32> { self.base_get_background() }
     fn set_background(&mut self, c: Option<u32>) { self.base_set_background(c); }
     fn get_border_color(&self) -> Option<u32> { self.base_get_border_color() }
@@ -1182,6 +1186,123 @@ impl View for TableView {
 
     fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool {
         self.base_fire_event(ui, event, data)
+    }
+
+    fn accessibility_node(&self) -> accesskit::Node {
+        let mut node = accesskit::Node::new(accesskit::Role::Table);
+        node.set_row_count(self.row_count());
+        node.set_column_count(self.columns.borrow().len());
+        node
+    }
+
+    /// Synthetic table structure: a header `Row` of `ColumnHeader`s (with the
+    /// live sort direction), then one `Row` per data row in display order,
+    /// each claiming its real cell elements as children. Item-id space:
+    /// 0 = header row, 1..=columns = headers, columns+1+raw = data row `raw`
+    /// (keyed by raw index so ids survive re-sorting).
+    fn accessibility_children(&self) -> Vec<(accesskit::NodeId, accesskit::Node)> {
+        let id = self.get_id();
+        let inset = self.border_inset();
+        let header_h = self.header_height_px.get();
+        let scroll_x = self.scroll_x.get();
+        let scroll_y = self.scroll_y.get();
+        let row_h = self.row_height_px.get();
+        let width = self.get_rect_width();
+        let cols = self.columns.borrow();
+        let col_offs = self.column_offsets.borrow();
+        let order = self.display_order.borrow();
+        let rows = self.rows.borrow();
+        let sort = self.sort_state.get();
+
+        let mut result = Vec::new();
+
+        // Header row first, so it precedes the data rows in reading order.
+        let mut header_children = Vec::new();
+        let mut header_nodes = Vec::new();
+        for (c, col) in cols.iter().enumerate() {
+            let header_id = crate::accessibility::item_node_id(&id, 1 + c);
+            let mut node = accesskit::Node::new(accesskit::Role::ColumnHeader);
+            node.set_label(col.title.clone());
+            node.set_column_index(c);
+            if let Some((sort_col, dir)) = sort
+                && sort_col == c
+            {
+                node.set_sort_direction(match dir {
+                    SortDirection::Asc => accesskit::SortDirection::Ascending,
+                    SortDirection::Desc => accesskit::SortDirection::Descending,
+                });
+            }
+            if col.sortable {
+                node.add_action(accesskit::Action::Click);
+            }
+            let x = inset + col_offs[c] + scroll_x;
+            node.set_bounds(accesskit::Rect {
+                x0: x as f64,
+                y0: inset as f64,
+                x1: (x + col.current_width_px) as f64,
+                y1: (inset + header_h) as f64,
+            });
+            header_children.push(header_id);
+            header_nodes.push((header_id, node));
+        }
+        let mut header_row = accesskit::Node::new(accesskit::Role::Row);
+        header_row.set_children(header_children);
+        header_row.set_bounds(accesskit::Rect {
+            x0: inset as f64,
+            y0: inset as f64,
+            x1: (width - inset) as f64,
+            y1: (inset + header_h) as f64,
+        });
+        result.push((crate::accessibility::item_node_id(&id, 0), header_row));
+        result.extend(header_nodes);
+
+        // Data rows, in display (sorted) order.
+        let base = 1 + cols.len();
+        for (di, &raw) in order.iter().enumerate() {
+            let row_id = crate::accessibility::item_node_id(&id, base + raw);
+            let mut node = accesskit::Node::new(accesskit::Role::Row);
+            node.set_row_index(di);
+            node.set_selected(self.selected_raw.get() == Some(raw));
+            if let Some(cells) = rows.get(raw) {
+                let kids: Vec<accesskit::NodeId> = cells.iter()
+                    .map(|cell| crate::accessibility::node_id_for(&cell.borrow().get_id()))
+                    .collect();
+                node.set_children(kids);
+            }
+            let y = inset + header_h + di as i32 * row_h + scroll_y;
+            node.set_bounds(accesskit::Rect {
+                x0: inset as f64,
+                y0: y as f64,
+                x1: (width - inset) as f64,
+                y1: (y + row_h) as f64,
+            });
+            result.push((row_id, node));
+        }
+        result
+    }
+
+    /// Cells are laid out at (0,0) and positioned at paint time, so the table
+    /// exposes them manually with their on-screen offsets (header + scroll).
+    fn accessibility_child_elements(&self) -> Vec<(Element, Point<i32>)> {
+        let inset = self.border_inset();
+        let header_h = self.header_height_px.get();
+        let scroll_x = self.scroll_x.get();
+        let scroll_y = self.scroll_y.get();
+        let row_h = self.row_height_px.get();
+        let col_offs = self.column_offsets.borrow();
+        let order = self.display_order.borrow();
+        let rows = self.rows.borrow();
+
+        let mut result = Vec::new();
+        for (di, &raw) in order.iter().enumerate() {
+            let Some(cells) = rows.get(raw) else { continue };
+            let y = inset + header_h + di as i32 * row_h + scroll_y;
+            for (c, cell) in cells.iter().enumerate() {
+                let x = inset + col_offs.get(c).copied().unwrap_or(0) + scroll_x;
+                result.push((std::rc::Rc::clone(cell), Point::new(x, y)));
+            }
+        }
+        result
     }
 
     fn click(&self, ui: &mut UI) -> bool {

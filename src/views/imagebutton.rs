@@ -244,6 +244,22 @@ impl View for ImageButton {
     fn get_tooltip(&self) -> Option<String> {
         self.base_get_tooltip()
     }
+
+    fn get_content_description(&self) -> Option<String> {
+        self.base_get_content_description()
+    }
+
+    fn set_content_description(&mut self, description: Option<String>) {
+        self.base_set_content_description(description);
+    }
+
+    fn get_labelled_by(&self) -> Option<String> {
+        self.base_get_labelled_by()
+    }
+
+    fn set_labelled_by(&mut self, view_id: Option<String>) {
+        self.base_set_labelled_by(view_id);
+    }
     fn set_tooltip(&mut self, tooltip: Option<String>) {
         self.base_set_tooltip(tooltip);
     }
@@ -289,6 +305,19 @@ impl View for ImageButton {
     fn click(&self, ui: &mut UI) -> bool {
         if !self.base_is_enabled() { return false; }
         self.base_fire_event(ui, EventType::Click, &EventData::None)
+    }
+
+    fn accessibility_node(&self) -> accesskit::Node {
+        let mut node = accesskit::Node::new(accesskit::Role::Button);
+        // No intrinsic text: the tooltip doubles as the accessible name until
+        // a content_description is set (Phase B).
+        if let Some(tooltip) = self.get_tooltip()
+            && !tooltip.is_empty()
+        {
+            node.set_label(tooltip);
+        }
+        node.add_action(accesskit::Action::Click);
+        node
     }
 
     fn on_mouse_move(&self, _ui: &mut UI, position: Point<i32>) -> bool {

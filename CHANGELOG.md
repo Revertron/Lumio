@@ -5,6 +5,84 @@ All notable changes to Lumio are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project aims to adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-07-12
+
+Screen-reader accessibility via [AccessKit](https://accesskit.dev): every
+window now exposes a full accessibility tree to the platform API (UIA /
+NSAccessibility / AT-SPI), screen readers can read and operate all widgets,
+and text fields support caret/selection-level access. Zero overhead until an
+assistive technology connects.
+
+### Fixed
+
+- **Memo selection/caret geometry after a scale change.** `Memo` cached its
+  line height at the first scale it saw and never invalidated it, so after a
+  re-layout at a different HiDPI scale the selection highlight, caret rect
+  and click-to-line hit-testing used a wrong (e.g. half-size) line height.
+  The cache is now reset on every text re-layout.
+
+### Changed
+
+- **ProgressBar with no explicit height now sizes to its intrinsic 16-dip
+  bar height** instead of stretching to all the vertical space its parent
+  offers (`Dimension::Min` heights currently resolve to the full available
+  height in the generic path; ProgressBar now overrides that). Give it an
+  explicit `height=".."` if you relied on the stretch.
+
+### Added
+
+- **Accessibility: depth** (fourth slice — completes the AccessKit
+  integration). `Edit`/`Memo` expose full text semantics: per-line `TextRun`
+  nodes with per-character geometry and word boundaries, plus live
+  caret/selection reporting — screen readers echo typed characters and
+  navigate by character/word/line, and UIA TextPattern works (password fields
+  still expose nothing). `TableView` publishes real table semantics: a header
+  row of `ColumnHeader`s with the live sort direction (AT click on a header
+  sorts), and one `Row` per data row grouping its cell views, with selection.
+  `RecyclerView` exposes its realized rows (plus the total item count) and
+  `NotificationStack` items appear in a polite live region, as do `StatusBar`
+  section texts. New universal XML attribute `labelled_by="view_id"` names a
+  control by another view's text (like `<label for=..>`). New `View` hooks
+  for custom widgets: `accessibility_children()` (synthetic per-item nodes,
+  which may group other nodes) and `accessibility_child_elements()` (expose
+  child views owned outside the `Container` protocol).
+- **Accessibility: assistive-technology actions** (third slice). Screen
+  readers can now operate the UI, not just read it: activating a control
+  (UIA Invoke / SelectionItem.Select) delivers a synthetic click through the
+  ordinary mouse dispatch — including synthetic items like list rows, tabs
+  and menu items; AT focus requests move keyboard focus; and
+  RangeValue.SetValue / Increment / Decrement drive a `Slider`, firing
+  `ValueChanged` exactly like the keyboard path (new `Slider::nudge`).
+  New public API: `UI::set_focus_to(&Element)` — the programmatic-focus
+  primitive (clears focus tree-wide, focuses the target, fires
+  `FocusLost`/`FocusGained`), also the building block for future
+  Tab-navigation.
+- **Accessibility: full widget coverage + `content_description`** (second
+  slice). All remaining widgets now describe themselves to screen readers:
+  RadioButton, Memo, ComboBox (with expanded state), ProgressBar, RichText,
+  ScrollView, TableView (role + dimensions), RecyclerView, MenuBar, and open
+  PopupMenus; List and TabView expose their rows/tabs as synthetic child
+  nodes with per-item bounds and selection (new `View::accessibility_children`
+  hook), a hovered menu item is reported as the AT focus, and decorative views
+  (Separator, undescribed ImageView) opt out of the tree. New universal XML
+  attribute `content_description` (Android-style) overrides any widget-derived
+  accessible name — use it on `ImageButton`/`ImageView`. New getters:
+  `RadioButton::get_text`, `Memo::is_read_only`, `ComboBox::is_open`,
+  `List::{get_selected, item_count, item_text}`,
+  `RecyclerView::get_selected_position`, `TabView::get_tab_title`,
+  `MenuBar::menu_titles`, `RichText::get_plain_text`.
+- **Screen-reader accessibility via AccessKit** (first slice). Every window now
+  exposes an accessibility tree to the platform API (UIA on Windows,
+  NSAccessibility on macOS, AT-SPI on Linux): a per-window
+  `accesskit_winit::Adapter` in the shared winit loop, a tree builder that
+  mirrors the visible view hierarchy (`lumio::accessibility`), and a new
+  defaulted `View::accessibility_node()` for widgets to describe themselves.
+  Label, Button, ImageButton, CheckBox, Edit (incl. protected password fields)
+  and Slider report role/name/state; focus changes are mirrored to assistive
+  tech. Zero overhead until a screen reader connects. New getters:
+  `Label/Button/CheckBox::get_text`, `Edit::is_read_only`,
+  `Slider::get_min/get_max/get_step`.
+
 ## [0.1.1] - 2026-07-12
 
 ### Changed

@@ -89,6 +89,11 @@ impl StatusBar {
         self.sections.len()
     }
 
+    /// The text of a section by index.
+    pub fn section_text(&self, index: usize) -> Option<String> {
+        self.sections.get(index).map(|s| s.text.clone())
+    }
+
     fn set_font(&mut self, font_name: &str) {
         self.font_manager.set_font(font_name);
     }
@@ -406,6 +411,22 @@ impl View for StatusBar {
     fn get_tooltip(&self) -> Option<String> {
         self.base_get_tooltip()
     }
+
+    fn get_content_description(&self) -> Option<String> {
+        self.base_get_content_description()
+    }
+
+    fn set_content_description(&mut self, description: Option<String>) {
+        self.base_set_content_description(description);
+    }
+
+    fn get_labelled_by(&self) -> Option<String> {
+        self.base_get_labelled_by()
+    }
+
+    fn set_labelled_by(&mut self, view_id: Option<String>) {
+        self.base_set_labelled_by(view_id);
+    }
     fn set_tooltip(&mut self, tooltip: Option<String>) {
         self.base_set_tooltip(tooltip);
     }
@@ -433,6 +454,21 @@ impl View for StatusBar {
 
     fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool {
         self.base_fire_event(ui, event, data)
+    }
+
+    fn accessibility_node(&self) -> accesskit::Node {
+        accesskit::Node::new(accesskit::Role::Status)
+    }
+
+    fn accessibility_children(&self) -> Vec<(accesskit::NodeId, accesskit::Node)> {
+        let id = self.get_id();
+        self.sections.iter().enumerate().map(|(i, section)| {
+            let mut node = accesskit::Node::new(accesskit::Role::Label);
+            node.set_value(section.text.clone());
+            // Status text changes (progress, hints) announce without focus.
+            node.set_live(accesskit::Live::Polite);
+            (crate::accessibility::item_node_id(&id, i), node)
+        }).collect()
     }
 
     fn click(&self, _ui: &mut UI) -> bool {

@@ -39,6 +39,10 @@ extern crate downcast_rs;
 #[cfg(feature = "backend-gl")]
 pub use speedy2d;
 
+// Re-export the accessibility vocabulary (Role/Node/TreeUpdate) so downstream
+// custom `View` impls build their nodes against the same accesskit version.
+pub use accesskit;
+
 pub mod app;
 pub use app::WindowConfig;
 /// Runtime render-backend selection (GL → software fallback in dual builds).
@@ -66,6 +70,9 @@ pub mod types;
 pub mod assets;
 pub mod styles;
 pub mod view_base;
+/// Screen-reader support: builds the per-window AccessKit tree from the view
+/// hierarchy and routes AT action requests back into the UI.
+pub mod accessibility;
 pub mod shortcut;
 pub mod drawing;
 /// Headless software rendering (UI → `tiny_skia::Pixmap`). Software core only.

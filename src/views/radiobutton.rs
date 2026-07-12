@@ -1,4 +1,4 @@
-﻿use std::cell::RefCell;
+use std::cell::RefCell;
 use std::cmp::max;
 
 use crate::text::{TextAlignment, TextOptions};
@@ -75,6 +75,11 @@ impl RadioButton {
         let scale = self.state.borrow().main.scale;
         let single_line = self.state.borrow().single_line;
         self.layout_text(self.get_rect_width(), single_line, scale);
+    }
+
+    /// The label text.
+    pub fn get_text(&self) -> String {
+        self.state.borrow().text.clone()
     }
 
     /// Whether this radio button is currently selected.
@@ -382,6 +387,22 @@ impl View for RadioButton {
     fn get_tooltip(&self) -> Option<String> {
         self.base_get_tooltip()
     }
+
+    fn get_content_description(&self) -> Option<String> {
+        self.base_get_content_description()
+    }
+
+    fn set_content_description(&mut self, description: Option<String>) {
+        self.base_set_content_description(description);
+    }
+
+    fn get_labelled_by(&self) -> Option<String> {
+        self.base_get_labelled_by()
+    }
+
+    fn set_labelled_by(&mut self, view_id: Option<String>) {
+        self.base_set_labelled_by(view_id);
+    }
     fn set_tooltip(&mut self, tooltip: Option<String>) {
         self.base_set_tooltip(tooltip);
     }
@@ -422,6 +443,14 @@ impl View for RadioButton {
 
     fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool {
         self.base_fire_event(ui, event, data)
+    }
+
+    fn accessibility_node(&self) -> accesskit::Node {
+        let mut node = accesskit::Node::new(accesskit::Role::RadioButton);
+        node.set_label(self.get_text());
+        node.set_toggled(if self.is_checked() { accesskit::Toggled::True } else { accesskit::Toggled::False });
+        node.add_action(accesskit::Action::Click);
+        node
     }
 
     fn click(&self, ui: &mut UI) -> bool {

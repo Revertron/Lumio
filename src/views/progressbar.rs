@@ -102,7 +102,13 @@ impl View for ProgressBar {
 
     fn layout_content(&mut self, x: i32, y: i32, width: i32, height: i32, _typeface: &Typeface, scale: f64) -> Rect<i32> {
         self.base_set_scale(scale);
-        let (new_width, new_height) = self.calculate_size(width, height, scale);
+        let (new_width, mut new_height) = self.calculate_size(width, height, scale);
+        // An unspecified (`Min`) height means the intrinsic bar height
+        // (16 dip), not all the vertical space the parent offers.
+        if matches!(self.get_bounds().1, Dimension::Min) {
+            let padding = self.get_padding(scale);
+            new_height = (DEFAULT_HEIGHT as f64 * scale).round() as i32 + padding.top + padding.bottom;
+        }
         let r = rect((x, y), (x + new_width, y + new_height));
         self.set_rect(r);
         r
@@ -239,6 +245,22 @@ impl View for ProgressBar {
     fn get_tooltip(&self) -> Option<String> {
         self.base_get_tooltip()
     }
+
+    fn get_content_description(&self) -> Option<String> {
+        self.base_get_content_description()
+    }
+
+    fn set_content_description(&mut self, description: Option<String>) {
+        self.base_set_content_description(description);
+    }
+
+    fn get_labelled_by(&self) -> Option<String> {
+        self.base_get_labelled_by()
+    }
+
+    fn set_labelled_by(&mut self, view_id: Option<String>) {
+        self.base_set_labelled_by(view_id);
+    }
     fn set_tooltip(&mut self, tooltip: Option<String>) {
         self.base_set_tooltip(tooltip);
     }
@@ -279,6 +301,17 @@ impl View for ProgressBar {
 
     fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool {
         self.base_fire_event(ui, event, data)
+    }
+
+    fn accessibility_node(&self) -> accesskit::Node {
+        let mut node = accesskit::Node::new(accesskit::Role::ProgressIndicator);
+        // An indeterminate bar has no meaningful value to report.
+        if !self.is_indeterminate() {
+            node.set_numeric_value(f64::from(self.get_value()));
+            node.set_min_numeric_value(0.0);
+            node.set_max_numeric_value(1.0);
+        }
+        node
     }
 
     fn click(&self, ui: &mut UI) -> bool {

@@ -272,6 +272,12 @@ impl RichText {
         self.clicked_href.borrow().clone()
     }
 
+    /// The content with all markup stripped (the concatenated span texts;
+    /// hard breaks are `\n`).
+    pub fn get_plain_text(&self) -> String {
+        self.content.borrow().text.clone()
+    }
+
     pub fn set_link_color(&self, color: u32) {
         *self.link_color.borrow_mut() = Some(color);
     }
@@ -1262,6 +1268,22 @@ impl View for RichText {
         self.base_get_tooltip()
     }
 
+    fn get_content_description(&self) -> Option<String> {
+        self.base_get_content_description()
+    }
+
+    fn set_content_description(&mut self, description: Option<String>) {
+        self.base_set_content_description(description);
+    }
+
+    fn get_labelled_by(&self) -> Option<String> {
+        self.base_get_labelled_by()
+    }
+
+    fn set_labelled_by(&mut self, view_id: Option<String>) {
+        self.base_set_labelled_by(view_id);
+    }
+
     fn set_tooltip(&mut self, tooltip: Option<String>) {
         self.base_set_tooltip(tooltip);
     }
@@ -1312,6 +1334,14 @@ impl View for RichText {
 
     fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool {
         self.base_fire_event(ui, event, data)
+    }
+
+    fn accessibility_node(&self) -> accesskit::Node {
+        // Static rich text reads as one flat text node (spans and links are a
+        // Phase-D refinement); like Label, the content goes in `value`.
+        let mut node = accesskit::Node::new(accesskit::Role::Label);
+        node.set_value(self.get_plain_text());
+        node
     }
 
     fn click(&self, ui: &mut UI) -> bool {

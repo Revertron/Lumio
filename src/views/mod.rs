@@ -79,6 +79,12 @@ pub struct FieldsMain {
     pub parent: Option<WeakElement>,
     pub font_manager: FontManager,
     pub tooltip: Option<String>,
+    /// Explicit accessible name for screen readers (Android's
+    /// `contentDescription`); overrides the widget-derived label.
+    pub content_description: Option<String>,
+    /// Id of another view (usually a `Label`) whose text names this view for
+    /// screen readers, like a `<label for=..>` association.
+    pub labelled_by: Option<String>,
     pub gravity: Gravity,
     pub layout_params: LayoutParams,
     pub listeners: HashMap<EventType, EventCallback>
@@ -105,6 +111,8 @@ impl FieldsMain {
             parent: None,
             font_manager: FontManager::new(),
             tooltip: None,
+            content_description: None,
+            labelled_by: None,
             gravity: Gravity::default(),
             layout_params: LayoutParams::default(),
             listeners: HashMap::new()

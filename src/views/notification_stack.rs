@@ -359,6 +359,10 @@ impl View for NotificationStack {
     fn get_id(&self) -> String { self.base_get_id() }
     fn get_tooltip(&self) -> Option<String> { self.base_get_tooltip() }
     fn set_tooltip(&mut self, tooltip: Option<String>) { self.base_set_tooltip(tooltip); }
+    fn get_content_description(&self) -> Option<String> { self.base_get_content_description() }
+    fn set_content_description(&mut self, d: Option<String>) { self.base_set_content_description(d); }
+    fn get_labelled_by(&self) -> Option<String> { self.base_get_labelled_by() }
+    fn set_labelled_by(&mut self, v: Option<String>) { self.base_set_labelled_by(v); }
     fn get_background(&self) -> Option<u32> { self.base_get_background() }
     fn set_background(&mut self, color: Option<u32>) { self.base_set_background(color); }
     fn get_border_color(&self) -> Option<u32> { self.base_get_border_color() }
@@ -379,6 +383,22 @@ impl View for NotificationStack {
     fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool {
         self.base_fire_event(ui, event, data)
     }
+    fn accessibility_node(&self) -> accesskit::Node {
+        // A polite live region: newly shown notifications are announced by
+        // screen readers without stealing focus.
+        let mut node = accesskit::Node::new(accesskit::Role::GenericContainer);
+        node.set_live(accesskit::Live::Polite);
+        node
+    }
+
+    fn accessibility_child_elements(&self) -> Vec<(Element, Point<i32>)> {
+        // Item rects are kept at their on-screen (stack-local) position by
+        // paint, so no extra offset is needed.
+        self.items.borrow().iter()
+            .map(|item| (Rc::clone(&item.element), Point::new(0, 0)))
+            .collect()
+    }
+
     fn click(&self, _ui: &mut UI) -> bool { false }
 
     fn update(&mut self, _ui: &mut UI) -> bool {

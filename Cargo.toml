@@ -1,6 +1,6 @@
 [package]
 name = "lumio-gui"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 authors = ["Revertron <lumio@revertron.com>"]
 description = "A declarative, XML-based retained-mode GUI toolkit for Rust desktop apps (GL or software rendering backend)"
@@ -28,10 +28,12 @@ default = ["backend-gl"]
 #   forces one; see src/backend.rs.
 # The `text-*` features are the text-layer half each backend pulls in.
 backend-gl = ["text-speedy2d", "system-fonts", "clipboard",
-              "dep:winit", "dep:glutin", "dep:glutin-winit", "dep:raw-window-handle"]
+              "dep:winit", "dep:glutin", "dep:glutin-winit", "dep:raw-window-handle",
+              "dep:accesskit_winit"]
 # Desktop software backend = the software core + a winit/softbuffer window + the
 # native niceties (system fonts, clipboard).
-backend-software = ["software", "system-fonts", "clipboard", "dep:winit", "dep:softbuffer"]
+backend-software = ["software", "system-fonts", "clipboard", "dep:winit", "dep:softbuffer",
+                    "dep:accesskit_winit"]
 # The software render + text CORE: tiny-skia + fontdue, exposing `render_to_pixmap`
 # and `SoftwareTheme` with NO window loop and NO native system-font/clipboard deps.
 # An embedder (e.g. a host that drives the UI externally and presents the pixmap
@@ -49,6 +51,13 @@ clipboard = ["dep:arboard"]
 [dependencies]
 quick-xml = "0.41.0"
 downcast-rs = "2.0.2"
+# Screen-reader accessibility. `accesskit` is the platform-independent tree
+# vocabulary (Role/Node/TreeUpdate) — always on, used by the View trait and the
+# tree builder, and works headless. `accesskit_winit` binds the tree to the
+# platform APIs (UIA/NSAccessibility/AT-SPI) inside the winit window loop, so
+# only the windowed backends pull it.
+accesskit = "0.24"
+accesskit_winit = { version = "0.33", optional = true }
 # speedy2d is used as a pure GL renderer: `windowing` (winit/glutin) is off;
 # `image-loading` stays on for `Classic`'s texture decoding. Lumio owns the
 # window + GL context (see the `dep:glutin*` deps below).

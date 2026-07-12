@@ -329,6 +329,10 @@ impl Edit {
         *self.read_only.borrow_mut() = read_only;
     }
 
+    pub fn is_read_only(&self) -> bool {
+        *self.read_only.borrow()
+    }
+
     pub fn set_max_length(&self, max_length: Option<usize>) {
         *self.max_length.borrow_mut() = max_length;
     }
@@ -1320,6 +1324,22 @@ impl View for Edit {
     fn get_tooltip(&self) -> Option<String> {
         self.base_get_tooltip()
     }
+
+    fn get_content_description(&self) -> Option<String> {
+        self.base_get_content_description()
+    }
+
+    fn set_content_description(&mut self, description: Option<String>) {
+        self.base_set_content_description(description);
+    }
+
+    fn get_labelled_by(&self) -> Option<String> {
+        self.base_get_labelled_by()
+    }
+
+    fn set_labelled_by(&mut self, view_id: Option<String>) {
+        self.base_set_labelled_by(view_id);
+    }
     fn set_tooltip(&mut self, tooltip: Option<String>) {
         self.base_set_tooltip(tooltip);
     }
@@ -1352,6 +1372,79 @@ impl View for Edit {
     fn click(&self, ui: &mut UI) -> bool {
         if !self.base_is_enabled() { return false; }
         self.base_fire_event(ui, EventType::Click, &EventData::None)
+    }
+
+    fn accessibility_node(&self) -> accesskit::Node {
+        if self.is_password() {
+            // Protected field: role only — the value must never reach the
+            // accessibility tree (and no text run is exposed either).
+            let mut node = accesskit::Node::new(accesskit::Role::PasswordInput);
+            if self.is_read_only() {
+                node.set_read_only();
+            }
+            return node;
+        }
+        let mut node = accesskit::Node::new(accesskit::Role::TextInput);
+        node.set_value(self.get_text());
+        if self.is_read_only() {
+            node.set_read_only();
+        }
+        // Caret/selection, expressed against the single text run below.
+        let run = crate::accessibility::item_node_id(&self.get_id(), 0);
+        let caret = *self.caret_pos.borrow();
+        let anchor = self.selection_anchor.borrow().unwrap_or(caret);
+        node.set_text_selection(accesskit::TextSelection {
+            anchor: accesskit::TextPosition { node: run, character_index: anchor },
+            focus: accesskit::TextPosition { node: run, character_index: caret },
+        });
+        node
+    }
+
+    /// One `TextRun` carrying the whole (single-line) text with per-character
+    /// geometry, so screen readers can echo typed characters and navigate by
+    /// character/word.
+    fn accessibility_children(&self) -> Vec<(accesskit::NodeId, accesskit::Node)> {
+        if self.is_password() {
+            return Vec::new();
+        }
+        let text = self.get_text();
+        let mut node = accesskit::Node::new(accesskit::Role::TextRun);
+        node.set_character_lengths(crate::accessibility::character_lengths(&text));
+        node.set_word_starts(crate::accessibility::word_starts(&text));
+        let char_count = text.chars().count();
+        node.set_value(text);
+
+        let state = self.state.borrow();
+        let scale = state.main.scale;
+        let rect = state.main.rect;
+        let padding = self.get_padding(scale);
+        let inner_h = rect.height() - padding.top - padding.bottom;
+        let (left_inset, _) = self.icon_insets(inner_h, scale);
+        let x0 = padding.left + left_inset + *self.scroll_x.borrow();
+
+        let mut text_width = 0f32;
+        if let Some(block) = &state.cached_text
+            && let Some(line) = block.iter_lines().next()
+        {
+            text_width = block.width();
+            // Per-character geometry, valid only while glyphs map 1:1 to
+            // chars (the same assumption the caret math makes).
+            let positions: Vec<f32> = line.iter_glyphs().map(|g| g.position_x()).collect();
+            if positions.len() == char_count {
+                let widths: Vec<f32> = line.iter_glyphs().map(|g| g.advance_width()).collect();
+                node.set_character_positions(positions);
+                node.set_character_widths(widths);
+            }
+        }
+        // View-local; the tree builder translates to window space.
+        node.set_bounds(accesskit::Rect {
+            x0: x0 as f64,
+            y0: padding.top as f64,
+            x1: (x0 as f64) + f64::from(text_width),
+            y1: (rect.height() - padding.bottom) as f64,
+        });
+
+        vec![(crate::accessibility::item_node_id(&self.get_id(), 0), node)]
     }
 
     fn update(&mut self, ui: &mut UI) -> bool {

@@ -234,6 +234,10 @@ impl Memo {
         *self.read_only.borrow_mut() = read_only;
     }
 
+    pub fn is_read_only(&self) -> bool {
+        *self.read_only.borrow()
+    }
+
     pub fn set_max_length(&self, max_length: Option<usize>) {
         *self.max_length.borrow_mut() = max_length;
     }
@@ -397,16 +401,23 @@ impl Memo {
                 *self.line_count.borrow_mut() = line_count;
                 *self.line_offsets.borrow_mut() = offsets;
                 drop(state);
-                if self.state.borrow().text.is_empty() {
-                    self.state.borrow_mut().cached_text = None;
+                let mut state = self.state.borrow_mut();
+                // The cached line height is scale-dependent; drop it so the
+                // next `get_line_height` recomputes at the scale this layout
+                // ran at (a window can move to a differently-scaled monitor).
+                state.line_height = 0f32;
+                if state.text.is_empty() {
+                    state.cached_text = None;
                 } else {
-                    self.state.borrow_mut().cached_text = Some(text);
+                    state.cached_text = Some(text);
                 }
                 return;
             }
         }
         drop(state);
-        self.state.borrow_mut().cached_text = None;
+        let mut state = self.state.borrow_mut();
+        state.line_height = 0f32;
+        state.cached_text = None;
     }
 
     fn layout_placeholder_text(&self) -> Option<TextBlock> {
@@ -1342,6 +1353,22 @@ impl View for Memo {
     fn get_tooltip(&self) -> Option<String> {
         self.base_get_tooltip()
     }
+
+    fn get_content_description(&self) -> Option<String> {
+        self.base_get_content_description()
+    }
+
+    fn set_content_description(&mut self, description: Option<String>) {
+        self.base_set_content_description(description);
+    }
+
+    fn get_labelled_by(&self) -> Option<String> {
+        self.base_get_labelled_by()
+    }
+
+    fn set_labelled_by(&mut self, view_id: Option<String>) {
+        self.base_set_labelled_by(view_id);
+    }
     fn set_tooltip(&mut self, tooltip: Option<String>) {
         self.base_set_tooltip(tooltip);
     }
@@ -1382,6 +1409,91 @@ impl View for Memo {
 
     fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool {
         self.base_fire_event(ui, event, data)
+    }
+
+    fn accessibility_node(&self) -> accesskit::Node {
+        let mut node = accesskit::Node::new(accesskit::Role::MultilineTextInput);
+        node.set_value(self.get_text());
+        if self.is_read_only() {
+            node.set_read_only();
+        }
+        // Caret/selection, expressed against the per-line text runs below.
+        let id = self.get_id();
+        let position = |pos: usize| {
+            let (line, _) = self.pos_to_line_and_x(pos);
+            let start = self.line_offsets.borrow().get(line).copied().unwrap_or(0);
+            accesskit::TextPosition {
+                node: crate::accessibility::item_node_id(&id, line),
+                character_index: pos.saturating_sub(start),
+            }
+        };
+        let caret = *self.caret_pos.borrow();
+        let anchor = self.selection_anchor.borrow().unwrap_or(caret);
+        node.set_text_selection(accesskit::TextSelection {
+            anchor: position(anchor),
+            focus: position(caret),
+        });
+        node
+    }
+
+    /// One `TextRun` per visual (wrapped) line. A hard line break belongs to
+    /// the end of its line's run, counted as one character — exactly how
+    /// `line_offsets` already assigns char ranges to lines.
+    fn accessibility_children(&self) -> Vec<(accesskit::NodeId, accesskit::Node)> {
+        let id = self.get_id();
+        let chars: Vec<char> = self.get_text().chars().collect();
+        let offsets = self.line_offsets.borrow().clone();
+        let line_height = self.get_line_height();
+        let scroll_y = *self.scroll_y.borrow();
+        let state = self.state.borrow();
+        let scale = state.main.scale;
+        let rect = state.main.rect;
+        let padding = self.get_padding(scale);
+
+        let line_count = offsets.len().max(1);
+        let mut result = Vec::with_capacity(line_count);
+        for i in 0..line_count {
+            let start = offsets.get(i).copied().unwrap_or(0);
+            let end = offsets.get(i + 1).copied().unwrap_or(chars.len());
+            let line_text: String = chars.get(start..end).unwrap_or(&[]).iter().collect();
+
+            let mut node = accesskit::Node::new(accesskit::Role::TextRun);
+            node.set_character_lengths(crate::accessibility::character_lengths(&line_text));
+            node.set_word_starts(crate::accessibility::word_starts(&line_text));
+
+            // Per-character geometry from the laid-out block; a hard break is
+            // not a glyph, so it gets a zero-width position after the last
+            // glyph (where an end-of-paragraph marker would render).
+            let ends_with_break = line_text.ends_with('\n');
+            let char_count = end.saturating_sub(start);
+            if let Some(block) = &state.cached_text
+                && let Some(line) = block.iter_lines().nth(i)
+            {
+                let mut positions: Vec<f32> = line.iter_glyphs().map(|g| g.position_x()).collect();
+                let mut widths: Vec<f32> = line.iter_glyphs().map(|g| g.advance_width()).collect();
+                if ends_with_break {
+                    let line_end = positions.last().copied().unwrap_or(0.0) + widths.last().copied().unwrap_or(0.0);
+                    positions.push(line_end);
+                    widths.push(0.0);
+                }
+                if positions.len() == char_count {
+                    node.set_character_positions(positions);
+                    node.set_character_widths(widths);
+                }
+            }
+            node.set_value(line_text);
+
+            // View-local; the tree builder translates to window space.
+            let y0 = padding.top as f32 + i as f32 * line_height + scroll_y as f32;
+            node.set_bounds(accesskit::Rect {
+                x0: padding.left as f64,
+                y0: f64::from(y0),
+                x1: (rect.width() - padding.right) as f64,
+                y1: f64::from(y0 + line_height),
+            });
+            result.push((crate::accessibility::item_node_id(&id, i), node));
+        }
+        result
     }
 
     fn click(&self, ui: &mut UI) -> bool {

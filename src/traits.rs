@@ -152,6 +152,20 @@ pub trait View: Downcast {
     #[allow(unused_variables)]
     fn set_tooltip(&mut self, tooltip: Option<String>) {}
 
+    /// Explicit accessible name for screen readers (Android's
+    /// `contentDescription`; XML attribute `content_description`). When set,
+    /// it overrides the widget-derived label in the accessibility tree. Give
+    /// one to views with no intrinsic text (`ImageButton`, `ImageView`, …).
+    fn get_content_description(&self) -> Option<String> { None }
+    #[allow(unused_variables)]
+    fn set_content_description(&mut self, description: Option<String>) {}
+
+    /// Id of another view (usually a `Label`) whose text names this view for
+    /// screen readers (XML attribute `labelled_by`), like `<label for=..>`.
+    fn get_labelled_by(&self) -> Option<String> { None }
+    #[allow(unused_variables)]
+    fn set_labelled_by(&mut self, view_id: Option<String>) {}
+
     fn get_background(&self) -> Option<u32> { None }
     #[allow(unused_variables)]
     fn set_background(&mut self, color: Option<u32>) {}
@@ -161,6 +175,36 @@ pub trait View: Downcast {
 
     fn as_container(&self) -> Option<&dyn Container> { None }
     fn as_container_mut(&mut self) -> Option<&mut dyn Container> { None }
+
+    /// The AccessKit node for this view: role plus widget-specific properties
+    /// (label, value, toggled state, supported actions). Universal properties
+    /// (bounds, disabled, tooltip-as-description, focus action, children) are
+    /// filled in by the tree builder in `crate::accessibility` — don't set
+    /// them here. The default is a plain structural container, which is right
+    /// for layout views; interactive widgets should override.
+    fn accessibility_node(&self) -> accesskit::Node {
+        accesskit::Node::new(accesskit::Role::GenericContainer)
+    }
+
+    /// Synthetic accessibility child nodes for view-internal items that are
+    /// not `View`s themselves (list rows, tabs, menu items). Derive each id
+    /// via [`crate::accessibility::item_node_id`] so it stays stable and
+    /// collision-free; any bounds set on these nodes are VIEW-LOCAL and the
+    /// tree builder translates them to window space. Emitted before the
+    /// view's real child views.
+    fn accessibility_children(&self) -> Vec<(accesskit::NodeId, accesskit::Node)> {
+        Vec::new()
+    }
+
+    /// Child `Element`s owned outside the `Container` protocol (virtualized
+    /// rows, notification items) that should still appear in the
+    /// accessibility tree. Each entry is the element plus an extra offset
+    /// from this view's own origin to the space the element's rect lives in
+    /// (e.g. content padding + scroll). The tree builder walks these like
+    /// ordinary children.
+    fn accessibility_child_elements(&self) -> Vec<(Element, Point<i32>)> {
+        Vec::new()
+    }
 
     /// When `true`, the XML parser does not treat this view's child tags as
     /// nested views. Instead it captures the literal inner markup of the

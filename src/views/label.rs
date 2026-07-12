@@ -301,6 +301,10 @@ impl Label {
         let _ = state.cached_text.take();
     }
 
+    pub fn get_text(&self) -> String {
+        self.state.borrow().text.clone()
+    }
+
     pub fn set_single_line(&self, single_line: bool) {
         let mut state = self.state.borrow_mut();
         state.single_line = single_line;
@@ -843,6 +847,22 @@ impl View for Label {
     fn get_tooltip(&self) -> Option<String> {
         self.base_get_tooltip()
     }
+
+    fn get_content_description(&self) -> Option<String> {
+        self.base_get_content_description()
+    }
+
+    fn set_content_description(&mut self, description: Option<String>) {
+        self.base_set_content_description(description);
+    }
+
+    fn get_labelled_by(&self) -> Option<String> {
+        self.base_get_labelled_by()
+    }
+
+    fn set_labelled_by(&mut self, view_id: Option<String>) {
+        self.base_set_labelled_by(view_id);
+    }
     fn set_tooltip(&mut self, tooltip: Option<String>) {
         self.base_set_tooltip(tooltip);
     }
@@ -888,6 +908,21 @@ impl View for Label {
     fn click(&self, ui: &mut UI) -> bool {
         if !self.base_is_enabled() { return false; }
         self.fire_click(ui)
+    }
+
+    fn accessibility_node(&self) -> accesskit::Node {
+        if self.is_link() {
+            let mut node = accesskit::Node::new(accesskit::Role::Link);
+            node.set_label(self.get_text());
+            node.add_action(accesskit::Action::Click);
+            return node;
+        }
+        let mut node = accesskit::Node::new(accesskit::Role::Label);
+        // AccessKit convention: a static-text node's content is its VALUE
+        // (`label_comes_from_value`); platform adapters derive the accessible
+        // name from it, and `labelled_by` associations read it too.
+        node.set_value(self.get_text());
+        node
     }
 
     fn on_mouse_move(&self, ui: &mut UI, position: Point<i32>) -> bool {

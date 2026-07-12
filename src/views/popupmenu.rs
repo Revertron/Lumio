@@ -658,6 +658,22 @@ impl View for PopupMenu {
     fn get_tooltip(&self) -> Option<String> {
         self.base_get_tooltip()
     }
+
+    fn get_content_description(&self) -> Option<String> {
+        self.base_get_content_description()
+    }
+
+    fn set_content_description(&mut self, description: Option<String>) {
+        self.base_set_content_description(description);
+    }
+
+    fn get_labelled_by(&self) -> Option<String> {
+        self.base_get_labelled_by()
+    }
+
+    fn set_labelled_by(&mut self, view_id: Option<String>) {
+        self.base_set_labelled_by(view_id);
+    }
     fn set_tooltip(&mut self, tooltip: Option<String>) {
         self.base_set_tooltip(tooltip);
     }
@@ -698,6 +714,46 @@ impl View for PopupMenu {
 
     fn fire_event(&self, ui: &mut UI, event: EventType, data: &EventData) -> bool {
         self.base_fire_event(ui, event, data)
+    }
+
+    fn accessibility_node(&self) -> accesskit::Node {
+        accesskit::Node::new(accesskit::Role::Menu)
+    }
+
+    fn accessibility_children(&self) -> Vec<(accesskit::NodeId, accesskit::Node)> {
+        let id = self.get_id();
+        let state = self.state.borrow();
+        let scale = state.scale;
+        let padding = state.padding.scaled(scale);
+        let width = state.rect.width();
+        drop(state);
+        let item_h = (ITEM_HEIGHT as f64 * scale).round() as i32;
+        let sep_h = (SEPARATOR_HEIGHT as f64 * scale).round() as i32;
+        let open_submenu = self.submenu_open.borrow().as_ref().map(|(i, _)| *i);
+        let mut result = Vec::new();
+        let mut y = padding.top;
+        for (i, item) in self.items.borrow().iter().enumerate() {
+            if item.separator {
+                y += sep_h;
+                continue;
+            }
+            let mut node = accesskit::Node::new(accesskit::Role::MenuItem);
+            node.set_label(item.text.clone());
+            if !item.children.is_empty() {
+                node.set_expanded(open_submenu == Some(i));
+            }
+            node.add_action(accesskit::Action::Click);
+            // View-local; the tree builder translates to window space.
+            node.set_bounds(accesskit::Rect {
+                x0: padding.left as f64,
+                y0: y as f64,
+                x1: (width - padding.right) as f64,
+                y1: (y + item_h) as f64,
+            });
+            result.push((crate::accessibility::item_node_id(&id, i), node));
+            y += item_h;
+        }
+        result
     }
 
     fn click(&self, ui: &mut UI) -> bool {

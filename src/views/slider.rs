@@ -174,6 +174,18 @@ impl Slider {
         self.value.get()
     }
 
+    pub fn get_min(&self) -> f32 {
+        self.min.get()
+    }
+
+    pub fn get_max(&self) -> f32 {
+        self.max.get()
+    }
+
+    pub fn get_step(&self) -> f32 {
+        self.step.get()
+    }
+
     /// Set the value, clamping to `[min, max]` and snapping to `step`. Returns
     /// whether the stored value actually changed. Does not fire an event.
     pub fn set_value(&self, v: f32) -> bool {
@@ -209,6 +221,17 @@ impl Slider {
     pub fn set_label_style(&self, style: LabelStyle) {
         self.label_style.set(style);
         self.invalidate();
+    }
+
+    /// Step the value by `direction` keyboard increments (+1 / -1), firing
+    /// `ValueChanged` when the value changes. Mirrors the arrow-key path;
+    /// used by the assistive-technology Increment/Decrement actions.
+    pub fn nudge(&self, ui: &mut UI, direction: i32) -> bool {
+        let changed = self.set_value(self.value.get() + self.increment() * direction as f32);
+        if changed {
+            self.fire_changed(ui);
+        }
+        changed
     }
 
     fn invalidate(&self) {
@@ -695,6 +718,22 @@ impl View for Slider {
         self.base_get_tooltip()
     }
 
+    fn get_content_description(&self) -> Option<String> {
+        self.base_get_content_description()
+    }
+
+    fn set_content_description(&mut self, description: Option<String>) {
+        self.base_set_content_description(description);
+    }
+
+    fn get_labelled_by(&self) -> Option<String> {
+        self.base_get_labelled_by()
+    }
+
+    fn set_labelled_by(&mut self, view_id: Option<String>) {
+        self.base_set_labelled_by(view_id);
+    }
+
     fn set_tooltip(&mut self, tooltip: Option<String>) {
         self.base_set_tooltip(tooltip);
     }
@@ -745,6 +784,21 @@ impl View for Slider {
 
     fn click(&self, _ui: &mut UI) -> bool {
         false
+    }
+
+    fn accessibility_node(&self) -> accesskit::Node {
+        let mut node = accesskit::Node::new(accesskit::Role::Slider);
+        node.set_numeric_value(f64::from(self.get_value()));
+        node.set_min_numeric_value(f64::from(self.get_min()));
+        node.set_max_numeric_value(f64::from(self.get_max()));
+        let step = self.get_step();
+        if step > 0.0 {
+            node.set_numeric_value_step(f64::from(step));
+        }
+        node.add_action(accesskit::Action::SetValue);
+        node.add_action(accesskit::Action::Increment);
+        node.add_action(accesskit::Action::Decrement);
+        node
     }
 
     fn on_mouse_button_down(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {

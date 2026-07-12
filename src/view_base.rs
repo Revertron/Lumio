@@ -222,6 +222,22 @@ pub trait ViewBasics: HasMainFields {
         self.main_fields().borrow_mut().tooltip = tooltip;
     }
 
+    fn base_get_content_description(&self) -> Option<String> {
+        self.main_fields().borrow().content_description.clone()
+    }
+
+    fn base_set_content_description(&self, description: Option<String>) {
+        self.main_fields().borrow_mut().content_description = description;
+    }
+
+    fn base_get_labelled_by(&self) -> Option<String> {
+        self.main_fields().borrow().labelled_by.clone()
+    }
+
+    fn base_set_labelled_by(&self, view_id: Option<String>) {
+        self.main_fields().borrow_mut().labelled_by = view_id;
+    }
+
     fn base_get_background(&self) -> Option<u32> {
         let fields = self.main_fields().borrow();
         if let Some(ref selector) = fields.background {
@@ -381,6 +397,14 @@ pub trait ViewBasics: HasMainFields {
             }
             "tooltip" => {
                 fields.borrow_mut().tooltip = Some(value.to_owned());
+                true
+            }
+            "content_description" => {
+                fields.borrow_mut().content_description = Some(value.to_owned());
+                true
+            }
+            "labelled_by" => {
+                fields.borrow_mut().labelled_by = Some(value.to_owned());
                 true
             }
             "background" => {
