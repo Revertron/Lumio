@@ -29,7 +29,7 @@
         <ComboBox id="combo1" width="240" items="Option A|Option B|Option C" selected="0"/>
 
         <!-- Nested Item tags -->
-        <ComboBox id="combo1" width="240" selected="2">
+        <ComboBox id="combo2" width="240" selected="2">
             <Item text="Very long Option A"/>
             <Item text="Very long Option B"/>
             <Item text="Option C"/>

@@ -503,6 +503,69 @@ impl UI {
         self.sync_focus()
     }
 
+    /// Moves keyboard focus to the next focusable view in document order,
+    /// wrapping at the end; when nothing has focus yet the first focusable
+    /// view is focused. Bound to Tab. Returns true if focus changed.
+    pub fn focus_next_view(&mut self) -> bool {
+        self.move_focus(false)
+    }
+
+    /// Moves keyboard focus to the previous focusable view in document order,
+    /// wrapping at the start. Bound to Shift+Tab. Returns true if focus changed.
+    pub fn focus_prev_view(&mut self) -> bool {
+        self.move_focus(true)
+    }
+
+    fn move_focus(&mut self, backwards: bool) -> bool {
+        // Under a modal overlay keyboard focus is confined to it.
+        let scope = match self.overlays.iter().rev().find(|e| e.mode == PopupMode::Modal) {
+            Some(entry) => Rc::clone(&entry.element),
+            None => match &self.root {
+                Some(root) => Rc::clone(root),
+                None => return false,
+            },
+        };
+        let mut focusables = Vec::new();
+        Self::collect_focusables(&scope, &mut focusables);
+        if focusables.is_empty() {
+            return false;
+        }
+        let current = focusables.iter()
+            .position(|el| el.borrow().get_state().map(|s| s.focused).unwrap_or(false));
+        let len = focusables.len();
+        let next = match current {
+            Some(i) if backwards => (i + len - 1) % len,
+            Some(i) => (i + 1) % len,
+            None if backwards => len - 1,
+            None => 0,
+        };
+        let target = Rc::clone(&focusables[next]);
+        self.set_focus_to(&target);
+        // Report the move by element identity, not by set_focus_to's result:
+        // its sync_focus diff compares view ids, which reads as "no change"
+        // when two views share an id — the key must still count as consumed
+        // (and trigger a redraw) because focus really moved.
+        current != Some(next)
+    }
+
+    /// Collects focusable, visible, enabled views in document order. Descends
+    /// only into children a container currently shows (`hit_test_views`), so
+    /// views on inactive `TabView` tabs are not reachable with Tab.
+    fn collect_focusables(element: &Element, result: &mut Vec<Element>) {
+        let view = element.borrow();
+        if view.get_visibility() != Visibility::Visible || !view.is_enabled() {
+            return;
+        }
+        if view.get_state().map(|s| s.focusable).unwrap_or(false) {
+            result.push(Rc::clone(element));
+        }
+        if let Some(container) = view.as_container() {
+            for child in container.hit_test_views() {
+                Self::collect_focusables(&child, result);
+            }
+        }
+    }
+
     /// Clear the text selection in every view (overlays + root). Selectable
     /// views (`Label`, `RichText`) drop their highlight; everything else is a
     /// no-op. Called when a view starts a new selection so only one view holds
@@ -1883,6 +1946,16 @@ impl UI {
             }
         }
         let mut consumed = self.dispatch_key_down(virtual_key_code, scancode, modifiers.clone());
+        // Tab / Shift+Tab move keyboard focus when no view consumed the key
+        // (views that want a literal Tab consume it themselves).
+        if !consumed && virtual_key_code == Some(VirtualKeyCode::Tab)
+            && !modifiers.ctrl() && !modifiers.alt() {
+            consumed = if modifiers.shift() {
+                self.focus_prev_view()
+            } else {
+                self.focus_next_view()
+            };
+        }
         // Global shortcuts are a fallback: anything the focused view or an
         // overlay consumed (e.g. Ctrl+Z in an Edit) keeps priority. Blocked
         // while a modal dialog is open.

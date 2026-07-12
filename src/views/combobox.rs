@@ -3,7 +3,7 @@ use std::cmp::max;
 use std::rc::Rc;
 
 use crate::text::{TextBlock, TextOptions};
-use crate::input::MouseButton;
+use crate::input::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
 
 use crate::assets::get_font_family;
 use crate::events::{EventCallback, EventData, EventType};
@@ -175,7 +175,7 @@ impl ComboBox {
         let scale = self.state.borrow().main.scale;
         let width = self.get_rect_width();
 
-        let dropdown = ComboDropdown::new(items, typeface, scale, width, Rc::clone(&self.pending_selection));
+        let dropdown = ComboDropdown::new(items, typeface, scale, width, Rc::clone(&self.pending_selection), *self.selected.borrow());
         let element: Element = Rc::new(RefCell::new(dropdown));
 
         let pos = self.get_absolute_position();
@@ -550,6 +550,22 @@ impl View for ComboBox {
         }
         false
     }
+
+    // Space, Enter or Alt+Down open the dropdown when the box is focused;
+    // the dropdown itself handles arrow keys and Enter as an overlay.
+    fn on_key_down(&self, ui: &mut UI, virtual_key_code: Option<VirtualKeyCode>, _scancode: KeyScancode, state: ModifiersState) -> bool {
+        if !self.base_is_enabled() { return false; }
+        let open = match virtual_key_code {
+            Some(VirtualKeyCode::Space | VirtualKeyCode::Return | VirtualKeyCode::NumpadEnter) => true,
+            Some(VirtualKeyCode::Down) => state.alt(),
+            _ => false,
+        };
+        if open && !self.is_open() {
+            self.open_dropdown(ui);
+            return true;
+        }
+        false
+    }
 }
 
 impl Default for ComboBox {
@@ -587,6 +603,7 @@ impl ComboDropdown {
         scale: f64,
         combo_width: i32,
         pending_selection: Rc<RefCell<Option<usize>>>,
+        selected: Option<usize>,
     ) -> Self {
         let mut main = FieldsMain::with_rect(rect((0, 0), (combo_width, 100)), Dimension::Min, Dimension::Min);
         main.padding = Borders::with_padding(2);
@@ -597,7 +614,8 @@ impl ComboDropdown {
             state: RefCell::new(main),
             items,
             cached_texts: RefCell::new(cached_texts),
-            hovered: RefCell::new(None),
+            // Keyboard navigation starts from the current selection.
+            hovered: RefCell::new(selected),
             pressed: RefCell::new(None),
             pending_selection,
             typeface,
@@ -897,5 +915,46 @@ impl View for ComboDropdown {
             }
         }
         false
+    }
+
+    // Keyboard navigation while the dropdown is open (dispatched as an
+    // overlay, before the root tree): arrows move the highlight, Enter
+    // commits it. Esc is handled by the generic popup-dismiss path.
+    fn on_key_down(&self, ui: &mut UI, virtual_key_code: Option<VirtualKeyCode>, _scancode: KeyScancode, _state: ModifiersState) -> bool {
+        let count = self.items.len();
+        if count == 0 {
+            return false;
+        }
+        let Some(code) = virtual_key_code else { return false; };
+        let current = *self.hovered.borrow();
+        match code {
+            VirtualKeyCode::Down => {
+                let next = current.map(|i| (i + 1).min(count - 1)).unwrap_or(0);
+                *self.hovered.borrow_mut() = Some(next);
+                true
+            }
+            VirtualKeyCode::Up => {
+                let next = current.map(|i| i.saturating_sub(1)).unwrap_or(count - 1);
+                *self.hovered.borrow_mut() = Some(next);
+                true
+            }
+            VirtualKeyCode::Home => {
+                *self.hovered.borrow_mut() = Some(0);
+                true
+            }
+            VirtualKeyCode::End => {
+                *self.hovered.borrow_mut() = Some(count - 1);
+                true
+            }
+            VirtualKeyCode::Return | VirtualKeyCode::NumpadEnter => {
+                if let Some(i) = current {
+                    *self.pending_selection.borrow_mut() = Some(i);
+                    let id = self.get_id();
+                    ui.close_popup(&id);
+                }
+                true
+            }
+            _ => false,
+        }
     }
 }

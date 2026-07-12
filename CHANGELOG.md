@@ -5,6 +5,35 @@ All notable changes to Lumio are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project aims to adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-07-13
+
+Keyboard navigation: Tab/Shift+Tab focus traversal and keyboard activation
+for all interactive widgets.
+
+### Fixed
+
+- **The Space key never reached views** — the winit→Lumio key table had no
+  mapping for the spacebar, so `on_key_down`/`on_key_up` fired with `None`.
+  Space now maps to `VirtualKeyCode::Space` (both backends share the table).
+- **Tab between two views sharing the same `id` is now consumed** (and
+  redraws): the focus-change diff compares ids, so the move used to read as
+  "no change" and the window kept painting the old focus.
+
+### Added
+
+- **Keyboard navigation.** Tab / Shift+Tab move focus across the whole view
+  tree in document order (wrapping, skipping disabled/invisible views and
+  views on inactive `TabView` tabs; confined to a modal overlay while one is
+  open). New `UI::focus_next_view()` / `UI::focus_prev_view()`. Focused
+  widgets now respond to the keyboard: `Button`/`ImageButton` activate on
+  Space/Enter, `CheckBox`/`RadioButton` toggle/select on Space (the checkbox
+  draws a focus outline around its label), `ComboBox` opens on
+  Space/Enter/Alt+Down and its dropdown is navigable with the arrow keys +
+  Enter. The `TabView` tab strip is a focus stop: Left/Right switch tabs
+  (firing `SelectionChanged`), with a focus outline on the active tab; a
+  strip-focused TabView no longer forwards keys to hidden tab content. New
+  `Theme::draw_rect_outline` helper (default impl on both backends).
+
 ## [0.2.0] - 2026-07-12
 
 Screen-reader accessibility via [AccessKit](https://accesskit.dev): every

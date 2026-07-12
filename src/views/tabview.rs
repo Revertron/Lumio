@@ -69,6 +69,22 @@ impl TabView {
         self.tabs.get(index).map(|t| t.title.clone())
     }
 
+    /// Whether the tab strip itself (not a view inside a tab) holds keyboard
+    /// focus. While it does, Left/Right switch tabs.
+    fn strip_focused(&self) -> bool {
+        self.state.borrow().state.focused
+    }
+
+    /// Switches to `index` and fires `SelectionChanged`; no-op when out of
+    /// range or already active.
+    fn change_tab(&self, ui: &mut UI, index: usize) {
+        if index >= self.views.len() || index == self.active_tab.get() {
+            return;
+        }
+        self.active_tab.set(index);
+        self.base_fire_event(ui, EventType::SelectionChanged, &EventData::Selected(index));
+    }
+
     fn set_font(&mut self, font_name: &str) {
         self.state.borrow_mut().font_manager.set_font(font_name);
     }
@@ -302,6 +318,20 @@ impl View for TabView {
                 let color = theme.get_text_color(view_state, self.state.borrow().foreground.as_ref());
                 theme.draw_text(text_x.round(), text_y.round(), color, text);
             }
+
+            // Keyboard-focus indicator: thin outline inside the active tab
+            // while the strip holds focus.
+            if view_state.focused && view_state.enabled {
+                let inset = (3.0 * scale).round() as i32;
+                let fr = rect(
+                    (tr.min.x + inset, tr.min.y + inset),
+                    (tr.max.x - inset, tr.max.y - inset),
+                );
+                if fr.width() > 0 && fr.height() > 0 {
+                    let width = (scale.round() as i32).max(1);
+                    theme.draw_rect_outline(fr, theme.color("focus"), width);
+                }
+            }
         }
 
         // Paint only the active child
@@ -379,6 +409,10 @@ impl View for TabView {
     }
 
     fn is_focused(&self) -> bool {
+        // The strip itself, or a view inside the active tab.
+        if self.state.borrow().state.focused {
+            return true;
+        }
         let active = self.active_tab.get();
         if active < self.views.len() {
             return self.views[active].borrow().is_focused();
@@ -391,11 +425,12 @@ impl View for TabView {
     }
 
     fn set_focused(&self, focused: bool) {
-        if focused {
-            return;
-        }
-        for v in self.views.iter() {
-            v.borrow().set_focused(false);
+        // `true` focuses the tab strip; children get focus individually.
+        self.state.borrow_mut().state.focused = focused;
+        if !focused {
+            for v in self.views.iter() {
+                v.borrow().set_focused(false);
+            }
         }
     }
 
@@ -548,6 +583,11 @@ impl View for TabView {
         if local_y < tab_bar_h {
             for (i, tab) in self.tabs.iter().enumerate() {
                 if tab.tab_rect.hit((local_x, local_y)) {
+                    // Clicking the strip gives it keyboard focus (children lose theirs).
+                    self.state.borrow_mut().state.focused = true;
+                    for v in self.views.iter() {
+                        v.borrow().set_focused(false);
+                    }
                     if i != self.active_tab.get() {
                         self.active_tab.set(i);
                         // Fire SelectionChanged listener
@@ -568,7 +608,9 @@ impl View for TabView {
             if v.borrow().on_mouse_button_down(ui, Point::new(local_x, local_y), button) {
                 focused = !f && v.borrow().is_focused();
                 if focused {
-                    // Unfocus other tabs' children
+                    // Focus moved into the content: the strip loses it, and so
+                    // do other tabs' children.
+                    self.state.borrow_mut().state.focused = false;
                     for (j, vv) in self.views.iter().enumerate() {
                         if j != active {
                             vv.borrow().set_focused(false);
@@ -600,6 +642,29 @@ impl View for TabView {
     }
 
     fn on_key_down(&self, ui: &mut UI, virtual_key_code: Option<VirtualKeyCode>, scancode: KeyScancode, state: ModifiersState) -> bool {
+        // While the strip has focus, Left/Right switch tabs. Both are
+        // consumed even at the ends so horizontal arrow focus-traversal in
+        // the parent Frame doesn't move focus away mid-strip; Up/Down are
+        // left alone so vertical traversal still works.
+        if self.strip_focused() {
+            if let Some(code) = virtual_key_code {
+                let active = self.active_tab.get();
+                match code {
+                    VirtualKeyCode::Left => {
+                        if active > 0 {
+                            self.change_tab(ui, active - 1);
+                        }
+                        return true;
+                    }
+                    VirtualKeyCode::Right => {
+                        self.change_tab(ui, active + 1);
+                        return true;
+                    }
+                    _ => {}
+                }
+            }
+            return false;
+        }
         let active = self.active_tab.get();
         if active < self.views.len() {
             return self.views[active].borrow().on_key_down(ui, virtual_key_code, scancode, state);
@@ -608,6 +673,9 @@ impl View for TabView {
     }
 
     fn on_key_up(&self, ui: &mut UI, virtual_key_code: Option<VirtualKeyCode>, scancode: KeyScancode, state: ModifiersState) -> bool {
+        if self.strip_focused() {
+            return false;
+        }
         let active = self.active_tab.get();
         if active < self.views.len() {
             return self.views[active].borrow().on_key_up(ui, virtual_key_code, scancode, state);
@@ -616,6 +684,9 @@ impl View for TabView {
     }
 
     fn on_key_char(&self, ui: &mut UI, unicode_codepoint: char, state: ModifiersState) -> bool {
+        if self.strip_focused() {
+            return false;
+        }
         let active = self.active_tab.get();
         if active < self.views.len() {
             return self.views[active].borrow().on_key_char(ui, unicode_codepoint, state);
@@ -626,8 +697,9 @@ impl View for TabView {
 
 impl Default for TabView {
     fn default() -> Self {
-        let mut main = FieldsMain::with_rect(rect((0, 0), (400, 300)), Dimension::Max, Dimension::Max);
-        main.state.focusable = false;
+        // Focusable: the tab strip is a keyboard-focus stop (Left/Right
+        // switch tabs); views inside tabs receive focus individually.
+        let main = FieldsMain::with_rect(rect((0, 0), (400, 300)), Dimension::Max, Dimension::Max);
         TabView {
             state: RefCell::new(main),
             views: Vec::new(),

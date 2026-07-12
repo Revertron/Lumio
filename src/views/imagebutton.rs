@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use crate::input::MouseButton;
+use crate::input::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
 
 use crate::events::{EventCallback, EventData, EventType};
 use crate::image_source::ImageSource;
@@ -359,6 +359,27 @@ impl View for ImageButton {
                 self.state.borrow_mut().state.pressed = false;
                 return true;
             }
+        }
+        false
+    }
+
+    // Space/Enter activate the focused button: press on key down, click on key up.
+    fn on_key_down(&self, _ui: &mut UI, virtual_key_code: Option<VirtualKeyCode>, _scancode: KeyScancode, _state: ModifiersState) -> bool {
+        if !self.base_is_enabled() { return false; }
+        if matches!(virtual_key_code, Some(VirtualKeyCode::Space | VirtualKeyCode::Return | VirtualKeyCode::NumpadEnter)) {
+            self.state.borrow_mut().state.pressed = true;
+            return true;
+        }
+        false
+    }
+
+    fn on_key_up(&self, ui: &mut UI, virtual_key_code: Option<VirtualKeyCode>, _scancode: KeyScancode, _state: ModifiersState) -> bool {
+        if !self.base_is_enabled() { return false; }
+        if matches!(virtual_key_code, Some(VirtualKeyCode::Space | VirtualKeyCode::Return | VirtualKeyCode::NumpadEnter))
+            && self.state.borrow().state.pressed {
+            self.state.borrow_mut().state.pressed = false;
+            self.click(ui);
+            return true;
         }
         false
     }

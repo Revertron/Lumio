@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::cmp::max;
 
 use crate::text::{TextAlignment, TextOptions};
-use crate::input::MouseButton;
+use crate::input::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
 
 use crate::assets::get_font_family;
 use crate::events::{EventCallback, EventData, EventType};
@@ -207,6 +207,36 @@ impl View for CheckBox {
         // Step 4: Draw checkmark if checked (on top of borders)
         if state.main.state.checked {
             theme.draw_component("checkbox.checkmark", box_rect, state.main.state);
+        }
+
+        // Keyboard-focus indicator: thin outline around the label (or the box
+        // when there is no label) — the box drawable has no focused selector.
+        // Clamped to the view rect: the paint is clipped to it, and the
+        // checkbox rect hugs its content.
+        if state.main.state.focused && state.main.state.enabled {
+            let pad = (2.0 * state.main.scale).round() as i32;
+            let target = match &state.cached_text {
+                Some(text) => {
+                    let x = rect.min.x + box_size + (self.text_margin as f64 * state.main.scale).round() as i32;
+                    let y = rect.min.y + ((self.get_rect_height() as f32 - text.height()) / 2f32) as i32;
+                    super::super::types::rect(
+                        (x - pad, y - pad),
+                        (x + text.width().ceil() as i32 + pad, y + text.height().ceil() as i32 + pad),
+                    )
+                }
+                None => super::super::types::rect(
+                    (box_rect.min.x - pad, box_rect.min.y - pad),
+                    (box_rect.max.x + pad, box_rect.max.y + pad),
+                ),
+            };
+            let focus_rect = super::super::types::rect(
+                (target.min.x.max(rect.min.x), target.min.y.max(rect.min.y)),
+                (target.max.x.min(rect.max.x), target.max.y.min(rect.max.y)),
+            );
+            if focus_rect.width() > 0 && focus_rect.height() > 0 {
+                let width = (state.main.scale.round() as i32).max(1);
+                theme.draw_rect_outline(focus_rect, theme.color("focus"), width);
+            }
         }
 
         theme.pop_clip();
@@ -422,6 +452,27 @@ impl View for CheckBox {
                 state.main.state.pressed = false;
                 return true;
             }
+        }
+        false
+    }
+
+    // Space toggles the focused checkbox: press on key down, click on key up.
+    fn on_key_down(&self, _ui: &mut UI, virtual_key_code: Option<VirtualKeyCode>, _scancode: KeyScancode, _state: ModifiersState) -> bool {
+        if !self.base_is_enabled() { return false; }
+        if matches!(virtual_key_code, Some(VirtualKeyCode::Space)) {
+            self.state.borrow_mut().main.state.pressed = true;
+            return true;
+        }
+        false
+    }
+
+    fn on_key_up(&self, ui: &mut UI, virtual_key_code: Option<VirtualKeyCode>, _scancode: KeyScancode, _state: ModifiersState) -> bool {
+        if !self.base_is_enabled() { return false; }
+        if matches!(virtual_key_code, Some(VirtualKeyCode::Space))
+            && self.state.borrow().main.state.pressed {
+            self.state.borrow_mut().main.state.pressed = false;
+            self.click(ui);
+            return true;
         }
         false
     }

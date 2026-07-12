@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::cmp::max;
 
 use crate::text::{TextAlignment, TextOptions};
-use crate::input::MouseButton;
+use crate::input::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
 
 use crate::assets::get_font_family;
 use crate::events::{EventCallback, EventData, EventType};
@@ -392,6 +392,28 @@ impl View for Button {
                 state.main.state.pressed = false;
                 return true;
             }
+        }
+        false
+    }
+
+    // Space/Enter activate the focused button: press on key down (visual
+    // feedback, idempotent under auto-repeat), click on key up.
+    fn on_key_down(&self, _ui: &mut UI, virtual_key_code: Option<VirtualKeyCode>, _scancode: KeyScancode, _state: ModifiersState) -> bool {
+        if !self.base_is_enabled() { return false; }
+        if matches!(virtual_key_code, Some(VirtualKeyCode::Space | VirtualKeyCode::Return | VirtualKeyCode::NumpadEnter)) {
+            self.state.borrow_mut().main.state.pressed = true;
+            return true;
+        }
+        false
+    }
+
+    fn on_key_up(&self, ui: &mut UI, virtual_key_code: Option<VirtualKeyCode>, _scancode: KeyScancode, _state: ModifiersState) -> bool {
+        if !self.base_is_enabled() { return false; }
+        if matches!(virtual_key_code, Some(VirtualKeyCode::Space | VirtualKeyCode::Return | VirtualKeyCode::NumpadEnter))
+            && self.state.borrow().main.state.pressed {
+            self.state.borrow_mut().main.state.pressed = false;
+            self.click(ui);
+            return true;
         }
         false
     }

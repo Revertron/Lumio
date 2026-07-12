@@ -135,6 +135,16 @@ pub trait Theme {
         self.draw_rect(rect, color);
     }
 
+    /// Thin rectangular outline (four filled strips), `width` in physical
+    /// pixels. Used for keyboard-focus indicators.
+    fn draw_rect_outline(&mut self, rect: Rect<i32>, color: u32, width: i32) {
+        let w = width.max(1);
+        self.draw_rect(crate::types::rect((rect.min.x, rect.min.y), (rect.max.x, rect.min.y + w)), color);
+        self.draw_rect(crate::types::rect((rect.min.x, rect.max.y - w), (rect.max.x, rect.max.y)), color);
+        self.draw_rect(crate::types::rect((rect.min.x, rect.min.y + w), (rect.min.x + w, rect.max.y - w)), color);
+        self.draw_rect(crate::types::rect((rect.max.x - w, rect.min.y + w), (rect.max.x, rect.max.y - w)), color);
+    }
+
     // New drawable-based methods
     /// Draw a drawable at the specified rectangle
     fn draw_drawable(&mut self, drawable: &Drawable, rect: Rect<i32>);
