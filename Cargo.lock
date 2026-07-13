@@ -1736,7 +1736,7 @@ dependencies = [
 
 [[package]]
 name = "lumio-gui"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "accesskit",
  "accesskit_winit",
@@ -1748,6 +1748,7 @@ dependencies = [
  "glutin-winit",
  "image",
  "include_dir",
+ "log",
  "quick-xml 0.41.0",
  "rand 0.8.6",
  "raw-window-handle",

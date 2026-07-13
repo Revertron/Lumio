@@ -14,6 +14,8 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use log::warn;
+
 use image::GenericImageView;
 
 use crate::assets::get_asset;
@@ -157,7 +159,7 @@ impl ImageSource {
         }
         self.loaded = true;
         let Some(bytes) = get_asset(&self.path) else {
-            println!("ImageSource: asset not found: {}", self.path);
+            warn!("ImageSource: asset not found: {}", self.path);
             return;
         };
         let is_svg = self.path.to_ascii_lowercase().ends_with(".svg") || svg::looks_like_svg(&bytes);
@@ -166,14 +168,14 @@ impl ImageSource {
                 let s = tree.size();
                 self.natural_size = (s.width().ceil() as u32, s.height().ceil() as u32);
             } else {
-                println!("ImageSource: failed to parse SVG: {}", self.path);
+                warn!("ImageSource: failed to parse SVG: {}", self.path);
             }
         } else {
             // Sniff the format from the content — user files (avatars,
             // downloads) often carry non-image extensions.
             match image::load_from_memory(&bytes) {
                 Ok(img) => self.natural_size = img.dimensions(),
-                Err(e) => println!("ImageSource: failed to decode image: {}", e),
+                Err(e) => warn!("ImageSource: failed to decode image: {}", e),
             }
         }
         self.is_svg = is_svg;

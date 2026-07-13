@@ -1,6 +1,8 @@
 use std::cell::{RefCell, RefMut};
 use std::rc::Rc;
 
+use log::trace;
+
 use crate::input::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
 use super::background::{self, BackgroundImage};
 use super::events::{EventCallback, EventData, EventType};
@@ -614,7 +616,7 @@ impl View for Frame {
                 }
             }
             if v.borrow().is_focused() {
-                println!("Found focused view {}", v.borrow().get_id());
+                trace!("Found focused view {}", v.borrow().get_id());
                 if v.borrow().on_key_down(ui, virtual_key_code, scancode, state.clone()) {
                     return true;
                 }
@@ -643,7 +645,7 @@ impl View for Frame {
                 }
             }
         }
-        println!("KD finished in {}", self.get_id());
+        trace!("KD finished in {}", self.get_id());
         false
     }
 

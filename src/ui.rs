@@ -5,6 +5,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
+use log::warn;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::{Reader, XmlVersion};
 use super::input::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, MouseScrollDistance, VirtualKeyCode};
@@ -1240,7 +1241,7 @@ impl UI {
                         view.borrow_mut().set_any(name, value);
                     }
                 }
-                None => eprintln!("Unknown style '{}' on <{}>", style_name, view_type),
+                None => warn!("Unknown style '{}' on <{}>", style_name, view_type),
             }
         }
         for (name, value) in &attributes {
@@ -1255,7 +1256,7 @@ impl UI {
     /// Register the attribute bundle of a `<Style name="..." .../>` element.
     fn parse_style(&mut self, e: &BytesStart) {
         let Some(name) = UI::get_attribute(e, "name") else {
-            eprintln!("<Style> element without a name attribute, ignored");
+            warn!("<Style> element without a name attribute, ignored");
             return;
         };
         let mut bundle = Vec::new();
@@ -1818,7 +1819,7 @@ impl UI {
     pub fn add_shortcut(&mut self, accel: &str, handler: Box<dyn FnMut(&mut UI) -> bool>) {
         match accel.parse::<Shortcut>() {
             Ok(shortcut) => self.add_shortcut_keys(shortcut, handler),
-            Err(e) => eprintln!("Bad shortcut: {}", e),
+            Err(e) => warn!("Bad shortcut: {}", e),
         }
     }
 

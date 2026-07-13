@@ -288,7 +288,7 @@ impl Walker {
             // freak hash collision: a TreeUpdate must not contain the same id
             // twice, so drop this subtree rather than corrupt the tree.
             #[cfg(debug_assertions)]
-            eprintln!("accessibility: duplicate node for view id {:?}, subtree skipped", view.get_id());
+            log::warn!("accessibility: duplicate node for view id {:?}, subtree skipped", view.get_id());
             return None;
         }
 
@@ -368,7 +368,7 @@ impl Walker {
         for (child_id, child_node) in view.accessibility_children() {
             if !self.seen.insert(child_id) {
                 #[cfg(debug_assertions)]
-                eprintln!("accessibility: duplicate synthetic node under view id {:?}, item skipped", view.get_id());
+                log::warn!("accessibility: duplicate synthetic node under view id {:?}, item skipped", view.get_id());
                 continue;
             }
             synthetic.push((child_id, child_node));

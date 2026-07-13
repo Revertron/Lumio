@@ -5,6 +5,7 @@
 
 use std::collections::{HashMap, VecDeque};
 
+use log::error;
 use tiny_skia::{FillRule, FilterQuality, IntSize, Mask, Paint as TsPaint, PathBuilder, Pixmap, PixmapPaint, Rect as TsRect, Transform};
 
 use super::super::drawing::engine_software::{argb_to_color, SoftwareDrawingEngine};
@@ -361,7 +362,7 @@ impl<'h> Theme for SoftwareTheme<'h> {
                     self.image_cache.insert(cache_key, (rgba.into_raw(), w, h));
                 }
                 Err(e) => {
-                    println!("Error decoding image: {}", e);
+                    error!("Error decoding image: {}", e);
                     return;
                 }
             }

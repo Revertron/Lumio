@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use log::trace;
 use crate::text::{TextBlock, TextOptions};
 use crate::input::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
 use super::super::assets::get_font_family;
@@ -421,7 +422,7 @@ impl View for List {
     fn on_mouse_button_down(&self, _ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
         if self.state.borrow().rect.hit((position.x, position.y)) {
-            println!("hit list");
+            trace!("hit list");
             if matches!(button, MouseButton::Left) {
                 self.state.borrow_mut().state.pressed = true;
             }
@@ -429,7 +430,7 @@ impl View for List {
             let rect = self.state.borrow_mut().rect;
             if let Some(index) = self.get_hit_item(position.x - rect.min.x, position.y - rect.min.y) {
                 self.select_item(index);
-                println!("Selected item {:?}", *self.selected.borrow());
+                trace!("Selected item {:?}", *self.selected.borrow());
             }
             return true;
         }

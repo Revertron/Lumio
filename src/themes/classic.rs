@@ -1,6 +1,8 @@
 use std::collections::{HashMap, VecDeque};
 use std::io::Cursor;
 
+use log::error;
+
 use speedy2d::Graphics2D;
 use speedy2d::color::Color;
 use speedy2d::dimen::{UVec2, Vector2};
@@ -217,7 +219,7 @@ impl<'h> Theme for Classic<'h> {
                     self.image_cache.insert(cache_key, handle);
                 }
                 Err(e) => {
-                    println!("Error creating image: {}", e);
+                    error!("Error creating image: {}", e);
                     return;
                 }
             }
@@ -246,7 +248,7 @@ impl<'h> Theme for Classic<'h> {
                     self.image_cache.insert(key, handle);
                 }
                 Err(e) => {
-                    println!("Error uploading raw image: {}", e);
+                    error!("Error uploading raw image: {}", e);
                     return;
                 }
             }

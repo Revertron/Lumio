@@ -10,6 +10,8 @@ use std::ffi::CString;
 use std::num::NonZeroU32;
 use std::rc::Rc;
 
+use log::error;
+
 use glutin::config::{ConfigTemplateBuilder, GlConfig};
 use glutin::context::{
     ContextApi, ContextAttributesBuilder, NotCurrentGlContext, PossiblyCurrentContext,
@@ -64,11 +66,11 @@ impl GlBackend {
         let (mut window, gl_config) = match built {
             Ok(Ok(r)) => r,
             Ok(Err(e)) => {
-                eprintln!("window: GL display build failed: {e}");
+                error!("window: GL display build failed: {e}");
                 return None;
             }
             Err(_) => {
-                eprintln!("window: no suitable GL config found");
+                error!("window: no suitable GL config found");
                 return None;
             }
         };
@@ -81,7 +83,7 @@ impl GlBackend {
         let not_current = match unsafe { gl_display.create_context(&gl_config, &context_attributes) } {
             Ok(c) => c,
             Err(e) => {
-                eprintln!("window: GL create_context failed: {e}");
+                error!("window: GL create_context failed: {e}");
                 return None;
             }
         };
@@ -93,7 +95,7 @@ impl GlBackend {
             None => match glutin_winit::finalize_window(event_loop, attrs, &gl_config) {
                 Ok(w) => w,
                 Err(e) => {
-                    eprintln!("window: finalize_window failed: {e}");
+                    error!("window: finalize_window failed: {e}");
                     return None;
                 }
             },
@@ -102,21 +104,21 @@ impl GlBackend {
         let surf_attrs = match window.build_surface_attributes(SurfaceAttributesBuilder::default()) {
             Ok(a) => a,
             Err(e) => {
-                eprintln!("window: build_surface_attributes failed: {e}");
+                error!("window: build_surface_attributes failed: {e}");
                 return None;
             }
         };
         let surface = match unsafe { gl_display.create_window_surface(&gl_config, &surf_attrs) } {
             Ok(s) => s,
             Err(e) => {
-                eprintln!("window: create_window_surface failed: {e}");
+                error!("window: create_window_surface failed: {e}");
                 return None;
             }
         };
         let context = match not_current.make_current(&surface) {
             Ok(c) => c,
             Err(e) => {
-                eprintln!("window: make_current failed: {e}");
+                error!("window: make_current failed: {e}");
                 return None;
             }
         };
@@ -132,7 +134,7 @@ impl GlBackend {
         } {
             Ok(r) => r,
             Err(e) => {
-                eprintln!("window: GLRenderer creation failed: {e}");
+                error!("window: GLRenderer creation failed: {e}");
                 return None;
             }
         };

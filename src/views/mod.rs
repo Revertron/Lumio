@@ -216,7 +216,7 @@ impl FromStr for Dimension {
                     let float = match s[0..s.len()-1].parse::<f32>() {
                         Ok(float) => float,
                         Err(e) => {
-                            println!("Error parsing {}, {}", s, e);
+                            log::warn!("Error parsing {}, {}", s, e);
                             0f32
                         }
                     };
@@ -225,7 +225,7 @@ impl FromStr for Dimension {
                     let int = match s[0..s.len()].parse::<u32>() {
                         Ok(int) => int,
                         Err(e) => {
-                            println!("Error parsing {}, {}", s, e);
+                            log::warn!("Error parsing {}, {}", s, e);
                             0u32
                         }
                     };

@@ -345,10 +345,10 @@ impl App {
                 return result;
             }
             if crate::backend::env_backend() == Some(RenderBackend::Gl) {
-                eprintln!("window: GL init failed and LUMIO_BACKEND=gl forbids the software fallback");
+                log::error!("window: GL init failed and LUMIO_BACKEND=gl forbids the software fallback");
                 return None;
             }
-            eprintln!("window: OpenGL initialization failed; falling back to software rendering");
+            log::warn!("window: OpenGL initialization failed; falling back to software rendering");
             crate::backend::set_active_backend(RenderBackend::Software);
             self.backend = Backend::Software(SoftwareBackend::new());
             self.backend.create(event_loop, attrs)

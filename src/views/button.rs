@@ -1,6 +1,8 @@
 use std::cell::RefCell;
 use std::cmp::max;
 
+use log::trace;
+
 use crate::text::{TextAlignment, TextOptions};
 use crate::input::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
 
@@ -383,10 +385,10 @@ impl View for Button {
         if matches!(button, MouseButton::Left) {
             if self.state.borrow().main.state.pressed {
                 if hit {
-                    println!("Doing click!");
+                    trace!("Doing click!");
                     self.click(ui);
                 } else {
-                    println!("Cancelled click");
+                    trace!("Cancelled click");
                 }
                 let mut state = self.state.borrow_mut();
                 state.main.state.pressed = false;

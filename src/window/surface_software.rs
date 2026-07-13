@@ -6,6 +6,8 @@
 use std::num::NonZeroU32;
 use std::rc::Rc;
 
+use log::error;
+
 use tiny_skia::Pixmap;
 use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window, WindowAttributes};
@@ -36,7 +38,7 @@ impl SoftwareBackend {
         let window = match event_loop.create_window(attrs) {
             Ok(w) => Rc::new(w),
             Err(e) => {
-                eprintln!("window: failed to create window: {e}");
+                error!("window: failed to create window: {e}");
                 return None;
             }
         };

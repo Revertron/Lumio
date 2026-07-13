@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use log::{debug, error};
 use super::selector::StateSelector;
 use super::parser::DrawableParser;
 
@@ -20,7 +21,7 @@ impl DrawableRegistry {
 
     /// Load all embedded drawable XML files
     fn load_embedded_drawables(&mut self) {
-        println!("Loading drawables");
+        debug!("Loading drawables");
         // Drawables are registered under role names ("button.back"); the XML
         // files hold the Classic theme's skin for each role.
         self.load_drawable("button", include_str!("../drawables/button_classic.xml"));
@@ -60,7 +61,7 @@ impl DrawableRegistry {
                 self.selectors.insert(name.to_string(), selector);
             }
             Err(e) => {
-                eprintln!("Failed to load drawable '{}': {}", name, e);
+                error!("Failed to load drawable '{}': {}", name, e);
             }
         }
     }

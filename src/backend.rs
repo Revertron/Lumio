@@ -67,7 +67,7 @@ pub(crate) fn env_backend() -> Option<RenderBackend> {
         "gl" => Some(RenderBackend::Gl),
         "software" => Some(RenderBackend::Software),
         other => {
-            eprintln!("lumio: ignoring unknown LUMIO_BACKEND value {other:?} (expected \"gl\" or \"software\")");
+            log::warn!("lumio: ignoring unknown LUMIO_BACKEND value {other:?} (expected \"gl\" or \"software\")");
             None
         }
     }
