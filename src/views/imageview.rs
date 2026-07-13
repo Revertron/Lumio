@@ -127,12 +127,14 @@ impl View for ImageView {
         theme.push_clip();
         theme.clip_rect(r);
 
+        self.base_draw_ninepatch(theme, r);
+
         // Read the natural size (loads the asset) under a short borrow, compute
         // the aspect-fitted rect, then draw under a fresh borrow — never nest two
         // borrows of `self.image`.
         let (nat_w, nat_h) = self.natural_size();
         if nat_w > 0 && nat_h > 0 {
-            let padding = state.padding.scaled(state.scale);
+            let padding = self.get_padding(state.scale);
             let content_w = r.width() - padding.left - padding.right;
             let content_h = r.height() - padding.top - padding.bottom;
 
@@ -222,7 +224,7 @@ impl View for ImageView {
         match (has_explicit_w, has_explicit_h) {
             // Both set: use both as-is
             (true, true) => {
-                let padding = state.padding.scaled(state.scale);
+                let padding = self.get_padding(state.scale);
                 let w = match state.width { Dimension::Dip(d) => d, _ => 0 };
                 let h = match state.height { Dimension::Dip(d) => d, _ => 0 };
                 let w = (w as f64 * state.scale).round() as i32 - padding.left - padding.right;
@@ -231,7 +233,7 @@ impl View for ImageView {
             }
             // Only width set: derive height from aspect ratio
             (true, false) => {
-                let padding = state.padding.scaled(state.scale);
+                let padding = self.get_padding(state.scale);
                 let w = match state.width { Dimension::Dip(d) => d, _ => 0 };
                 let w = (w as f64 * state.scale).round() as i32 - padding.left - padding.right;
                 let h = (w as f64 / aspect).round() as i32;
@@ -239,7 +241,7 @@ impl View for ImageView {
             }
             // Only height set: derive width from aspect ratio
             (false, true) => {
-                let padding = state.padding.scaled(state.scale);
+                let padding = self.get_padding(state.scale);
                 let h = match state.height { Dimension::Dip(d) => d, _ => 0 };
                 let h = (h as f64 * state.scale).round() as i32 - padding.top - padding.bottom;
                 let w = (h as f64 * aspect).round() as i32;

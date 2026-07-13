@@ -192,7 +192,7 @@ impl PopupMenu {
             return None;
         }
         let scale = state.scale;
-        let padding = state.padding.scaled(scale);
+        let padding = self.get_padding(scale);
         let item_h = (ITEM_HEIGHT as f64 * scale).round() as i32;
         let sep_h = (SEPARATOR_HEIGHT as f64 * scale).round() as i32;
         let local_y = y - r.min.y - padding.top;
@@ -215,7 +215,7 @@ impl PopupMenu {
     fn item_top(&self, index: usize) -> i32 {
         let state = self.state.borrow();
         let scale = state.scale;
-        let padding = state.padding.scaled(scale);
+        let padding = self.get_padding(scale);
         let item_h = (ITEM_HEIGHT as f64 * scale).round() as i32;
         let sep_h = (SEPARATOR_HEIGHT as f64 * scale).round() as i32;
         let mut y = padding.top;
@@ -460,10 +460,14 @@ impl View for PopupMenu {
         theme.push_clip();
         theme.clip_rect(r);
 
-        // Draw background (same frame as Button)
-        theme.draw_component("button.back", r, state.state);
+        // Draw background (same frame as Button). A 9-patch background
+        // replaces both the back and the body frame.
+        let ninepatch = self.base_draw_ninepatch(theme, r);
+        if !ninepatch {
+            theme.draw_component("button.back", r, state.state);
+        }
 
-        let padding = state.padding.scaled(scale);
+        let padding = self.get_padding(scale);
         let icon_size = (ICON_SIZE as f64 * scale).round() as i32;
         let gap = (ICON_TEXT_GAP as f64 * scale).round() as i32;
         let pad_left = (ITEM_PADDING_LEFT as f64 * scale).round() as i32;
@@ -538,7 +542,9 @@ impl View for PopupMenu {
         }
 
         // Draw border frame (same as Button)
-        theme.draw_component("button.body", r, state.state);
+        if !ninepatch {
+            theme.draw_component("button.body", r, state.state);
+        }
 
         theme.pop_clip();
     }
@@ -724,7 +730,7 @@ impl View for PopupMenu {
         let id = self.get_id();
         let state = self.state.borrow();
         let scale = state.scale;
-        let padding = state.padding.scaled(scale);
+        let padding = self.get_padding(scale);
         let width = state.rect.width();
         drop(state);
         let item_h = (ITEM_HEIGHT as f64 * scale).round() as i32;

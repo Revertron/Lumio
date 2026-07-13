@@ -42,8 +42,9 @@ impl DrawableParser {
         Ok(selector)
     }
 
-    /// Parse state attributes from <item> element
-    fn parse_state_matcher(element: &quick_xml::events::BytesStart) -> Result<StateMatcher, String> {
+    /// Parse state attributes from <item> element. Also used by the 9-patch
+    /// selector parser in `crate::ninepatch`, which shares the item format.
+    pub(crate) fn parse_state_matcher(element: &quick_xml::events::BytesStart) -> Result<StateMatcher, String> {
         let mut matcher = StateMatcher::new();
 
         for attr in element.attributes() {
@@ -471,7 +472,7 @@ impl DrawableParser {
         Err(format!("Missing attribute: {}", name))
     }
 
-    fn get_attr_opt(element: &quick_xml::events::BytesStart, name: &str) -> Option<String> {
+    pub(crate) fn get_attr_opt(element: &quick_xml::events::BytesStart, name: &str) -> Option<String> {
         Self::get_attr(element, name).ok()
     }
 

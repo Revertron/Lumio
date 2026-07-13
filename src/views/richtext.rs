@@ -388,7 +388,7 @@ impl RichText {
         let laid = laid.as_ref()?;
         let state = self.state.borrow();
         let scale = state.main.scale;
-        let padding = state.main.padding.scaled(scale);
+        let padding = self.get_padding(scale);
         let r = state.main.rect;
         let ox = r.min.x + padding.left;
         let oy = r.min.y + padding.top;
@@ -484,7 +484,7 @@ impl RichText {
         }
         let state = self.state.borrow();
         let scale = state.main.scale;
-        let padding = state.main.padding.scaled(scale);
+        let padding = self.get_padding(scale);
         let r = state.main.rect;
         let ox = r.min.x + padding.left;
         let oy = r.min.y + padding.top;
@@ -1082,7 +1082,9 @@ impl View for RichText {
         theme.push_clip();
         theme.clip_rect(r);
 
-        let padding = state.main.padding.scaled(scale);
+        self.base_draw_ninepatch(theme, r);
+
+        let padding = self.get_padding(scale);
         let ox = r.min.x + padding.left;
         let oy = r.min.y + padding.top;
         let line_w = ((1.0 * scale).round() as i32).max(1);

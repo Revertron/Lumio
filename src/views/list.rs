@@ -181,8 +181,12 @@ impl View for List {
         theme.clip_rect(rect);
         let state = self.get_state().unwrap();
 
-        // Step 1: Draw background (before items)
-        theme.draw_component("edit.back", rect, state);
+        // Step 1: Draw background (before items). A 9-patch background
+        // replaces both the back and the body components.
+        let ninepatch = self.base_draw_ninepatch(theme, rect);
+        if !ninepatch {
+            theme.draw_component("edit.back", rect, state);
+        }
 
         //let color = theme.get_text_color(self.state.borrow().state, &self.state.borrow().foreground);
         let mut y = rect.min.y;
@@ -208,7 +212,9 @@ impl View for List {
         }
 
         // Step 2: Draw borders (after items)
-        theme.draw_component("edit.body", rect, state);
+        if !ninepatch {
+            theme.draw_component("edit.body", rect, state);
+        }
 
         theme.pop_clip();
     }

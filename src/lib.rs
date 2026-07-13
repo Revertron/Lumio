@@ -64,6 +64,8 @@ pub mod dialog;
 pub mod layout;
 pub mod background;
 pub mod image_source;
+/// Android-style 9-patch (`.9.png`) backgrounds: CPU-composited, per-state.
+pub mod ninepatch;
 pub mod views;
 pub mod themes;
 pub mod types;

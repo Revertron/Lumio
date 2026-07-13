@@ -31,3 +31,4 @@ pub use crate::views::{RichText, SpanStyle};
 pub use crate::views::{Slider, LabelStyle};
 pub use crate::views::{TreeView, TreeNode, IconList, IconListItem};
 pub use crate::background::{BackgroundImage, BgRepeat, BgOffset, BgPosition, BgSize, BgSizeComponent, BgOrigin};
+pub use crate::ninepatch::{NinePatchBackground, NinePatchSource};

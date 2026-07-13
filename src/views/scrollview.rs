@@ -323,6 +323,13 @@ impl View for ScrollView {
         let abs_origin = Point::from((origin.x + my_rect.min.x, origin.y + my_rect.min.y));
         let scale = self.state.borrow().scale;
 
+        // A 9-patch background paints behind the scrolled content.
+        {
+            let mut r = my_rect;
+            r.move_by(origin);
+            self.base_draw_ninepatch(theme, r);
+        }
+
         // Paint viewport content with clipping
         if let Some(child) = &*self.child.borrow() {
             let vp = self.viewport_rect();

@@ -91,7 +91,17 @@ pub struct FieldsMain {
     pub labelled_by: Option<String>,
     pub gravity: Gravity,
     pub layout_params: LayoutParams,
-    pub listeners: HashMap<EventType, EventCallback>
+    pub listeners: HashMap<EventType, EventCallback>,
+    /// Optional 9-patch background (single `.9.png` or per-state selector),
+    /// set via the universal `background` attribute. Nested `RefCell` so paint
+    /// code, which holds an immutable borrow of `FieldsMain`, can mutate the
+    /// composite cache — same pattern as `Frame::background_image`.
+    pub background_ninepatch: std::cell::RefCell<Option<crate::ninepatch::NinePatchBackground>>,
+    /// True once padding was set explicitly (XML attribute or `set_padding`);
+    /// explicit padding wins over a 9-patch's content padding. Note internal
+    /// framework `set_padding` calls also mark this — harmless, those views
+    /// don't carry 9-patch backgrounds.
+    pub padding_explicit: bool
 }
 
 impl FieldsMain {
@@ -119,7 +129,9 @@ impl FieldsMain {
             labelled_by: None,
             gravity: Gravity::default(),
             layout_params: LayoutParams::default(),
-            listeners: HashMap::new()
+            listeners: HashMap::new(),
+            background_ninepatch: std::cell::RefCell::new(None),
+            padding_explicit: false
         }
     }
 

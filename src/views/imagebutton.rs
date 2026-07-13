@@ -102,11 +102,16 @@ impl View for ImageButton {
         theme.push_clip();
         theme.clip_rect(r);
 
-        // Draw background when not flat, or when hovered/pressed (but skip if hover_image handles hover)
-        if !flat {
-            theme.draw_component("button.back", r, state.state);
-        } else if (state.state.hovered || state.state.pressed) && !has_hover_image {
-            theme.draw_component("button.back", r, state.state);
+        // Draw background when not flat, or when hovered/pressed (but skip if
+        // hover_image handles hover). A 9-patch background replaces both the
+        // back and the body components in every mode.
+        let ninepatch = self.base_draw_ninepatch(theme, r);
+        if !ninepatch {
+            if !flat {
+                theme.draw_component("button.back", r, state.state);
+            } else if (state.state.hovered || state.state.pressed) && !has_hover_image {
+                theme.draw_component("button.back", r, state.state);
+            }
         }
 
         // Use the hover image when hovered/pressed and it actually loaded
@@ -114,7 +119,7 @@ impl View for ImageButton {
         let use_hover = (state.state.hovered || state.state.pressed)
             && self.hover_image.borrow().as_ref().is_some_and(|s| s.is_loaded());
 
-        let padding = state.padding.scaled(state.scale);
+        let padding = self.get_padding(state.scale);
         let content_w = r.width() - padding.left - padding.right;
         let content_h = r.height() - padding.top - padding.bottom;
         let img_size = content_w.min(content_h);
@@ -130,10 +135,12 @@ impl View for ImageButton {
         }
 
         // Draw borders when not flat, or when pressed (unless no_inset suppresses it)
-        if !flat && !(no_inset && state.state.pressed) {
-            theme.draw_component("button.body", r, state.state);
-        } else if state.state.pressed && !no_inset {
-            theme.draw_component("button.body", r, state.state);
+        if !ninepatch {
+            if !flat && !(no_inset && state.state.pressed) {
+                theme.draw_component("button.body", r, state.state);
+            } else if state.state.pressed && !no_inset {
+                theme.draw_component("button.body", r, state.state);
+            }
         }
 
         theme.pop_clip();
@@ -191,14 +198,14 @@ impl View for ImageButton {
         let state = self.state.borrow();
         let size = match state.width {
             Dimension::Dip(d) => {
-                let padding = state.padding.scaled(state.scale);
+                let padding = self.get_padding(state.scale);
                 (d as f64 * state.scale).round() as i32 - padding.left - padding.right
             }
             _ => (DEFAULT_IMAGE_SIZE as f64 * state.scale).round() as i32,
         };
         let h = match state.height {
             Dimension::Dip(d) => {
-                let padding = state.padding.scaled(state.scale);
+                let padding = self.get_padding(state.scale);
                 (d as f64 * state.scale).round() as i32 - padding.top - padding.bottom
             }
             _ => size,

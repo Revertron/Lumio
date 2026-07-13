@@ -242,8 +242,9 @@ impl Label {
             None => return,
         };
         let scale = state.main.scale;
-        let padding = &state.main.padding;
-        let pad_h = (padding.left as f64 * scale).round() as i32 + (padding.right as f64 * scale).round() as i32;
+        // Effective padding (may come from a 9-patch background), pre-scaled.
+        let padding = self.get_padding(scale);
+        let pad_h = padding.left + padding.right;
         // text_size is dips, like an explicit font_size — both scale.
         let base_size = typeface.font_size
             .unwrap_or(state.text_size) * scale as f32;
@@ -281,7 +282,7 @@ impl Label {
             + (if has_right { actual_icon + gap } else { 0 });
         // Update rect to fit new text
         let new_width = text.width().ceil() as i32 + pad_h + actual_reserve;
-        let pad_v = (padding.top as f64 * scale).round() as i32 + (padding.bottom as f64 * scale).round() as i32;
+        let pad_v = padding.top + padding.bottom;
         let new_height = text.height().ceil() as i32 + pad_v + self.link_extra_v(scale);
         drop(state);
         let mut state = self.state.borrow_mut();
@@ -422,7 +423,7 @@ impl Label {
             None => return 0,
         };
         let scale = state.main.scale;
-        let padding = state.main.padding.scaled(scale);
+        let padding = self.get_padding(scale);
         let my_rect = state.main.rect;
         let inner_h = my_rect.height() - padding.top - padding.bottom;
         let (left_inset, _) = self.icon_insets(inner_h, scale);
@@ -654,14 +655,16 @@ impl View for Label {
         theme.push_clip();
         theme.clip_rect(rect);
 
-        // Background fill (rounded if corner_radius > 0).
-        if let Some(bg) = *self.background_color.borrow() {
+        // Background fill (9-patch, else rounded if corner_radius > 0).
+        if !self.base_draw_ninepatch(theme, rect)
+            && let Some(bg) = *self.background_color.borrow()
+        {
             let radius = ((*self.corner_radius.borrow() as f64) * scale).round() as i32;
             theme.draw_rounded_rect(rect, bg, radius);
         }
 
         // Icon insets — same coordinate convention as Edit.
-        let padding = state.main.padding.scaled(scale);
+        let padding = self.get_padding(scale);
         let inner_h = rect.height() - padding.top - padding.bottom;
         let (left_inset, right_inset) = self.icon_insets(inner_h, scale);
 

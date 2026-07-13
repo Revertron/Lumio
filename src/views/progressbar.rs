@@ -124,10 +124,13 @@ impl View for ProgressBar {
         let mut r = state.rect;
         r.move_by(origin);
 
-        // Draw sunken track (same chrome as an edit field, like the legacy theme)
+        // Draw sunken track (same chrome as an edit field, like the legacy
+        // theme). A 9-patch background replaces the track chrome.
         let no_focus = ViewState::no_focus();
-        theme.draw_component("edit.back", r, no_focus);
-        theme.draw_component("edit.body", r, no_focus);
+        if !self.base_draw_ninepatch(theme, r) {
+            theme.draw_component("edit.back", r, no_focus);
+            theme.draw_component("edit.body", r, no_focus);
+        }
 
         // Inner area (inside the 2px sunken border)
         let scale = state.scale;

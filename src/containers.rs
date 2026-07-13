@@ -282,16 +282,18 @@ impl View for Frame {
         theme.push_clip();
         theme.clip_rect(rect);
         let state = self.state.borrow();
-        match state.background.as_ref().and_then(|bg| bg.get_state(&state.state)) {
-            Some(crate::styles::selector::DrawState::Color(c)) => theme.draw_rect(rect, *c),
-            Some(crate::styles::selector::DrawState::Token(t)) => {
-                let c = theme.color(t);
-                theme.draw_rect(rect, c);
+        if !self.base_draw_ninepatch(theme, rect) {
+            match state.background.as_ref().and_then(|bg| bg.get_state(&state.state)) {
+                Some(crate::styles::selector::DrawState::Color(c)) => theme.draw_rect(rect, *c),
+                Some(crate::styles::selector::DrawState::Token(t)) => {
+                    let c = theme.color(t);
+                    theme.draw_rect(rect, c);
+                }
+                _ => theme.draw_component("panel.back", rect, state.state),
             }
-            _ => theme.draw_component("panel.back", rect, state.state),
         }
         if let Some(bg) = self.background_image.borrow_mut().as_mut() {
-            bg.paint(theme, rect, &state.padding.scaled(state.scale), state.scale);
+            bg.paint(theme, rect, &self.get_padding(state.scale), state.scale);
         }
         if let Some(border_color) = state.border_color {
             let r = rect;

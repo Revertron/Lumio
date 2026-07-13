@@ -173,8 +173,12 @@ impl View for Button {
         theme.push_clip();
         theme.clip_rect(rect);
 
-        // Step 1: Draw background (before text)
-        theme.draw_component("button.back", rect, state.main.state);
+        // Step 1: Draw background (before text). A 9-patch background
+        // replaces both the back and the body components.
+        let ninepatch = self.base_draw_ninepatch(theme, rect);
+        if !ninepatch {
+            theme.draw_component("button.back", rect, state.main.state);
+        }
 
         // Step 2: Draw text
         if let Some(text) = &state.cached_text {
@@ -185,7 +189,9 @@ impl View for Button {
         }
 
         // Step 3: Draw borders/body (after text, covers edges)
-        theme.draw_component("button.body", rect, state.main.state);
+        if !ninepatch {
+            theme.draw_component("button.body", rect, state.main.state);
+        }
 
         theme.pop_clip();
     }
