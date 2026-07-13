@@ -263,6 +263,10 @@ impl View for RadioButton {
         let box_y = (self.get_rect_height() - box_size) / 2;
         let box_rect = super::super::types::rect((rect.min.x + left_inset, rect.min.y + box_y), (rect.min.x + left_inset + box_size, rect.min.y + box_y + box_size));
 
+        // A 9-patch background paints behind the whole view; the radio circle
+        // itself stays drawable-based.
+        self.base_draw_ninepatch(theme, rect);
+
         // Step 1: Draw radio background (circle)
         theme.draw_component("radio.back", box_rect, state.main.state);
 

@@ -279,8 +279,13 @@ impl View for ComboBox {
         theme.push_clip();
         theme.clip_rect(rect);
 
-        // Step 1: Draw full edit-field area (white background + sunken border)
-        theme.draw_component("edit.back", rect, state.main.state);
+        // Step 1: Draw full edit-field area (white background + sunken border).
+        // A 9-patch background replaces the back and the body components; the
+        // arrow button and focus highlight stay drawable-based.
+        let ninepatch = self.base_draw_ninepatch(theme, rect);
+        if !ninepatch {
+            theme.draw_component("edit.back", rect, state.main.state);
+        }
 
         // Step 2: When focused, highlight the text area with the selection colour
         // and draw the dashed focus rectangle inside it (rather than on the arrow
@@ -307,7 +312,9 @@ impl View for ComboBox {
         }
 
         // Step 4: Draw sunken border over entire rect
-        theme.draw_component("edit.body", rect, state.main.state);
+        if !ninepatch {
+            theme.draw_component("edit.body", rect, state.main.state);
+        }
 
         // Step 5: Draw raised button with arrow inside the sunken area. Clear the
         // focused flag so the arrow button doesn't draw its own focus rectangle;

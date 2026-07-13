@@ -1161,10 +1161,14 @@ impl View for RecyclerView {
 
         // Step 1: Draw background (before items). An explicit `background`
         // attribute overrides the default sunken-edit surface, letting apps
-        // give a list its own pane color (e.g. a chat timeline).
-        match self.get_background() {
-            Some(color) => theme.draw_rect(rect, color),
-            None => theme.draw_component("edit.back", rect, self.get_state().unwrap()),
+        // give a list its own pane color (e.g. a chat timeline). A 9-patch
+        // background replaces both the back and the body components.
+        let ninepatch = self.base_draw_ninepatch(theme, rect);
+        if !ninepatch {
+            match self.get_background() {
+                Some(color) => theme.draw_rect(rect, color),
+                None => theme.draw_component("edit.back", rect, self.get_state().unwrap()),
+            }
         }
 
         let padding = self.get_padding(self.state.borrow().scale);
@@ -1180,7 +1184,9 @@ impl View for RecyclerView {
         }
 
         // Step 2: Draw borders (after items)
-        theme.draw_component("edit.body", rect, self.get_state().unwrap());
+        if !ninepatch {
+            theme.draw_component("edit.body", rect, self.get_state().unwrap());
+        }
 
         theme.pop_clip();
     }

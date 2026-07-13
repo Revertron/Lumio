@@ -1,0 +1,38 @@
+<Frame direction="vertical" padding="12">
+    <Label text="9-patch backgrounds: fixed corners, stretched middles" font_style="Bold" margin="6"/>
+
+    <Frame direction="horizontal" width="max" height="min">
+        <Frame background="panel.9.png" direction="vertical" width="220" margin="6">
+            <Label text="Small panel"/>
+            <Label text="(padding comes from the patch)"/>
+        </Frame>
+        <Frame background="panel.9.png" direction="vertical" width="max" weight="1" margin="6">
+            <Label text="Wide panel — same panel.9.png stretched"/>
+            <Label text="Corners stay crisp at any size."/>
+            <Label text="Try resizing the window."/>
+        </Frame>
+    </Frame>
+
+    <Frame direction="horizontal" width="max" height="min">
+        <Button id="fancy1" background="fancy_button.xml" text="Fancy button" margin="6"/>
+        <Button id="fancy2" background="fancy_button.xml" text="Hover and press me" margin="6"/>
+        <Button id="fancy3" background="fancy_button.xml" text="Padded" padding="12" margin="6"/>
+        <Button text="Classic button" margin="6"/>
+    </Frame>
+
+    <Frame direction="horizontal" width="max" height="min">
+        <Label background="panel.9.png" text="A Label on a 9-patch" margin="6"/>
+        <Edit background="panel.9.png" width="260" text="An Edit on a 9-patch" margin="6"/>
+        <Edit width="200" text="A classic Edit" margin="6"/>
+    </Frame>
+
+    <Frame direction="horizontal" width="max" height="min">
+        <Memo background="panel.9.png" width="240" height="90" text="A Memo on a 9-patch.&#10;Wraps and scrolls as usual." margin="6"/>
+        <Frame direction="vertical" width="max" weight="1">
+            <ComboBox background="panel.9.png" width="200" margin="6"
+                      items="ComboBox on a 9-patch|Second item" selected="0"/>
+            <CheckBox background="panel.9.png" text="CheckBox on a 9-patch" margin="6"/>
+            <ProgressBar background="panel.9.png" width="220" value="0.6" margin="6"/>
+        </Frame>
+    </Frame>
+</Frame>

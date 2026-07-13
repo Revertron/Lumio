@@ -271,9 +271,11 @@ impl View for Grid {
         let abs = Point { x: r.min.x + origin.x, y: r.min.y + origin.y };
 
         // Optional background fill if configured via `background` attribute.
-        if let Some(bg) = self.base_get_background() {
-            let mut full = r;
-            full.move_by(origin);
+        let mut full = r;
+        full.move_by(origin);
+        if !self.base_draw_ninepatch(theme, full)
+            && let Some(bg) = self.base_get_background()
+        {
             theme.draw_rect(full, bg);
         }
 

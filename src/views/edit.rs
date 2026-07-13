@@ -1077,14 +1077,18 @@ impl View for Edit {
         let mut rect = state.main.rect;
         rect.move_by(origin);
 
-        // Step 1: Draw background
+        // Step 1: Draw background. A 9-patch background replaces both the
+        // back and the body components.
         theme.push_clip();
         theme.clip_rect(rect);
-        theme.draw_component("edit.back", rect, state.main.state);
+        let ninepatch = self.base_draw_ninepatch(theme, rect);
+        if !ninepatch {
+            theme.draw_component("edit.back", rect, state.main.state);
+        }
         theme.pop_clip();
 
         // Step 2: Draw selection highlight + text (or placeholder)
-        let padding = state.main.padding.scaled(state.main.scale);
+        let padding = self.get_padding(state.main.scale);
         let mut text_rect = rect;
         text_rect.shrink_by(padding.top, padding.left, padding.right, padding.bottom);
         let inner_h = text_rect.height();
@@ -1183,7 +1187,9 @@ impl View for Edit {
         rect.move_by(origin);
         theme.push_clip();
         theme.clip_rect(rect);
-        theme.draw_component("edit.body", rect, state.main.state);
+        if !ninepatch {
+            theme.draw_component("edit.body", rect, state.main.state);
+        }
         theme.pop_clip();
 
         // Step 3.5: Error underline. Draw a 2-dip line just above the existing

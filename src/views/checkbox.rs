@@ -189,6 +189,10 @@ impl View for CheckBox {
         let box_y = (self.get_rect_height() - box_size) / 2;
         let box_rect = super::super::types::rect((rect.min.x, rect.min.y + box_y), (rect.min.x + box_size, rect.min.y + box_y + box_size));
 
+        // A 9-patch background paints behind the whole view; the check box
+        // itself stays drawable-based.
+        self.base_draw_ninepatch(theme, rect);
+
         // Step 1: Draw checkbox background (before text)
         theme.draw_component("edit.back", box_rect, state.main.state);
 

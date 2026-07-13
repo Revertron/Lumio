@@ -275,12 +275,15 @@ impl View for TabView {
         theme.push_clip();
         theme.clip_rect(my_rect);
 
-        // Draw content area panel (below tab bar)
+        // Draw content area panel (below tab bar). A 9-patch background
+        // replaces the content panel; the tab strip stays drawable-based.
         let content_rect = rect(
             (my_rect.min.x, my_rect.min.y + tab_bar_h),
             (my_rect.max.x, my_rect.max.y),
         );
-        theme.draw_component("tab.content", content_rect, view_state);
+        if !self.base_draw_ninepatch(theme, content_rect) {
+            theme.draw_component("tab.content", content_rect, view_state);
+        }
 
         let active = self.active_tab.get();
 

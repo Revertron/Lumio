@@ -367,7 +367,7 @@ impl Memo {
         let typeface = state.main.font_manager.get();
         if let Some(typeface) = typeface {
             if let Some(font) = get_font_family(&typeface.font_name, typeface.font_style) {
-                let padding = state.main.padding.scaled(state.main.scale);
+                let padding = self.get_padding(state.main.scale);
                 let available_width = (width - padding.left - padding.right).max(1) as f32;
                 let options = TextOptions::new().with_wrap_to_width(available_width, TextAlignment::Left);
                 let text_str = if state.text.is_empty() { " " } else { &state.text };
@@ -429,7 +429,7 @@ impl Memo {
         let typeface = state.main.font_manager.get();
         if let Some(typeface) = typeface {
             if let Some(font) = get_font_family(&typeface.font_name, typeface.font_style) {
-                let padding = state.main.padding.scaled(state.main.scale);
+                let padding = self.get_padding(state.main.scale);
                 let available_width = (state.main.rect.width() - padding.left - padding.right).max(1) as f32;
                 let options = TextOptions::new().with_wrap_to_width(available_width, TextAlignment::Left);
                 let base_size = typeface.font_size
@@ -1180,14 +1180,18 @@ impl View for Memo {
         let mut rect = state.main.rect;
         rect.move_by(origin);
 
-        // Step 1: Draw background
+        // Step 1: Draw background. A 9-patch background replaces both the
+        // back and the body components.
         theme.push_clip();
         theme.clip_rect(rect);
-        theme.draw_component("edit.back", rect, state.main.state);
+        let ninepatch = self.base_draw_ninepatch(theme, rect);
+        if !ninepatch {
+            theme.draw_component("edit.back", rect, state.main.state);
+        }
         theme.pop_clip();
 
         // Step 2: Draw selection highlight + text (or placeholder)
-        let padding = state.main.padding.scaled(state.main.scale);
+        let padding = self.get_padding(state.main.scale);
         let mut text_rect = rect;
         text_rect.shrink_by(padding.top, padding.left, padding.right, padding.bottom);
         theme.push_clip();
@@ -1234,7 +1238,9 @@ impl View for Memo {
         rect.move_by(origin);
         theme.push_clip();
         theme.clip_rect(rect);
-        theme.draw_component("edit.body", rect, state.main.state);
+        if !ninepatch {
+            theme.draw_component("edit.body", rect, state.main.state);
+        }
         theme.pop_clip();
 
         // Step 4: Draw caret

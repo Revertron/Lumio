@@ -584,7 +584,12 @@ impl View for TreeView {
         theme.clip_rect(r);
 
         let main_state = self.state.borrow().state;
-        theme.draw_component("edit.back", r, main_state);
+        // A 9-patch background replaces the back and the body components;
+        // scrollbars stay drawable-based.
+        let ninepatch = self.base_draw_ninepatch(theme, r);
+        if !ninepatch {
+            theme.draw_component("edit.back", r, main_state);
+        }
 
         let inset = self.border_inset();
         let scale = self.state.borrow().scale;
@@ -673,7 +678,9 @@ impl View for TreeView {
             theme.draw_component("button.body", thumb, s);
         }
 
-        theme.draw_component("edit.body", r, main_state);
+        if !ninepatch {
+            theme.draw_component("edit.body", r, main_state);
+        }
         theme.pop_clip();
     }
 

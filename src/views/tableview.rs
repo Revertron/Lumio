@@ -950,9 +950,13 @@ impl View for TableView {
         theme.push_clip();
         theme.clip_rect(r);
 
-        // Outer background
+        // Outer background. A 9-patch background replaces the back and the
+        // body components; headers and scrollbars stay drawable-based.
         let main_state = self.state.borrow().state;
-        theme.draw_component("edit.back", r, main_state);
+        let ninepatch = self.base_draw_ninepatch(theme, r);
+        if !ninepatch {
+            theme.draw_component("edit.back", r, main_state);
+        }
 
         let header_h = self.header_height_px.get();
         let bw = self.body_width();
@@ -1126,7 +1130,9 @@ impl View for TableView {
         }
 
         // Outer border
-        theme.draw_component("edit.body", r, main_state);
+        if !ninepatch {
+            theme.draw_component("edit.body", r, main_state);
+        }
 
         theme.pop_clip();
     }

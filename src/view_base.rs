@@ -122,7 +122,16 @@ pub trait ViewBasics: HasMainFields {
     }
 
     fn base_get_padding(&self, scale: f64) -> Borders {
-        self.main_fields().borrow().padding.scaled(scale)
+        let fields = self.main_fields().borrow();
+        // A 9-patch background carries its own content padding (right/bottom
+        // markers); it applies unless padding was set explicitly.
+        if !fields.padding_explicit
+            && let Some(np) = fields.background_ninepatch.borrow_mut().as_mut()
+            && let Some(pad) = np.content_padding()
+        {
+            return pad.scaled(scale);
+        }
+        fields.padding.scaled(scale)
     }
 
     fn base_set_padding(&self, top: i32, left: i32, right: i32, bottom: i32) {
@@ -131,6 +140,7 @@ pub trait ViewBasics: HasMainFields {
         fields.padding.left = left;
         fields.padding.right = right;
         fields.padding.bottom = bottom;
+        fields.padding_explicit = true;
     }
 
     fn base_get_margin(&self, scale: f64) -> Borders {
@@ -236,6 +246,23 @@ pub trait ViewBasics: HasMainFields {
 
     fn base_set_labelled_by(&self, view_id: Option<String>) {
         self.main_fields().borrow_mut().labelled_by = view_id;
+    }
+
+    /// Draws the 9-patch background into `rect` (screen-space) if one is set.
+    /// Returns `true` when drawn so the caller skips its default back/body
+    /// drawing. Takes only an immutable borrow of `FieldsMain` (the composite
+    /// cache lives in a nested `RefCell`) — safe to call while the view's
+    /// `paint` holds its own state borrow.
+    fn base_draw_ninepatch(&self, theme: &mut dyn crate::themes::Theme, rect: Rect<i32>) -> bool {
+        let fields = self.main_fields().borrow();
+        let mut np = fields.background_ninepatch.borrow_mut();
+        match np.as_mut() {
+            Some(np) => {
+                np.paint(theme, rect, &fields.state, fields.scale);
+                true
+            }
+            None => false,
+        }
     }
 
     fn base_get_background(&self) -> Option<u32> {
@@ -344,23 +371,33 @@ pub trait ViewBasics: HasMainFields {
                 true
             }
             "padding" => {
-                fields.borrow_mut().padding.set_all(value.parse().unwrap_or(0));
+                let mut f = fields.borrow_mut();
+                f.padding.set_all(value.parse().unwrap_or(0));
+                f.padding_explicit = true;
                 true
             }
             "padding_top" => {
-                fields.borrow_mut().padding.top = value.parse().unwrap_or(0);
+                let mut f = fields.borrow_mut();
+                f.padding.top = value.parse().unwrap_or(0);
+                f.padding_explicit = true;
                 true
             }
             "padding_left" => {
-                fields.borrow_mut().padding.left = value.parse().unwrap_or(0);
+                let mut f = fields.borrow_mut();
+                f.padding.left = value.parse().unwrap_or(0);
+                f.padding_explicit = true;
                 true
             }
             "padding_right" => {
-                fields.borrow_mut().padding.right = value.parse().unwrap_or(0);
+                let mut f = fields.borrow_mut();
+                f.padding.right = value.parse().unwrap_or(0);
+                f.padding_explicit = true;
                 true
             }
             "padding_bottom" => {
-                fields.borrow_mut().padding.bottom = value.parse().unwrap_or(0);
+                let mut f = fields.borrow_mut();
+                f.padding.bottom = value.parse().unwrap_or(0);
+                f.padding_explicit = true;
                 true
             }
             "margin" => {
@@ -408,10 +445,31 @@ pub trait ViewBasics: HasMainFields {
                 true
             }
             "background" => {
-                if let Some(draw_state) = parse_draw_state(value) {
+                // Three value forms share this attribute: a `.9.png` path
+                // (single 9-patch), an `.xml` path (per-state 9-patch
+                // selector), or the classic `@token`/`#hex` fill. Last write
+                // wins across forms.
+                let lower = value.to_ascii_lowercase();
+                if lower.ends_with(".9.png") {
+                    let mut f = fields.borrow_mut();
+                    *f.background_ninepatch.borrow_mut() =
+                        Some(crate::ninepatch::NinePatchBackground::from_png(value));
+                    f.background = None;
+                } else if lower.ends_with(".xml") {
+                    match crate::ninepatch::NinePatchBackground::from_selector(value) {
+                        Ok(np) => {
+                            let mut f = fields.borrow_mut();
+                            *f.background_ninepatch.borrow_mut() = Some(np);
+                            f.background = None;
+                        }
+                        Err(e) => log::warn!("background selector '{}': {}", value, e),
+                    }
+                } else if let Some(draw_state) = parse_draw_state(value) {
                     let mut selector = MainSelector::new();
                     selector.add_state(ViewState::no_focus(), draw_state);
-                    fields.borrow_mut().background = Some(selector);
+                    let mut f = fields.borrow_mut();
+                    f.background = Some(selector);
+                    *f.background_ninepatch.borrow_mut() = None;
                 }
                 true
             }

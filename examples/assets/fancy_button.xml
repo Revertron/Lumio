@@ -1,0 +1,5 @@
+<selector>
+    <item state_pressed="true" src="button_pressed.9.png"/>
+    <item state_hovered="true" src="button_hover.9.png"/>
+    <item src="button.9.png"/>
+</selector>

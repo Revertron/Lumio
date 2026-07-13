@@ -276,7 +276,9 @@ impl View for MenuBar {
 
         theme.push_clip();
         theme.clip_rect(r);
-        theme.draw_rect(r, theme.color("background"));
+        if !self.base_draw_ninepatch(theme, r) {
+            theme.draw_rect(r, theme.color("background"));
+        }
 
         let pad_h = (TITLE_PADDING_H as f64 * scale).round() as i32;
         let hovered = *self.hovered.borrow();

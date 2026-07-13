@@ -498,6 +498,7 @@ impl View for Slider {
 
         theme.push_clip();
         theme.clip_rect(r);
+        self.base_draw_ninepatch(theme, r);
         if !enabled {
             theme.push_opacity(0.5);
         }

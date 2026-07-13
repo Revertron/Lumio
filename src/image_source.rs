@@ -34,8 +34,15 @@ thread_local! {
     static PENDING_IMAGE_EVICTIONS: RefCell<Vec<u64>> = const { RefCell::new(Vec::new()) };
 }
 
-fn push_pending(id: u64) {
+pub(crate) fn push_pending(id: u64) {
     PENDING_IMAGE_EVICTIONS.with(|q| q.borrow_mut().push(id));
+}
+
+/// Mint a fresh globally-unique image id (a texture cache key). Shared with
+/// [`crate::ninepatch::NinePatchSource`], whose composited buffers live in the
+/// same per-window image caches.
+pub(crate) fn next_image_id() -> u64 {
+    NEXT_IMAGE_ID.fetch_add(1, Ordering::Relaxed)
 }
 
 /// Take all pending texture-eviction ids. Called via [`drain_evictions`] from a
