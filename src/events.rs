@@ -22,6 +22,8 @@ pub enum EventType {
     KeyDown,
     ContextMenu,
     ValueChanged,
+    Expanded,
+    Collapsed,
 }
 
 /// Payload passed to every event listener. Variants are keyed by payload
@@ -29,8 +31,10 @@ pub enum EventType {
 /// the view for its text), `CheckedChanged` carries `Checked`, selection
 /// events carry `Selected`, pointer events (`HoverEnter`, `DoubleClick`,
 /// `ContextMenu`, `MouseMove`) carry `Position` in absolute window
-/// coordinates, `KeyDown` carries `Key`, and `ValueChanged` (Slider) carries
-/// the new numeric `Value`.
+/// coordinates, `KeyDown` carries `Key`, `ValueChanged` (Slider) carries
+/// the new numeric `Value`, and `Expanded`/`Collapsed` (TreeView) carry
+/// `Selected` with the visible-row index (read the node key via
+/// `TreeView::expanded_key()`).
 #[derive(Clone, Debug, PartialEq)]
 pub enum EventData {
     None,

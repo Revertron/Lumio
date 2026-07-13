@@ -25,7 +25,7 @@ The gaps cluster into five areas:
 
 - **Theming is hardcoded** — one Win95-style theme, colors baked in as constants.
 - **Text input lacks table-stakes features** — no undo/redo, no password masking.
-- **Standard widgets missing** — MenuBar, Slider, TreeView, SpinEdit.
+- **Standard widgets missing** — MenuBar, Slider, SpinEdit.
 - **Platform integration is thin** — no native OS file dialogs, no IME
   (multi-window and in-app modal dialogs now done — see items 6 and Tier 3).
 - **Developer experience** — no docs, no XML includes, no hot reload, no tests.
@@ -77,8 +77,11 @@ All contained within the two views.
   owner routing as part of this work.
 - **Slider** and a numeric **SpinEdit/Stepper** (the "spinner" already pending
   in the Alfis migration notes).
-- **TreeView** — expand/collapse hierarchy; can reuse RecyclerView's
-  virtualization for large trees.
+- **TreeView** — DONE 2026-07: app-managed node tree with lazy loading
+  (`Expanded`/`Collapsed` events + `set_children` by key), single selection,
+  keyboard navigation, per-node icons. An **IconList** (Explorer "List" mode:
+  icon+text items flowing into columns, horizontal scroll, Ctrl/Shift
+  multi-select) landed alongside it; see `examples/explorer.rs` for both.
 - **Tri-state CheckBox** (indeterminate).
 - **Editable / filtering ComboBox** (type-to-filter, autocomplete).
 

@@ -17,7 +17,7 @@ use super::traits::{Element, View};
 use super::types::Point;
 use super::themes::Typeface;
 
-use super::views::{Button, Edit, Label, CheckBox, RadioButton, ComboBox, ScrollView, ProgressBar, TabView, List, RecyclerView, ImageButton, ImageView, PopupMenu, Separator, SplitPanel, StatusBar, Memo, NotificationStack, TableView, TableColumn, TableRow, Grid, RichText, MenuBar, Menu, MenuItemTag, Slider};
+use super::views::{Button, Edit, Label, CheckBox, RadioButton, ComboBox, ScrollView, ProgressBar, TabView, List, RecyclerView, ImageButton, ImageView, PopupMenu, Separator, SplitPanel, StatusBar, Memo, NotificationStack, TableView, TableColumn, TableRow, Grid, RichText, MenuBar, Menu, MenuItemTag, Slider, TreeView, IconList};
 use super::views::{Dimension, Visibility};
 use std::time::Duration;
 
@@ -137,6 +137,10 @@ pub struct UI {
     on_mouse_up: Option<Box<dyn FnMut(&mut UI, Point<i32>) -> bool>>,
     overlays: Vec<PopupEntry>,
     mouse_pos: Point<i32>,
+    /// Last known keyboard-modifier state, kept current by the window loop
+    /// (`ModifiersChanged`) and by key dispatch. Lets mouse handlers (which
+    /// carry no modifier argument) implement Ctrl/Shift+Click behavior.
+    modifiers: ModifiersState,
     tooltip_view_id: Option<String>,
     tooltip_hover_start: Option<Instant>,
     tooltip_showing: bool,
@@ -269,6 +273,7 @@ impl UI {
         let mut ui = UI {
             width, height, typeface, scale, root: None, types: HashMap::new(),
             on_start: None, on_file_drop: None, on_mouse_up: None, overlays: Vec::new(), mouse_pos: Point::new(0, 0),
+            modifiers: ModifiersState::default(),
             tooltip_view_id: None, tooltip_hover_start: None, tooltip_showing: false, tooltip_popup: None, needs_relayout: false,
             notification_stack: None,
             pending_removals: Vec::new(),
@@ -322,6 +327,8 @@ impl UI {
         ui.register::<Menu>("Menu");
         ui.register::<MenuItemTag>("MenuItem");
         ui.register::<Slider>("Slider");
+        ui.register::<TreeView>("TreeView");
+        ui.register::<IconList>("IconList");
         ui
     }
 
@@ -1923,7 +1930,20 @@ impl UI {
         }
     }
 
+    /// Last known keyboard-modifier state. Mouse handlers use this to
+    /// implement Ctrl/Shift+Click behavior (mouse events carry no modifiers).
+    pub fn modifiers(&self) -> &ModifiersState {
+        &self.modifiers
+    }
+
+    /// Record the current keyboard-modifier state. Called by the window loop
+    /// on `ModifiersChanged`; also useful for synthetic dispatch in tests.
+    pub fn set_modifiers(&mut self, modifiers: ModifiersState) {
+        self.modifiers = modifiers;
+    }
+
     pub fn on_key_down(&mut self, virtual_key_code: Option<VirtualKeyCode>, scancode: KeyScancode, modifiers: ModifiersState) -> bool {
+        self.modifiers = modifiers.clone();
         // A user KeyDown listener on the focused view runs BEFORE built-in
         // handling, so apps can intercept keys the view would otherwise
         // consume; returning false falls through to normal behavior.
@@ -1989,6 +2009,7 @@ impl UI {
     }
 
     pub fn on_key_up(&mut self, virtual_key_code: Option<VirtualKeyCode>, scancode: KeyScancode, modifiers: ModifiersState) -> bool {
+        self.modifiers = modifiers.clone();
         let elements: Vec<Element> = self.overlays.iter().rev()
             .map(|e| Rc::clone(&e.element))
             .collect();

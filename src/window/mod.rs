@@ -500,7 +500,10 @@ impl ApplicationHandler<accesskit_winit::Event> for App {
                     ws.pending_layout = true;
                     ws.window.request_redraw();
                 }
-                WindowEvent::ModifiersChanged(m) => ws.mod_state = m.state().into(),
+                WindowEvent::ModifiersChanged(m) => {
+                    ws.mod_state = m.state().into();
+                    ws.ui.set_modifiers(ws.mod_state.clone());
+                }
                 _ if blocked => {}
                 WindowEvent::CursorMoved { position, .. } => {
                     ws.mouse_pos = Point::new(position.x.round() as i32, position.y.round() as i32);

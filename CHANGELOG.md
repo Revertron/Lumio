@@ -5,6 +5,42 @@ All notable changes to Lumio are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project aims to adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-07-13
+
+New widgets: TreeView (lazy, app-managed hierarchy) and IconList (Explorer
+"List"-mode multi-select item view), demoed together in `examples/explorer.rs`.
+
+**Breaking:** `EventType` gained the `Expanded` and `Collapsed` variants —
+exhaustive `match`es on `EventType` need new arms.
+
+### Added
+
+- **TreeView** — hierarchical tree widget with app-managed nodes: set an
+  initial tree with `set_roots`, react to the new `EventType::Expanded` /
+  `EventType::Collapsed` events (node via `expanded_key()`) and grow branches
+  lazily with `set_children(key, ..)` — nodes created with
+  `has_children: true` show a chevron before any children are loaded, and the
+  chevron clears itself when an expand yields nothing. Single selection
+  (fires `SelectionChanged`, read via `selected_key()`), full keyboard
+  navigation (arrows expand/collapse/jump-to-parent, Home/End/PageUp/Down),
+  per-node icons with optional tint, vertical scrollbar, `Role::Tree`
+  accessibility. XML attrs: `row_height`, `icon_size`, `indent`, `font_size`.
+- **IconList** — Windows-Explorer-"List"-mode item view: small icon + text
+  per item, items flow top-to-bottom wrapping into uniform-width columns,
+  horizontal scrollbar (the mouse wheel scrolls horizontally). Multi-select
+  with Explorer semantics: click, Ctrl+Click toggle, Shift+Click range,
+  Ctrl+Shift+Click range-add, arrow keys with Shift-extend. Fires
+  `SelectionChanged`; `selected_indices()` / `last_selected()` /
+  `item_at(x, y)` (pairs with a `DoubleClick` listener for open/navigate).
+  XML attrs: `row_height`, `icon_size`, `item_width`, `font_size`.
+- **`UI::modifiers()`** — the last known keyboard-modifier state, kept
+  current by the window loop, so mouse handlers can implement
+  Ctrl/Shift+Click behavior (mouse events carry no modifiers). Settable via
+  `UI::set_modifiers` for synthetic dispatch in tests.
+- **`examples/explorer.rs`** — file-manager demo wiring both new widgets in
+  a `SplitPanel`: lazily-loaded directory tree on the left, directory
+  contents (folders first) on the right, double-click to navigate.
+
 ## [0.2.1] - 2026-07-13
 
 Keyboard navigation: Tab/Shift+Tab focus traversal and keyboard activation

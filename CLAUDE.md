@@ -68,7 +68,7 @@ Views are organized in a retained parent-child tree structure:
 - **Views** (`src/views/`): Concrete implementations, grouped by role:
   - Text: `Label`, `Edit`, `Memo` (multi-line), `RichText` (spannable HTML subset)
   - Buttons & toggles: `Button`, `ImageButton`, `CheckBox`, `RadioButton`
-  - Selection & data: `ComboBox`, `List`, `RecyclerView` (virtualized), `TableView` (sortable/resizable columns)
+  - Selection & data: `ComboBox`, `List`, `RecyclerView` (virtualized), `TableView` (sortable/resizable columns), `TreeView` (lazy expand/collapse hierarchy), `IconList` (Explorer-"List"-mode column flow, multi-select)
   - Layout & containers: `Frame`, `Grid`, `ScrollView`, `TabView`, `SplitPanel`, `Separator`
   - Images & indicators: `ImageView`, `ProgressBar`, `StatusBar`
   - Menus & overlays: `MenuBar`, `PopupMenu`, `NotificationStack`

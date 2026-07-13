@@ -29,4 +29,5 @@ pub use crate::views::{Dimension, Direction, Borders, Gravity, HAlign, VAlign, V
 pub use crate::views::{TableView, ColumnDef, ColumnWidth, SortDirection, Grid};
 pub use crate::views::{RichText, SpanStyle};
 pub use crate::views::{Slider, LabelStyle};
+pub use crate::views::{TreeView, TreeNode, IconList, IconListItem};
 pub use crate::background::{BackgroundImage, BgRepeat, BgOffset, BgPosition, BgSize, BgSizeComponent, BgOrigin};

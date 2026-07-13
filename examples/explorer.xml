@@ -1,0 +1,9 @@
+<SplitPanel id="root" width="max" height="max" direction="horizontal" split_pos="300" min_pane_size="150">
+    <Frame id="left" width="max" height="max" direction="vertical" padding="4">
+        <TreeView id="tree" width="max" height="max"/>
+    </Frame>
+    <Frame id="right" width="max" height="max" direction="vertical" padding="4">
+        <Label id="path_label" text="" width="max" margin_bottom="4"/>
+        <IconList id="files" width="max" height="max"/>
+    </Frame>
+</SplitPanel>
