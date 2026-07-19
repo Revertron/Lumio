@@ -5,6 +5,56 @@ All notable changes to Lumio are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project aims to adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-07-19
+
+**Skins** — a theme is now a swappable *resource bundle* (a palette **plus** the
+drawable *forms*), not just a palette recolor. Build a skin, register it, and
+select it per-window or swap it live; a custom skin overrides only the roles it
+changes, layering over a shared base set. Demoed in `examples/skins.rs`.
+
+### Added
+
+- **`Skin`** (`src/skin.rs`) — bundles a `Palette` with the drawable form set
+  (`DrawableRegistry`). Two built-ins, `Skin::light()` and `Skin::dark()`, share
+  the classic forms and differ only in palette. Exported as `lumio::Skin`.
+- **`Skin::builder`** / **`BuiltinSkin`** — build a custom skin over a built-in
+  base (`.base(BuiltinSkin::Dark)`), overriding individual drawable roles with
+  XML (`.drawable("button.back", xml)`), then `.build()`. Roles left unset fall
+  back to the base form, so a skin only carries what it changes.
+- **Palette token overrides.** `Palette::with_color` / `with_dimension` /
+  `with_typeface` derive a palette from a built-in one; `SkinBuilder::color` /
+  `dimension` / `typeface` layer single tokens on top of the base, so a skin can
+  tweak (say) just `selection` without replacing the whole palette.
+- **Per-role drawable overrides.** `DrawableRegistry` gained a base + override
+  model: overridden roles resolve locally, everything else against a shared base
+  (so "dark mode" is still one form set, recolored).
+- **9-patch role drawables.** A skin can override a role with a 9-patch instead
+  of a shape drawable — `.drawable("button.back", "button.9.png")`, or a
+  `<selector>` `.xml` referencing per-state `.9.png`s — falling back to the
+  shape/base form otherwise.
+- **Skin manifest XML.** `Skin::from_xml` builds a whole skin from one `<skin>`
+  document — an optional `base`, `<color>` / `<dimension>` / `<typeface>` token
+  overrides, and `<drawable>` role overrides (a 9-patch `src`, or inline shape
+  `<selector>` XML). Sugar over `Skin::builder`; `examples/skins.rs` uses it.
+- **Named skin registry.** `register_skin(skin)` makes a skin selectable by name
+  alongside the built-in `"light"` / `"dark"`; `skin_by_name` resolves them.
+- **`WindowConfig::skin(name)`** — choose a window's skin by name; falls back to
+  `.palette(..)` when unset or unknown.
+- **`UI::set_skin(name)`** — swap a window's skin at runtime from an event
+  handler (applied before the next paint). `set_palette` remains for
+  palette-only recolors.
+- **`Skin`, `SkinBuilder`, `BuiltinSkin`, `register_skin`** re-exported from the
+  prelude; **`examples/skins.rs`** cycles light → dark → a custom "flat" skin.
+
+### Changed
+
+- **Renderer trait rename (breaking).** The rendering-abstraction trait `Theme`
+  is now **`Renderer`**, and its two implementations `Classic` / `SoftwareTheme`
+  are now **`RendererGL`** / **`RendererSoftware`** — matching the trait name and
+  freeing "theme" for the palette/skin layer. Prelude re-exports updated
+  (`Renderer`, `RendererGL`); custom `View` impls change `&mut dyn Theme` to
+  `&mut dyn Renderer`.
+
 ## [0.4.0] - 2026-07-13
 
 Android-style **9-patch (`.9.png`) backgrounds** for every widget: PNGs with

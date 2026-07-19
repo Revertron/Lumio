@@ -5,7 +5,7 @@ use crate::input::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance
 use super::super::assets::get_font_family;
 use super::super::common::DEFAULT_TEXT_SIZE;
 use super::super::events::{EventCallback, EventData, EventType};
-use super::super::themes::{Theme, Typeface, ViewState};
+use super::super::themes::{Renderer, Typeface, ViewState};
 use super::super::traits::{Element, View, WeakElement};
 use super::super::types::{Point, Rect, rect};
 use super::super::ui::UI;
@@ -174,7 +174,7 @@ impl View for List {
         rect.width() <= width && rect.height() <= height
     }
 
-    fn paint(&self, origin: Point<i32>, theme: &mut dyn Theme) {
+    fn paint(&self, origin: Point<i32>, theme: &mut dyn Renderer) {
         let mut rect = self.get_rect();
         rect.move_by(origin);
         theme.push_clip();

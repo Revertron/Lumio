@@ -1,24 +1,24 @@
 #[cfg(feature = "backend-gl")]
-mod classic;
+mod renderer_gl;
 #[cfg(feature = "backend-gl")]
 mod utils;
 #[cfg(feature = "software")]
-mod software;
+mod renderer_software;
 
 use super::styles::selector::{DrawState, MainSelector};
 use super::drawing::{Drawable, DrawableRegistry, Palette};
 use super::text::TextBlock;
 #[cfg(feature = "backend-gl")]
-pub use self::classic::Classic;
+pub use self::renderer_gl::RendererGL;
 #[cfg(feature = "backend-gl")]
-pub use self::classic::ImageCache;
+pub use self::renderer_gl::ImageCache;
 #[cfg(feature = "software")]
-pub use self::software::{GlyphCache, SoftwareImageCache, SoftwareTheme};
+pub use self::renderer_software::{GlyphCache, SoftwareImageCache, RendererSoftware};
 use super::types::Rect;
 
 /// The default root typeface: the palette's "default" role with its size
 /// stripped (so per-role palette sizes win when they cascade into views).
-/// Backend-neutral; used at app startup to seed `UI::from_xml`. `Classic` and
+/// Backend-neutral; used at app startup to seed `UI::from_xml`. `RendererGL` and
 /// the software backend both expose this.
 pub fn default_typeface() -> Typeface {
     let mut typeface = crate::drawing::current_typeface("default");
@@ -27,7 +27,7 @@ pub fn default_typeface() -> Typeface {
 }
 
 /// A stack of nested opacity multipliers, shared by the theme backends (both
-/// `Classic` and `SoftwareTheme` embed one). Pushing multiplies the new opacity
+/// `RendererGL` and `RendererSoftware` embed one). Pushing multiplies the new opacity
 /// into the current effective value so nested faded/disabled views compose;
 /// [`current`](Self::current) is the effective opacity to draw with.
 #[derive(Default)]
@@ -56,7 +56,7 @@ impl OpacityStack {
     }
 }
 
-pub trait Theme {
+pub trait Renderer {
     fn clear_screen(&mut self);
 
     /// The palette this theme resolves colors, dimensions and typefaces against.
@@ -105,7 +105,7 @@ pub trait Theme {
     }
 
     /// Resolve a named palette dimension token (e.g. "scrollbar.thickness")
-    /// to dips. Layout code without a `Theme` instance uses
+    /// to dips. Layout code without a `Renderer` instance uses
     /// `drawing::current_dimension` instead.
     fn dimension(&self, token: &str) -> f32 {
         self.palette().dimension(token)

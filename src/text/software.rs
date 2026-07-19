@@ -1,5 +1,5 @@
 //! fontdue software text backend. Shapes + lays out text with `fontdue::layout`
-//! and stores positioned glyphs in the payload for `SoftwareTheme::draw_text` to
+//! and stores positioned glyphs in the payload for `RendererSoftware::draw_text` to
 //! rasterize.
 //!
 //! Parity with the GL backend: honors `TextOptions::align` (via fontdue's

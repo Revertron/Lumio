@@ -6,7 +6,7 @@ use crate::input::MouseButton;
 
 use crate::assets::get_font_family;
 use crate::events::{EventCallback, EventData, EventType};
-use crate::themes::{Theme, Typeface, ViewState};
+use crate::themes::{Renderer, Typeface, ViewState};
 use crate::traits::{Container, Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::{PopupDirection, PopupMode, UI};
@@ -268,7 +268,7 @@ impl View for MenuBar {
         cw <= width && ch <= height
     }
 
-    fn paint(&self, origin: Point<i32>, theme: &mut dyn Theme) {
+    fn paint(&self, origin: Point<i32>, theme: &mut dyn Renderer) {
         let state = self.state.borrow();
         let mut r = state.rect;
         r.move_by(origin);
@@ -626,7 +626,7 @@ impl View for Menu {
         r
     }
     fn fits_in_rect(&self, _w: i32, _h: i32, _scale: f64) -> bool { true }
-    fn paint(&self, _origin: Point<i32>, _theme: &mut dyn Theme) {}
+    fn paint(&self, _origin: Point<i32>, _theme: &mut dyn Renderer) {}
     fn get_state(&self) -> Option<ViewState> { Some(self.state.borrow().state) }
     fn get_rect(&self) -> Rect<i32> { self.base_get_rect() }
     fn set_rect(&mut self, r: Rect<i32>) { self.base_set_rect(r); }
@@ -745,7 +745,7 @@ impl View for MenuItemTag {
         r
     }
     fn fits_in_rect(&self, _w: i32, _h: i32, _scale: f64) -> bool { true }
-    fn paint(&self, _origin: Point<i32>, _theme: &mut dyn Theme) {}
+    fn paint(&self, _origin: Point<i32>, _theme: &mut dyn Renderer) {}
     fn get_state(&self) -> Option<ViewState> { Some(self.state.borrow().state) }
     fn get_rect(&self) -> Rect<i32> { self.base_get_rect() }
     fn set_rect(&mut self, r: Rect<i32>) { self.base_set_rect(r); }

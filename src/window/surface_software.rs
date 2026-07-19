@@ -1,4 +1,4 @@
-//! Software [`RenderSurface`]: a `tiny_skia::Pixmap` painted by [`SoftwareTheme`]
+//! Software [`RenderSurface`]: a `tiny_skia::Pixmap` painted by [`RendererSoftware`]
 //! and blitted (RGBA → 0RGB) to a softbuffer surface. Owns the per-window image
 //! and glyph caches. This is the one place the neutral window loop touches
 //! softbuffer / tiny-skia; the GL surface (Phase 3) is the parallel impl.
@@ -14,7 +14,7 @@ use winit::window::{Window, WindowAttributes};
 
 use super::RenderSurface;
 use crate::drawing::{DrawableRegistry, Palette};
-use crate::themes::{GlyphCache, SoftwareImageCache, SoftwareTheme};
+use crate::themes::{GlyphCache, SoftwareImageCache, RendererSoftware};
 use crate::ui::UI;
 
 type SbContext = softbuffer::Context<Rc<Window>>;
@@ -88,7 +88,7 @@ impl RenderSurface for SoftwareSurface {
         crate::image_source::drain_evictions(&mut self.image_cache);
 
         {
-            let mut theme = SoftwareTheme::new(
+            let mut theme = RendererSoftware::new(
                 &mut self.pixmap,
                 registry,
                 palette,

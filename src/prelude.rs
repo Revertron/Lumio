@@ -14,10 +14,11 @@ pub use crate::shortcut::Shortcut;
 pub use crate::input::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, MouseScrollDistance, VirtualKeyCode};
 pub use crate::types::{Point, Rect};
 pub use crate::assets::{AssetsProvider, set_provider, set_font_fallbacks};
-pub use crate::themes::{Theme, Typeface, FontStyle, default_typeface};
+pub use crate::themes::{Renderer, Typeface, FontStyle, default_typeface};
 #[cfg(feature = "backend-gl")]
-pub use crate::themes::Classic;
+pub use crate::themes::RendererGL;
 pub use crate::drawing::Palette;
+pub use crate::skin::{Skin, SkinBuilder, BuiltinSkin, register_skin};
 pub use crate::containers::Frame;
 pub use crate::layout::{Layout, LinearLayout, OverlayLayout, DockLayout, create_layout};
 pub use crate::views::{Label, Button, Edit, CheckBox, RadioButton, ComboBox, ScrollView, ProgressBar, TabView, List, ImageButton, ImageView, Separator, SplitPanel, StatusBar, Memo, NotificationStack};

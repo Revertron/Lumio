@@ -11,7 +11,7 @@ use crate::common::{delete_char, delete_range, insert_str, InputFilter, TextEdit
 use crate::views::{Borders, Gravity};
 use crate::views::popupmenu::PopupMenu;
 use crate::styles::selector::FontSelector;
-use crate::themes::{Theme, Typeface, ViewState};
+use crate::themes::{Renderer, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::{PopupDirection, PopupMode, UI};
@@ -1034,7 +1034,7 @@ impl Memo {
 
     /// Paint selection highlight across multiple lines.
     /// Returns the rectangles that were filled, for the contrast text overlay.
-    fn paint_selection(&self, theme: &mut dyn Theme, text_rect: Rect<i32>, scroll_y: i32) -> Vec<Rect<i32>> {
+    fn paint_selection(&self, theme: &mut dyn Renderer, text_rect: Rect<i32>, scroll_y: i32) -> Vec<Rect<i32>> {
         let mut rects = Vec::new();
         if let Some(anchor) = *self.selection_anchor.borrow() {
             let caret = *self.caret_pos.borrow();
@@ -1173,7 +1173,7 @@ impl View for Memo {
         }
     }
 
-    fn paint(&self, origin: Point<i32>, theme: &mut dyn Theme) {
+    fn paint(&self, origin: Point<i32>, theme: &mut dyn Renderer) {
         self.update_scroll();
         let state = self.state.borrow();
         let scroll_y = *self.scroll_y.borrow();

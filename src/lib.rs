@@ -77,6 +77,10 @@ pub mod view_base;
 pub mod accessibility;
 pub mod shortcut;
 pub mod drawing;
+/// A swappable visual bundle (palette + drawable forms) a window is painted
+/// with; see [`Skin`]. Built-ins: [`Skin::light`] / [`Skin::dark`].
+pub mod skin;
+pub use skin::Skin;
 /// Headless software rendering (UI → `tiny_skia::Pixmap`). Software core only.
 #[cfg(feature = "software")]
 pub mod render;

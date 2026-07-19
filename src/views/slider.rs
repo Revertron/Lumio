@@ -16,7 +16,7 @@ use crate::assets::get_font_family;
 use crate::events::{EventCallback, EventData, EventType};
 use crate::input::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
 use crate::text::{TextBlock, TextOptions};
-use crate::themes::{Theme, Typeface, ViewState};
+use crate::themes::{Renderer, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::UI;
@@ -485,7 +485,7 @@ impl View for Slider {
         r.width() <= width && r.height() <= height
     }
 
-    fn paint(&self, origin: Point<i32>, theme: &mut dyn Theme) {
+    fn paint(&self, origin: Point<i32>, theme: &mut dyn Renderer) {
         let (mut r, scale, vstate, enabled) = {
             let s = self.state.borrow();
             (s.rect, s.scale, s.state, s.state.enabled)

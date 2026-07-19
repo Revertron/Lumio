@@ -12,7 +12,7 @@ use std::cell::{Cell, RefCell};
 use crate::input::MouseButton;
 
 use crate::events::{EventCallback, EventData, EventType};
-use crate::themes::{Theme, Typeface, ViewState};
+use crate::themes::{Renderer, Typeface, ViewState};
 use crate::traits::{Container, Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::UI;
@@ -266,7 +266,7 @@ impl View for Grid {
         r.width() <= w && r.height() <= h
     }
 
-    fn paint(&self, origin: Point<i32>, theme: &mut dyn Theme) {
+    fn paint(&self, origin: Point<i32>, theme: &mut dyn Renderer) {
         let r = self.state.borrow().rect;
         let abs = Point { x: r.min.x + origin.x, y: r.min.y + origin.y };
 

@@ -1,6 +1,6 @@
 //! speedy2d text backend. Shapes text with `FontFamily::layout_text` and copies
 //! the resulting geometry into the backend-neutral [`TextBlock`], keeping the
-//! original `FormattedTextBlock` as the draw payload for `Classic`.
+//! original `FormattedTextBlock` as the draw payload for `RendererGL`.
 
 use speedy2d::font::{FontFamily, TextAlignment as SpAlignment, TextLayout, TextOptions as SpOptions};
 

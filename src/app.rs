@@ -52,6 +52,11 @@ pub struct WindowConfig {
     pub maximizable: bool,
     /// Palette the window starts with (default [`Palette::classic`]).
     pub palette: Palette,
+    /// Name of a registered skin to paint the window with (built-in `"light"`/
+    /// `"dark"`, or one passed to [`register_skin`](crate::skin::register_skin)).
+    /// When set and resolvable it wins over [`palette`](Self::palette); `None`
+    /// (the default) uses the palette over the base forms.
+    pub skin: Option<String>,
 }
 
 impl WindowConfig {
@@ -72,6 +77,7 @@ impl WindowConfig {
             minimizable: true,
             maximizable: true,
             palette: Palette::classic(),
+            skin: None,
         }
     }
 
@@ -135,6 +141,15 @@ impl WindowConfig {
     /// Choose the palette the window starts with.
     pub fn palette(mut self, palette: Palette) -> Self {
         self.palette = palette;
+        self
+    }
+
+    /// Paint the window with a registered skin, by name (built-in `"light"`/
+    /// `"dark"`, or one passed to [`register_skin`](crate::skin::register_skin)).
+    /// A resolvable name overrides [`palette`](Self::palette); an unknown name
+    /// falls back to the palette.
+    pub fn skin(mut self, name: impl Into<String>) -> Self {
+        self.skin = Some(name.into());
         self
     }
 }

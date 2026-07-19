@@ -5,7 +5,7 @@ use std::rc::Rc;
 use downcast_rs::{impl_downcast, Downcast};
 use crate::input::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
 use super::super::events::{EventCallback, EventData, EventType};
-use super::super::themes::{Theme, Typeface, ViewState};
+use super::super::themes::{Renderer, Typeface, ViewState};
 use super::super::traits::{Element, View, WeakElement};
 use super::super::types::{Point, Rect, rect};
 use super::super::ui::UI;
@@ -1151,7 +1151,7 @@ impl View for RecyclerView {
         rect.width() <= width && rect.height() <= height
     }
 
-    fn paint(&self, origin: Point<i32>, theme: &mut dyn Theme) {
+    fn paint(&self, origin: Point<i32>, theme: &mut dyn Renderer) {
         let mut rect = self.get_rect();
         let start = rect.min + origin;
         rect.move_by(origin);

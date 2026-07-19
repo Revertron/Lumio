@@ -8,7 +8,7 @@ use crate::input::{MouseButton, MouseCursorType};
 
 use crate::assets::get_font_family;
 use crate::events::{EventCallback, EventData, EventType};
-use crate::themes::{FontStyle, Theme, Typeface, ViewState};
+use crate::themes::{FontStyle, Renderer, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::{PopupDirection, PopupMode, UI};
@@ -1067,7 +1067,7 @@ impl View for RichText {
         }
     }
 
-    fn paint(&self, origin: Point<i32>, theme: &mut dyn Theme) {
+    fn paint(&self, origin: Point<i32>, theme: &mut dyn Renderer) {
         // Re-lay-out if content changed since the last `layout_content`. Compute
         // the wrap params first so the immutable `laid` borrow is dropped before
         // `ensure_laid` takes a mutable borrow.

@@ -6,7 +6,7 @@ use crate::input::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance
 
 use crate::assets::get_font_family;
 use crate::events::{EventCallback, EventData, EventType};
-use crate::themes::{Theme, Typeface, ViewState};
+use crate::themes::{Renderer, Typeface, ViewState};
 use crate::traits::{Container, Element, View, WeakElement};
 use crate::types::{Point, Rect, point, rect};
 use crate::ui::UI;
@@ -833,7 +833,7 @@ impl TableView {
         if idx < n { Some(idx) } else { None }
     }
 
-    fn paint_sort_indicator(&self, theme: &mut dyn Theme, cell_rect: Rect<i32>, dir: SortDirection) {
+    fn paint_sort_indicator(&self, theme: &mut dyn Renderer, cell_rect: Rect<i32>, dir: SortDirection) {
         let scale = self.state.borrow().scale;
         let size = (8.0 * scale).round() as i32;
         let cx = cell_rect.max.x - (10.0 * scale).round() as i32;
@@ -943,7 +943,7 @@ impl View for TableView {
         r.width() <= w && r.height() <= h
     }
 
-    fn paint(&self, origin: Point<i32>, theme: &mut dyn Theme) {
+    fn paint(&self, origin: Point<i32>, theme: &mut dyn Renderer) {
         let mut r = self.state.borrow().rect;
         r.move_by(origin);
 
@@ -1708,7 +1708,7 @@ impl View for TableColumn {
         r
     }
     fn fits_in_rect(&self, _w: i32, _h: i32, _scale: f64) -> bool { true }
-    fn paint(&self, _origin: Point<i32>, _theme: &mut dyn Theme) {}
+    fn paint(&self, _origin: Point<i32>, _theme: &mut dyn Renderer) {}
     fn get_state(&self) -> Option<ViewState> { Some(self.state.borrow().state) }
     fn get_rect(&self) -> Rect<i32> { self.base_get_rect() }
     fn set_rect(&mut self, r: Rect<i32>) { self.base_set_rect(r); }
@@ -1763,7 +1763,7 @@ impl View for TableRow {
         r
     }
     fn fits_in_rect(&self, _w: i32, _h: i32, _scale: f64) -> bool { true }
-    fn paint(&self, _origin: Point<i32>, _theme: &mut dyn Theme) {}
+    fn paint(&self, _origin: Point<i32>, _theme: &mut dyn Renderer) {}
     fn get_state(&self) -> Option<ViewState> { Some(self.state.borrow().state) }
     fn get_rect(&self) -> Rect<i32> { self.base_get_rect() }
     fn set_rect(&mut self, r: Rect<i32>) { self.base_set_rect(r); }

@@ -30,6 +30,7 @@ use self::surface_gl::{GlBackend, GlSurface};
 use crate::app::WindowConfig;
 use crate::backend::RenderBackend;
 use crate::drawing::{DrawableRegistry, Palette};
+use crate::skin::Skin;
 use crate::input::{ModifiersState, MouseCursorType, VirtualKeyCode};
 use crate::types::Point;
 use crate::ui::{EscapeAction, WindowCommand, UI};
@@ -123,6 +124,10 @@ struct PendingWindow {
     ui: UI,
     is_child: bool,
     modal: bool,
+    /// A resolved skin to paint with, bypassing name resolution. Set for child
+    /// windows so a dialog inherits the parent's exact current skin — forms plus
+    /// its possibly-runtime-swapped palette. `None` → resolve from `config`.
+    skin: Option<Skin>,
 }
 
 struct WindowState {
@@ -133,8 +138,9 @@ struct WindowState {
     /// readers via the platform accessibility API. Inert (near-zero cost)
     /// until an assistive technology actually connects.
     access_adapter: accesskit_winit::Adapter,
-    drawable_registry: DrawableRegistry,
-    palette: Palette,
+    /// The visual bundle this window is painted with: palette + drawable forms.
+    /// A runtime `set_palette` swaps only the palette, keeping the forms.
+    skin: Skin,
     width: u32,
     height: u32,
     scale: f64,
@@ -170,22 +176,30 @@ impl WindowState {
         self.window.request_redraw();
     }
 
-    /// Render one frame: coalesced relayout + pending palette (both neutral),
-    /// then hand off to the backend surface to paint and present.
+    /// Render one frame: one coalesced relayout for any pending resize / skin /
+    /// palette change, then hand off to the backend surface to paint and present.
     fn render(&mut self) {
-        // Coalesced relayout from a resize/scale-factor burst.
-        if self.pending_layout {
-            self.ui.layout(self.width, self.height, self.scale);
-            self.pending_layout = false;
-        }
+        // Coalesce a resize/scale-factor relayout and any pending skin/palette
+        // change into a single layout pass. A full skin swap (forms + palette)
+        // applies first; a palette-only swap then recolors on top.
+        let mut needs_layout = self.pending_layout;
+        self.pending_layout = false;
 
+        if let Some(skin) = self.ui.take_pending_skin() {
+            crate::drawing::set_current_palette(skin.palette().clone());
+            self.skin = skin;
+            needs_layout = true;
+        }
         if let Some(palette) = self.ui.take_pending_palette() {
             crate::drawing::set_current_palette(palette.clone());
-            self.palette = palette;
+            self.skin.set_palette(palette);
+            needs_layout = true;
+        }
+        if needs_layout {
             self.ui.layout(self.width, self.height, self.scale);
         }
 
-        self.surface.paint(&self.ui, &self.palette, &self.drawable_registry, self.scale);
+        self.surface.paint(&self.ui, self.skin.palette(), self.skin.drawables(), self.scale);
 
         // Mirror the freshly laid-out UI into the accessibility tree. Every
         // visual change funnels through a redraw, so this keeps screen readers
@@ -256,9 +270,21 @@ impl App {
                 Err(_) => attrs,
             }
         };
+        // A child window carries its parent's resolved skin directly (so a
+        // parent's runtime palette swap is inherited); otherwise resolve from the
+        // config: a named skin (registered or built-in) wins, else wrap the
+        // config palette over the base forms. An explicitly-set name that does
+        // not resolve warns (mirroring `UI::set_skin`) before falling back.
+        let skin = pw.skin.unwrap_or_else(|| match &pw.config.skin {
+            Some(name) => crate::skin::skin_by_name(name).unwrap_or_else(|| {
+                log::warn!("window: unknown skin '{name}'; using the config palette instead");
+                Skin::from_palette(pw.config.palette.clone())
+            }),
+            None => Skin::from_palette(pw.config.palette.clone()),
+        });
         // Make this window's palette the active one for `@token`/typeface
         // resolution before any layout runs.
-        crate::drawing::set_current_palette(pw.config.palette.clone());
+        crate::drawing::set_current_palette(skin.palette().clone());
         // The backend creates the window and its render surface together: the GL
         // backend must create the window alongside a matching GL config, so window
         // creation can't be hoisted out of the backend.
@@ -310,8 +336,7 @@ impl App {
             surface,
             ui,
             access_adapter,
-            drawable_registry: DrawableRegistry::new(),
-            palette: pw.config.palette,
+            skin,
             width: w,
             height: h,
             scale,
@@ -400,9 +425,17 @@ impl App {
                     .center()
                     .resizable(req.resizable)
                     .minimizable(req.minimizable)
-                    .maximizable(req.maximizable)
-                    .palette(ws.palette.clone());
-                new_windows.push(PendingWindow { config, ui: req.ui, is_child: true, modal: req.modal });
+                    .maximizable(req.maximizable);
+                // Inherit the parent's exact current skin (forms + its
+                // possibly-runtime-swapped palette) rather than re-resolving the
+                // skin's name, which would drop a parent `set_palette`.
+                new_windows.push(PendingWindow {
+                    config,
+                    ui: req.ui,
+                    is_child: true,
+                    modal: req.modal,
+                    skin: Some(ws.skin.clone()),
+                });
             }
             if ws.ui.take_close_request() {
                 to_close.push(id);
@@ -658,7 +691,7 @@ pub fn run_with_config(ui: UI, config: WindowConfig) -> Result<(), winit::error:
         next_tick: Instant::now(),
         proxy,
         esc_pending_close: None,
-        pending_main: Some(PendingWindow { config, ui, is_child: false, modal: false }),
+        pending_main: Some(PendingWindow { config, ui, is_child: false, modal: false, skin: None }),
     };
     event_loop.run_app(&mut app)
 }

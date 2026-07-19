@@ -15,7 +15,7 @@ Lumio-owned winit window loop (`src/window/`); they differ only in the per-windo
 `RenderSurface`. `backend-gl` (default) draws with the vendored speedy2d used as a
 *pure GL renderer* over a glutin context Lumio creates; `backend-software` renders
 on the CPU with tiny-skia + fontdue (plus a headless UI → `Pixmap`/PNG path). The
-seam is the backend-neutral `Theme`/text/input abstractions; apps launch with the
+seam is the backend-neutral `Renderer`/text/input abstractions; apps launch with the
 neutral `lumio::run(ui, WindowConfig)` and switch backends by Cargo feature, no
 source edits. `speedy2d` is an optional, renderer-only dependency (its windowing
 feature is off; absent entirely from the software build). See
@@ -42,13 +42,13 @@ Implemented 2026-06: all six phases, including the dark palette
 references and `style=` bundles in layout XML.
 
 A theme becomes a resource bundle (drawables + color palette + metrics +
-typography) instead of a code module; the `Theme` trait shrinks to primitive
+typography) instead of a code module; the `Renderer` trait shrinks to primitive
 drawing + resource lookup. Dark mode becomes a palette swap, new themes are
 XML-only, and `style=` / `@token` references become available in layout XML.
 
 - Runtime theme switching — DONE: `ui.set_palette(..)` swaps the palette and
   triggers a full relayout/redraw (themes are palette-driven, so a palette swap
-  *is* a theme switch; there is one `Theme` impl).
+  *is* a theme switch; there is one `Renderer` impl).
 - Rogue hardcoded view colors (selection blue, placeholder gray, tooltip yellow,
   TableView selection) pulled into palette tokens — DONE (`selection`,
   `text_hint`, `tooltip_back`, `outline`, … in `src/drawing/palette.rs`).

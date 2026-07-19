@@ -4,7 +4,7 @@ use std::rc::Rc;
 use crate::input::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
 
 use crate::events::{EventCallback, EventData, EventType};
-use crate::themes::{Theme, Typeface, ViewState};
+use crate::themes::{Renderer, Typeface, ViewState};
 use crate::view_base::{HasMainFields, ViewBasics};
 use crate::traits::{Container, Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
@@ -318,7 +318,7 @@ impl View for ScrollView {
         size.0 <= width && size.1 <= height
     }
 
-    fn paint(&self, origin: Point<i32>, theme: &mut dyn Theme) {
+    fn paint(&self, origin: Point<i32>, theme: &mut dyn Renderer) {
         let my_rect = self.state.borrow().rect;
         let abs_origin = Point::from((origin.x + my_rect.min.x, origin.y + my_rect.min.y));
         let scale = self.state.borrow().scale;
@@ -821,7 +821,7 @@ impl View for ScrollView {
 }
 
 impl ScrollView {
-    fn paint_scrollbar(&self, abs_origin: Point<i32>, theme: &mut dyn Theme, _scale: f64) {
+    fn paint_scrollbar(&self, abs_origin: Point<i32>, theme: &mut dyn Renderer, _scale: f64) {
         // Track background
         let track = self.track_rect();
         let abs_track = rect(

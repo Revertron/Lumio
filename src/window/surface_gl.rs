@@ -1,5 +1,5 @@
 //! GL [`RenderSurface`]: a host-owned glutin context + `speedy2d::GLRenderer`,
-//! painted by [`Classic`]. The GL parallel of `surface_software.rs`.
+//! painted by [`RendererGL`]. The GL parallel of `surface_software.rs`.
 //!
 //! speedy2d is used purely as a renderer here (its `windowing` feature is off);
 //! Lumio owns the winit window and the GL context. The glutin setup mirrors what
@@ -30,7 +30,7 @@ use winit::window::{Window, WindowAttributes};
 
 use super::RenderSurface;
 use crate::drawing::{DrawableRegistry, Palette};
-use crate::themes::{Classic, ImageCache};
+use crate::themes::{RendererGL, ImageCache};
 use crate::ui::UI;
 
 /// GL backend: a stateless window + surface factory. Each window gets its own
@@ -179,7 +179,7 @@ impl RenderSurface for GlSurface {
             let renderer = &mut self.renderer;
             let image_cache = &mut self.image_cache;
             renderer.draw_frame(|graphics| {
-                let mut theme = Classic::new(graphics, registry, palette, image_cache, w, h, scale);
+                let mut theme = RendererGL::new(graphics, registry, palette, image_cache, w, h, scale);
                 ui.paint(&mut theme);
             });
         }

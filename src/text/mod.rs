@@ -1,6 +1,6 @@
 //! Backend-neutral text layer.
 //!
-//! Views and the [`Theme`](crate::themes::Theme) trait depend only on the types
+//! Views and the [`Renderer`](crate::themes::Renderer) trait depend only on the types
 //! here; the actual shaping and measurement is delegated to a backend — speedy2d
 //! (`text-speedy2d`) and/or fontdue (`text-software`). With both compiled in,
 //! the backend a font shapes with is decided at load time by
@@ -27,7 +27,7 @@ compile_error!(
 );
 
 /// The backend-specific draw payload carried by every [`TextBlock`]. Only the
-/// matching [`Theme`](crate::themes::Theme) backend reads it (via
+/// matching [`Renderer`](crate::themes::Renderer) backend reads it (via
 /// [`TextBlock::payload`]); a mismatched theme skips the block (only possible
 /// around a runtime backend switch — the next layout re-shapes). Single-backend
 /// builds compile a one-variant enum: a zero-overhead newtype.

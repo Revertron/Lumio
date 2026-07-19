@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use crate::input::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
 
 use crate::events::{EventCallback, EventData, EventType};
-use crate::themes::{Theme, Typeface, ViewState};
+use crate::themes::{Renderer, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::UI;
@@ -294,7 +294,7 @@ impl View for NotificationStack {
 
     fn fits_in_rect(&self, _width: i32, _height: i32, _scale: f64) -> bool { true }
 
-    fn paint(&self, origin: Point<i32>, theme: &mut dyn Theme) {
+    fn paint(&self, origin: Point<i32>, theme: &mut dyn Renderer) {
         // Snapshot enough state to release the items borrow before painting,
         // so callbacks driven by deeper paint paths can't deadlock the RefCell.
         struct PaintItem {

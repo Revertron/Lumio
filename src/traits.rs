@@ -4,7 +4,7 @@ use downcast_rs::Downcast;
 use super::input::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
 use super::events::{EventCallback, EventData, EventType};
 use super::ui::UI;
-use super::themes::{Theme, ViewState};
+use super::themes::{Renderer, ViewState};
 use super::types::{Rect, Point};
 use super::themes::Typeface;
 use super::views::{Borders, Dimension, Gravity, LayoutParams, Visibility};
@@ -32,7 +32,7 @@ pub trait View: Downcast {
         self.set_rect(my_rect);
     }
     fn fits_in_rect(&self, width: i32, height: i32, scale: f64) -> bool;
-    fn paint(&self, origin: Point<i32>, theme: &mut dyn Theme);
+    fn paint(&self, origin: Point<i32>, theme: &mut dyn Renderer);
     fn get_state(&self) -> Option<ViewState>;
     fn get_rect(&self) -> Rect<i32>;
     fn set_rect(&mut self, rect: Rect<i32>);

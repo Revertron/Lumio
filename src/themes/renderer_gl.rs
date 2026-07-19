@@ -11,14 +11,14 @@ use speedy2d::shape::Rectangle;
 
 use super::super::drawing::{Drawable, DrawableRegistry, DrawingEngine, Palette};
 use super::super::text::TextBlock;
-use super::super::themes::{OpacityStack, Theme, Typeface, ViewState};
+use super::super::themes::{OpacityStack, Renderer, Typeface, ViewState};
 use super::super::types::{Rect, rect};
 
 /// Cache for GPU image handles, keyed by the owning `ImageSource`'s unique id.
 pub type ImageCache = HashMap<u64, ImageHandle>;
 
 #[allow(unused)]
-pub struct Classic<'h> {
+pub struct RendererGL<'h> {
     graphics: &'h mut Graphics2D,
     width: i32,
     height: i32,
@@ -32,7 +32,7 @@ pub struct Classic<'h> {
 }
 
 #[allow(dead_code)]
-impl<'h> Classic<'h> {
+impl<'h> RendererGL<'h> {
     fn current_opacity(&self) -> f32 {
         self.opacity.current()
     }
@@ -72,7 +72,7 @@ impl<'h> Classic<'h> {
         scale: f64
     ) -> Self {
         let current_clip = rect((0, 0), (width, height));
-        Classic {
+        RendererGL {
             graphics,
             width,
             height,
@@ -87,7 +87,7 @@ impl<'h> Classic<'h> {
     }
 }
 
-impl<'h> Theme for Classic<'h> {
+impl<'h> Renderer for RendererGL<'h> {
     fn clear_screen(&mut self) {
         self.graphics.set_clip(None);
         self.graphics.clear_screen(Color::from_hex_rgb(self.palette.color("background")));
@@ -186,8 +186,15 @@ impl<'h> Theme for Classic<'h> {
     }
 
     fn draw_component(&mut self, role: &str, rect: Rect<i32>, state: ViewState) {
-        // Get drawable from registry
-        if let Some(selector) = self.drawable_registry.get(role) {
+        // Copy the registry ref out so the 9-patch paint below can take `&mut self`.
+        let registry = self.drawable_registry;
+        // A 9-patch override for this role wins over any shape drawable.
+        if let Some(ninepatch) = registry.get_ninepatch(role) {
+            let scale = self.scale;
+            ninepatch.borrow_mut().paint(self, rect, &state, scale);
+            return;
+        }
+        if let Some(selector) = registry.get(role) {
             if let Some(drawable) = selector.get_drawable(&state) {
                 let mut engine = DrawingEngine::new(self.graphics, self.scale, self.palette);
                 engine.draw_drawable(drawable, rect);

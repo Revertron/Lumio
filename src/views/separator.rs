@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::str::FromStr;
 
 use crate::events::{EventCallback, EventData, EventType};
-use crate::themes::{Theme, Typeface, ViewState};
+use crate::themes::{Renderer, Typeface, ViewState};
 use crate::view_base::{HasMainFields, ViewBasics};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
@@ -76,7 +76,7 @@ impl View for Separator {
         r.width() <= width && r.height() <= height
     }
 
-    fn paint(&self, origin: Point<i32>, theme: &mut dyn Theme) {
+    fn paint(&self, origin: Point<i32>, theme: &mut dyn Renderer) {
         let state = self.state.borrow();
         let mut r = state.rect;
         r.move_by(origin);

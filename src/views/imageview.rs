@@ -4,7 +4,7 @@ use crate::input::MouseButton;
 
 use crate::events::{EventCallback, EventData, EventType};
 use crate::image_source::ImageSource;
-use crate::themes::{Theme, Typeface, ViewState};
+use crate::themes::{Renderer, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::UI;
@@ -119,7 +119,7 @@ impl View for ImageView {
         cw <= width && ch <= height
     }
 
-    fn paint(&self, origin: Point<i32>, theme: &mut dyn Theme) {
+    fn paint(&self, origin: Point<i32>, theme: &mut dyn Renderer) {
         let state = self.state.borrow();
         let mut r = state.rect;
         r.move_by(origin);

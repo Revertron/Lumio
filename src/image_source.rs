@@ -20,7 +20,7 @@ use image::GenericImageView;
 
 use crate::assets::get_asset;
 use crate::svg;
-use crate::themes::Theme;
+use crate::themes::Renderer;
 use crate::types::Rect;
 
 /// Source of the next image id. Starts at 1 so 0 can never be a live key.
@@ -204,7 +204,7 @@ impl ImageSource {
     /// (`0xFFFFFFFF` = no change). No internal aspect-fit — callers that want
     /// letterboxing compute the fitted rect themselves. For SVG this
     /// re-rasterizes when `rect`'s size changed, retiring the previous texture.
-    pub fn draw(&mut self, theme: &mut dyn Theme, rect: Rect<i32>, tint: u32) {
+    pub fn draw(&mut self, theme: &mut dyn Renderer, rect: Rect<i32>, tint: u32) {
         self.ensure_loaded();
         let w = rect.width().max(0) as u32;
         let h = rect.height().max(0) as u32;

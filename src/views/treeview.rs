@@ -7,7 +7,7 @@ use crate::input::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance
 use crate::assets::get_font_family;
 use crate::events::{EventCallback, EventData, EventType};
 use crate::image_source::ImageSource;
-use crate::themes::{Theme, Typeface, ViewState};
+use crate::themes::{Renderer, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, point, rect};
 use crate::ui::UI;
@@ -498,7 +498,7 @@ impl TreeView {
     /// Draw a chevron with rect slivers: right-pointing when collapsed,
     /// down-pointing when expanded. `color` follows the row's text color so
     /// the chevron stays visible on the selection highlight.
-    fn paint_chevron(&self, theme: &mut dyn Theme, zone: Rect<i32>, expanded: bool, color: u32) {
+    fn paint_chevron(&self, theme: &mut dyn Renderer, zone: Rect<i32>, expanded: bool, color: u32) {
         let scale = self.state.borrow().scale;
         let size = (8.0 * scale).round() as i32;
         let cx = zone.min.x + zone.width() / 2;
@@ -576,7 +576,7 @@ impl View for TreeView {
         r.width() <= w && r.height() <= h
     }
 
-    fn paint(&self, origin: Point<i32>, theme: &mut dyn Theme) {
+    fn paint(&self, origin: Point<i32>, theme: &mut dyn Renderer) {
         let mut r = self.state.borrow().rect;
         r.move_by(origin);
 

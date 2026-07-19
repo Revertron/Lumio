@@ -8,13 +8,13 @@ use crate::themes::Typeface;
 ///
 /// Colors are resolved at draw time by the drawing engine (for
 /// `color="@token"` references in drawable XML) and by views (via
-/// `Theme::color`). Every color entry must carry an explicit alpha byte
+/// `Renderer::color`). Every color entry must carry an explicit alpha byte
 /// (`0xAARRGGBB`): token values are used verbatim via `Color::from_hex_argb`,
 /// while literal 6-digit hex colors in drawable XML get full alpha added by
 /// the parser. An entry without alpha would render fully transparent.
 ///
 /// Dimensions are in dips (callers multiply by scale). Because layout runs
-/// before any per-frame `Theme` exists, views read them through
+/// before any per-frame `Renderer` exists, views read them through
 /// [`current_dimension`], which queries the thread-local palette kept in sync
 /// by the window handler.
 #[derive(Clone)]
@@ -37,14 +37,14 @@ pub fn set_current_palette(palette: Palette) {
 }
 
 /// Resolve a dimension token (dips) against the currently active palette.
-/// Usable from layout code, where no `Theme` instance exists yet.
+/// Usable from layout code, where no `Renderer` instance exists yet.
 pub fn current_dimension(token: &str) -> f32 {
     CURRENT.with(|current| current.borrow().dimension(token))
 }
 
 /// Resolve a color token against the currently active palette. For code that
 /// runs outside paint (e.g. the tooltip is assembled in `UI` before any
-/// `Theme` instance exists); paint code should prefer `Theme::color`.
+/// `Renderer` instance exists); paint code should prefer `Renderer::color`.
 pub fn current_color(token: &str) -> u32 {
     CURRENT.with(|current| current.borrow().color(token))
 }
@@ -189,6 +189,26 @@ impl Palette {
             Some(typeface) => typeface.clone(),
             None => self.typefaces.get("default").cloned().unwrap_or_default(),
         }
+    }
+
+    /// Derive a palette from this one with `token` set to `argb` (added or
+    /// replaced). Chain to customize a built-in palette:
+    /// `Palette::dark().with_color("selection", 0xFF8000FF)`.
+    pub fn with_color(mut self, token: impl Into<String>, argb: u32) -> Self {
+        self.colors.insert(token.into(), argb);
+        self
+    }
+
+    /// Derive a palette with dimension `token` (dips) set to `value`.
+    pub fn with_dimension(mut self, token: impl Into<String>, value: f32) -> Self {
+        self.dimensions.insert(token.into(), value);
+        self
+    }
+
+    /// Derive a palette with the typeface for `role` set to `typeface`.
+    pub fn with_typeface(mut self, role: impl Into<String>, typeface: Typeface) -> Self {
+        self.typefaces.insert(role.into(), typeface);
+        self
     }
 }
 

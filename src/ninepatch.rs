@@ -8,7 +8,7 @@
 //! Rendering is CPU-composited: [`crate::ninepatch::NinePatchSource`]
 //! stretches the patch to the destination size into one RGBA buffer, caches it
 //! (last size only, same shape as `ImageSource::rasterized`), and draws it
-//! through [`crate::themes::Theme::draw_raw_image_tinted`] — so both backends
+//! through [`crate::themes::Renderer::draw_raw_image_tinted`] — so both backends
 //! share one code path and there are no GPU seam/filtering artifacts between
 //! cells.
 //!
@@ -27,7 +27,7 @@ use crate::assets::get_asset;
 use crate::drawing::parser::DrawableParser;
 use crate::drawing::selector::StateMatcher;
 use crate::image_source::{next_image_id, push_pending};
-use crate::themes::{Theme, ViewState};
+use crate::themes::{Renderer, ViewState};
 use crate::types::Rect;
 use crate::views::Borders;
 
@@ -283,7 +283,7 @@ impl NinePatchSource {
     /// Draw the patch stretched to exactly `rect`. Fixed regions are sized at
     /// `source px × scale`. Re-composites when the size or scale changed,
     /// retiring the previous texture (see `ImageSource` for the id scheme).
-    pub fn draw(&mut self, theme: &mut dyn Theme, rect: Rect<i32>, scale: f64, tint: u32) {
+    pub fn draw(&mut self, theme: &mut dyn Renderer, rect: Rect<i32>, scale: f64, tint: u32) {
         self.ensure_loaded();
         let w = rect.width().max(0) as u32;
         let h = rect.height().max(0) as u32;
@@ -363,7 +363,7 @@ impl NinePatchBackground {
     }
 
     /// Draw the state-matched patch stretched over `rect`.
-    pub fn paint(&mut self, theme: &mut dyn Theme, rect: Rect<i32>, state: &ViewState, scale: f64) {
+    pub fn paint(&mut self, theme: &mut dyn Renderer, rect: Rect<i32>, state: &ViewState, scale: f64) {
         if let Some(src) = self.item_for(state) {
             src.draw(theme, rect, scale, 0xFFFFFFFF);
         }

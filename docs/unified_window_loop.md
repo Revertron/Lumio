@@ -30,12 +30,12 @@ speedy2d already separates renderer from windowing:
   via a proc-address loader closure.
 - `GLRenderer::set_viewport_size_pixels(UVec2)` — `lib.rs:535`, for resize.
 - `GLRenderer::draw_frame(|g: &mut Graphics2D| { ... })` — `lib.rs:633`, hands us
-  the `Graphics2D`. `Classic` drives it unchanged (and `Graphics2D` even has its
+  the `Graphics2D`. `RendererGL` drives it unchanged (and `Graphics2D` even has its
   own `create_image_from_*`, `lib.rs:671/697/743`, so the GL image cache path is
   unaffected).
 - Both `GLRenderer` and `Graphics2D` are public; the whole winit/glutin window
   path is gated behind speedy2d's **`windowing`** Cargo feature, which we turn off
-  (`default-features = false`). `image-loading` stays on (Classic needs it).
+  (`default-features = false`). `image-loading` stays on (RendererGL needs it).
 
 So speedy2d needs **no source changes** — just feature flags.
 
@@ -48,8 +48,8 @@ So speedy2d needs **no source changes** — just feature flags.
        └─ calls Win<T> per window  │            │   gating, escape, cursor,
                                     │            │   command-pump
   SW:  Lumio App (winit loop, ─────┘            └── per-window RenderSurface:
-       window map, modal stack)                      • GlSurface  (glutin + speedy2d GLRenderer → Classic)
-       └─ WindowState per window                     • SoftwareSurface (softbuffer + tiny-skia → SoftwareTheme)
+       window map, modal stack)                      • GlSurface  (glutin + speedy2d GLRenderer → RendererGL)
+       └─ WindowState per window                     • SoftwareSurface (softbuffer + tiny-skia → RendererSoftware)
 ```
 
 `win.rs` and the `Win<T>` per-window handler are **deleted**. The software loop
@@ -65,7 +65,7 @@ stack, command pump) is backend-neutral and written once.
 /// knows how to paint a laid-out UI and present it.
 trait RenderSurface {
     fn resize(&mut self, width: u32, height: u32);
-    /// Build the backend Theme, paint `ui` into the surface, and present.
+    /// Build the backend Renderer, paint `ui` into the surface, and present.
     /// Eviction drain + pending-palette handling live here (cache type differs
     /// per backend).
     fn paint(&mut self, ui: &UI, palette: &Palette, registry: &DrawableRegistry, scale: f64);
@@ -74,10 +74,10 @@ trait RenderSurface {
 
 - **SoftwareSurface** = today's `WindowState::render` body: `Pixmap` +
   softbuffer surface + `GlyphCache`/`SoftwareImageCache`; paints via
-  `SoftwareTheme`, blits to softbuffer.
+  `RendererSoftware`, blits to softbuffer.
 - **GlSurface** = glutin `Surface` + `PossiblyCurrentContext` +
   `speedy2d::GLRenderer` + GL `ImageCache`; `paint` = make-current →
-  `draw_frame(|g| { let mut t = Classic::new(g, registry, palette, &mut cache, w, h, scale); ui.paint(&mut t); })` → `swap_buffers`.
+  `draw_frame(|g| { let mut t = RendererGL::new(g, registry, palette, &mut cache, w, h, scale); ui.paint(&mut t); })` → `swap_buffers`.
 
 Per-window neutral state (moves out of `WindowState`): `ui`, `registry`,
 `palette`, `width`, `height`, `scale`, `mouse_pos`, `mod_state`, `last_cursor`,
@@ -131,7 +131,7 @@ the move takes on.
    all 78 software tests pass, and `software_window_example` opens + renders a
    real window without crashing. References updated in `lib.rs`/`app.rs`/`prelude.rs`.
 3. **GL surface — DONE.** Added `window/surface_gl.rs` (`GlBackend` + `GlSurface:
-   RenderSurface`: glutin context + `speedy2d::GLRenderer` → `Classic`, per-window
+   RenderSurface`: glutin context + `speedy2d::GLRenderer` → `RendererGL`, per-window
    make-current). The backend seam now owns window creation (`create(event_loop,
    attrs)`) because GL must build the window alongside a matching GL config.
    `backend-gl` routes through the neutral loop; `app::run` collapsed to one
@@ -191,7 +191,7 @@ speedy2d's window code set a few things our loop must match:
 
 ## Explicitly NOT changed
 
-`Theme` trait, `crate::text`, `crate::input`, `Classic`/`SoftwareTheme`
+`Renderer` trait, `crate::text`, `crate::input`, `RendererGL`/`RendererSoftware`
 internals, the drawable engines, and `WindowConfig`/`WindowRequest` semantics.
 This is a window-loop/ownership refactor, not a rendering or input change.
 

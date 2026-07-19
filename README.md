@@ -18,8 +18,10 @@ rendering backend, selected at compile time with no source changes.
 - **Retained-mode tree** with three layout engines behind a `Layout` trait
   (linear, overlay, dock), HiDPI/scale awareness, and per-view gravity.
 - **Switchable rendering backends** (see below) behind one window loop.
-- **Theming** — palette-driven colors/dimensions/typefaces, light & dark, with
-  `@token` references and `<Style>` in layout XML.
+- **Theming & skins** — palette-driven colors/dimensions/typefaces (light & dark)
+  with `@token` references and `<Style>` in layout XML; swappable **skins** bundle
+  a palette with the drawable *forms*, selectable per-window or at runtime and
+  extensible with your own (see [Skins](#skins)).
 - **Rich widget set** — text input with undo/redo & selection, tables, virtualized
   lists, rich text, menus, dialogs, notifications, SVG & raster images.
 - **Multi-window + app-modal dialogs**, tooltips, popups, mouse-cursor switching.
@@ -47,11 +49,11 @@ from a software-only build. Design notes: `docs/unified_window_loop.md`.
 ```toml
 # Cargo.toml — the crate is published as `lumio-gui`, but imported as `lumio`.
 [dependencies]
-lumio-gui = "0.1"                             # GL backend (default)
+lumio-gui = "0.5"                             # GL backend (default)
 # software backend instead:
-# lumio-gui = { version = "0.1", default-features = false, features = ["backend-software"] }
+# lumio-gui = { version = "0.5", default-features = false, features = ["backend-software"] }
 # GL with automatic software fallback (e.g. for apps that must run in GPU-less VMs):
-# lumio-gui = { version = "0.1", features = ["backend-software"] }
+# lumio-gui = { version = "0.5", features = ["backend-software"] }
 ```
 
 ```rust
@@ -83,13 +85,49 @@ fn main() {
 ## Widgets
 
 - **Text:** `Label`, `Edit`, `Memo` (multi-line), `RichText` (spannable HTML subset)
-- **Buttons & toggles:** `Button`, `ImageButton`, `CheckBox`, `RadioButton`
+- **Buttons, toggles & sliders:** `Button`, `ImageButton`, `CheckBox`,
+  `RadioButton`, `Slider`
 - **Selection & data:** `ComboBox`, `List`, `RecyclerView` (virtualized),
-  `TableView` (sortable/resizable columns)
+  `TableView` (sortable/resizable columns), `TreeView` (lazy hierarchy),
+  `IconList` (Explorer list-mode multi-select)
 - **Layout & containers:** `Frame`, `Grid`, `ScrollView`, `TabView`, `SplitPanel`,
   `Separator`
 - **Images & indicators:** `ImageView`, `ProgressBar`, `StatusBar`
 - **Menus & overlays:** `MenuBar`, `PopupMenu`, `NotificationStack`
+
+## Skins
+
+A **skin** bundles a palette with the drawable *forms* widgets are painted with.
+Two ship built in — `"light"` and `"dark"` (same classic forms, different
+palette). Build your own over a base, overriding only the roles you want, then
+select it by name — per window, or swapped at runtime:
+
+```rust
+use lumio::prelude::*;
+
+// Register a custom skin: dark palette + a flat button background.
+register_skin(
+    Skin::builder("flat")
+        .base(BuiltinSkin::Dark)
+        .drawable("button.back", r#"<selector><item><layer-list><item>
+            <shape type="rect"><solid color="@progress_fill"/></shape>
+        </item></layer-list></item></selector>"#)
+        .build(),
+);
+
+// Start a window on it…
+lumio::run(ui, WindowConfig::new("App", 800, 520).skin("flat"));
+
+// …or swap at runtime from an event handler:
+//   ui.set_skin("dark");
+```
+
+Overridden roles resolve against the skin; everything else falls back to the
+shared base set. A role can be overridden with a shape drawable (as above) or a
+9-patch (`.drawable("button.back", "button.9.png")`), and individual palette
+tokens can be tweaked with `.color(..)` / `.dimension(..)`. A whole skin can also
+be written as an XML manifest and loaded with `Skin::from_xml`. See
+[`examples/skins.rs`](examples/skins.rs).
 
 ## Building & running
 

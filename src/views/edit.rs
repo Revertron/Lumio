@@ -12,7 +12,7 @@ use crate::image_source::ImageSource;
 use crate::views::{Borders, Gravity};
 use crate::views::popupmenu::PopupMenu;
 use crate::styles::selector::FontSelector;
-use crate::themes::{Theme, Typeface, ViewState};
+use crate::themes::{Renderer, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::{PopupDirection, PopupMode, UI};
@@ -289,7 +289,7 @@ impl Edit {
         self.base_fire_event(ui, event, &EventData::None);
     }
 
-    fn draw_icon(&self, theme: &mut dyn Theme, icon_rect: Rect<i32>, is_left: bool, tint: u32) {
+    fn draw_icon(&self, theme: &mut dyn Renderer, icon_rect: Rect<i32>, is_left: bool, tint: u32) {
         let cell = if is_left { &self.icon_left } else { &self.icon_right };
         if let Some(icon) = cell.borrow_mut().as_mut() {
             icon.draw(theme, icon_rect, tint);
@@ -1068,7 +1068,7 @@ impl View for Edit {
         }
     }
 
-    fn paint(&self, origin: Point<i32>, theme: &mut dyn Theme) {
+    fn paint(&self, origin: Point<i32>, theme: &mut dyn Renderer) {
         // Lazy load icon assets on first paint
         self.load_icons();
         self.update_scroll();

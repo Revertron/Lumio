@@ -7,7 +7,7 @@ use crate::input::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance
 use crate::assets::get_font_family;
 use crate::events::{EventCallback, EventData, EventType};
 use crate::image_source::ImageSource;
-use crate::themes::{Theme, Typeface, ViewState};
+use crate::themes::{Renderer, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, point, rect};
 use crate::ui::UI;
@@ -457,7 +457,7 @@ impl View for IconList {
         r.width() <= w && r.height() <= h
     }
 
-    fn paint(&self, origin: Point<i32>, theme: &mut dyn Theme) {
+    fn paint(&self, origin: Point<i32>, theme: &mut dyn Renderer) {
         let mut r = self.state.borrow().rect;
         r.move_by(origin);
 

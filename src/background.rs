@@ -7,7 +7,7 @@
 //! factor-of-natural-size components).
 
 use crate::image_source::ImageSource;
-use crate::themes::Theme;
+use crate::themes::Renderer;
 use crate::types::{Rect, rect};
 use crate::views::{Borders, HAlign, VAlign};
 
@@ -170,7 +170,7 @@ impl BackgroundImage {
     /// Draws the background image. `frame_rect` is the frame's screen rect,
     /// `padding` is already scaled to physical pixels. The caller must have
     /// clipped to `frame_rect` already (partial tiles rely on the scissor).
-    pub fn paint(&mut self, theme: &mut dyn Theme, frame_rect: Rect<i32>, padding: &Borders, scale: f64) {
+    pub fn paint(&mut self, theme: &mut dyn Renderer, frame_rect: Rect<i32>, padding: &Borders, scale: f64) {
         let natural = self.image.natural_size();
         if !self.image.is_loaded() || self.opacity <= 0.0 {
             return;

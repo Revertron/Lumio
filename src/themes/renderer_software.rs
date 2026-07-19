@@ -1,5 +1,5 @@
-//! Software theme: a `Theme` implementation over `tiny_skia::Pixmap`. Mirror of
-//! `Classic` but rasterizing on the CPU (used for headless rendering today; the
+//! Software theme: a `Renderer` implementation over `tiny_skia::Pixmap`. Mirror of
+//! `RendererGL` but rasterizing on the CPU (used for headless rendering today; the
 //! software window loop reuses it later). Text is rasterized per-glyph from the
 //! fontdue payload carried by `TextBlock`.
 
@@ -11,7 +11,7 @@ use tiny_skia::{FillRule, FilterQuality, IntSize, Mask, Paint as TsPaint, PathBu
 use super::super::drawing::engine_software::{argb_to_color, SoftwareDrawingEngine};
 use super::super::drawing::{Drawable, DrawableRegistry, Palette};
 use super::super::text::TextBlock;
-use super::super::themes::{OpacityStack, Theme, ViewState};
+use super::super::themes::{OpacityStack, Renderer, ViewState};
 use super::super::types::{Rect, rect};
 
 /// Decoded images for the software backend, keyed by the owning `ImageSource`
@@ -35,7 +35,7 @@ enum ClipDecision {
     Masked,
 }
 
-pub struct SoftwareTheme<'h> {
+pub struct RendererSoftware<'h> {
     pixmap: &'h mut Pixmap,
     width: i32,
     height: i32,
@@ -56,7 +56,7 @@ pub struct SoftwareTheme<'h> {
     glyph_cache: &'h mut GlyphCache,
 }
 
-impl<'h> SoftwareTheme<'h> {
+impl<'h> RendererSoftware<'h> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         pixmap: &'h mut Pixmap,
@@ -68,7 +68,7 @@ impl<'h> SoftwareTheme<'h> {
         height: i32,
         scale: f64,
     ) -> Self {
-        SoftwareTheme {
+        RendererSoftware {
             pixmap,
             width,
             height,
@@ -141,7 +141,7 @@ impl<'h> SoftwareTheme<'h> {
     }
 }
 
-impl<'h> Theme for SoftwareTheme<'h> {
+impl<'h> Renderer for RendererSoftware<'h> {
     fn clear_screen(&mut self) {
         let color = argb_to_color(self.palette.color("background") | 0xFF00_0000, 1.0)
             .unwrap_or(tiny_skia::Color::WHITE);
@@ -320,7 +320,15 @@ impl<'h> Theme for SoftwareTheme<'h> {
     }
 
     fn draw_component(&mut self, role: &str, rect: Rect<i32>, state: ViewState) {
-        if let Some(selector) = self.drawable_registry.get(role) {
+        let registry = self.drawable_registry;
+        // A 9-patch override for this role wins over any shape drawable; it
+        // paints through `draw_raw_image_tinted`, which honors the clip stack.
+        if let Some(ninepatch) = registry.get_ninepatch(role) {
+            let scale = self.scale;
+            ninepatch.borrow_mut().paint(self, rect, &state, scale);
+            return;
+        }
+        if let Some(selector) = registry.get(role) {
             if let Some(drawable) = selector.get_drawable(&state) {
                 let clip = match self.clip_decision(rect) {
                     ClipDecision::Skip => return,
@@ -373,7 +381,7 @@ impl<'h> Theme for SoftwareTheme<'h> {
     }
 }
 
-impl<'h> SoftwareTheme<'h> {
+impl<'h> RendererSoftware<'h> {
     /// Blit straight RGBA8 (tinted, opacity-folded, premultiplied), scaled to fill
     /// `rect`. SVG sources arrive already rasterized at `rect`'s size, so the scale
     /// is 1:1 and the blit stays crisp; raster images arrive at their natural
@@ -444,7 +452,7 @@ mod tests {
         let mut image_cache = SoftwareImageCache::new();
         let mut glyph_cache = GlyphCache::new();
         {
-            let mut theme = SoftwareTheme::new(
+            let mut theme = RendererSoftware::new(
                 &mut pixmap, &registry, &palette, &mut image_cache, &mut glyph_cache, 40, 40, 1.0,
             );
             let img = vec![255u8; 2 * 2 * 4];

@@ -7,7 +7,7 @@ use crate::assets::get_font_family;
 use crate::events::{EventCallback, EventData, EventType};
 use crate::image_source::ImageSource;
 
-use crate::themes::{Theme, Typeface, ViewState};
+use crate::themes::{Renderer, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
 use crate::types::{Point, Rect, rect};
 use crate::ui::{PopupDirection, PopupMode, UI};
@@ -207,7 +207,7 @@ impl Label {
         self.base_fire_event(ui, event, &EventData::None);
     }
 
-    fn draw_icon(&self, theme: &mut dyn Theme, icon_rect: Rect<i32>, is_left: bool, tint: u32) {
+    fn draw_icon(&self, theme: &mut dyn Renderer, icon_rect: Rect<i32>, is_left: bool, tint: u32) {
         let cell = if is_left { &self.left_icon } else { &self.right_icon };
         if let Some(icon) = cell.borrow_mut().as_mut() {
             icon.draw(theme, icon_rect, tint);
@@ -641,7 +641,7 @@ impl View for Label {
         }
     }
 
-    fn paint(&self, origin: Point<i32>, theme: &mut dyn Theme) {
+    fn paint(&self, origin: Point<i32>, theme: &mut dyn Renderer) {
         // Rebuild cached text if it was invalidated (e.g. by set_text)
         if self.state.borrow().cached_text.is_none() {
             self.rebuild_text();

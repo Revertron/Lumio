@@ -253,7 +253,7 @@ pub trait ViewBasics: HasMainFields {
     /// drawing. Takes only an immutable borrow of `FieldsMain` (the composite
     /// cache lives in a nested `RefCell`) — safe to call while the view's
     /// `paint` holds its own state borrow.
-    fn base_draw_ninepatch(&self, theme: &mut dyn crate::themes::Theme, rect: Rect<i32>) -> bool {
+    fn base_draw_ninepatch(&self, theme: &mut dyn crate::themes::Renderer, rect: Rect<i32>) -> bool {
         let fields = self.main_fields().borrow();
         let mut np = fields.background_ninepatch.borrow_mut();
         match np.as_mut() {

@@ -13,7 +13,7 @@ use super::input::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, Mo
 use super::containers::Frame;
 use super::events::{EventData, EventType};
 use super::shortcut::Shortcut;
-use super::themes::Theme;
+use super::themes::Renderer;
 use super::traits::{Element, View};
 use super::types::Point;
 use super::themes::Typeface;
@@ -159,6 +159,9 @@ pub struct UI {
     /// A palette change requested from app code (e.g. inside an event
     /// handler); picked up by the window handler before the next paint.
     pending_palette: Option<crate::drawing::Palette>,
+    /// A skin change requested from app code (resolved from the skin registry
+    /// by [`UI::set_skin`]); picked up by the window handler before the next paint.
+    pending_skin: Option<crate::skin::Skin>,
     /// Named attribute bundles, applied to a view via `style="name"` in
     /// layout XML before the view's own attributes (own attributes win).
     /// Registered from `<Style name="..." .../>` elements or [`UI::add_style`].
@@ -280,6 +283,7 @@ impl UI {
             pending_removals: Vec::new(),
             requested_cursor: None,
             pending_palette: None,
+            pending_skin: None,
             styles: HashMap::new(),
             focus_owner: None,
             hover_owner: None,
@@ -847,7 +851,7 @@ impl UI {
     /// Paint one overlay (or the tooltip, token = [`TOOLTIP_TOKEN`]) with its rect's top-left
     /// at the theme's origin — for an external-popups embedder rendering it into its own
     /// surface. `false` if the token is gone.
-    pub fn paint_overlay(&self, token: u64, theme: &mut dyn Theme) -> bool {
+    pub fn paint_overlay(&self, token: u64, theme: &mut dyn Renderer) -> bool {
         if token == TOOLTIP_TOKEN {
             if let Some(t) = &self.tooltip_popup {
                 let r = t.element.borrow().get_rect();
@@ -1097,7 +1101,7 @@ impl UI {
         }
     }
 
-    pub fn paint(&self, theme: &mut dyn Theme) {
+    pub fn paint(&self, theme: &mut dyn Renderer) {
         theme.clear_screen();
         if let Some(root) = &self.root {
             root.borrow().paint(Point::from((0, 0)), theme);
@@ -1659,6 +1663,24 @@ impl UI {
     /// a palette change since the last paint.
     pub fn take_pending_palette(&mut self) -> Option<crate::drawing::Palette> {
         self.pending_palette.take()
+    }
+
+    /// Request a skin change by name (resolved via the skin registry and the
+    /// built-in `"light"` / `"dark"`). Applied by the window handler before the
+    /// next paint, so it is safe to call from inside event handlers. An unknown
+    /// name is ignored (with a warning); use
+    /// [`register_skin`](crate::skin::register_skin) first for custom skins.
+    pub fn set_skin(&mut self, name: &str) {
+        match crate::skin::skin_by_name(name) {
+            Some(skin) => self.pending_skin = Some(skin),
+            None => warn!("set_skin: unknown skin '{name}'"),
+        }
+    }
+
+    /// Taken by the window handler each frame; `Some` means the app requested a
+    /// skin change since the last paint.
+    pub fn take_pending_skin(&mut self) -> Option<crate::skin::Skin> {
+        self.pending_skin.take()
     }
 
     /// Queues a new OS window with its own UI. Safe to call from event

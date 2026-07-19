@@ -1,5 +1,5 @@
 //! Headless software rendering: lay out a UI and paint it into a
-//! `tiny_skia::Pixmap` with the [`SoftwareTheme`](crate::themes::SoftwareTheme),
+//! `tiny_skia::Pixmap` with the [`RendererSoftware`](crate::themes::RendererSoftware),
 //! no window required. Useful
 //! for tests, screenshots, and as the foundation the software window loop will
 //! reuse. Only available under the `backend-software` feature.
@@ -7,7 +7,7 @@
 use tiny_skia::Pixmap;
 
 use crate::drawing::{DrawableRegistry, Palette};
-use crate::themes::{GlyphCache, SoftwareImageCache, SoftwareTheme};
+use crate::themes::{GlyphCache, SoftwareImageCache, RendererSoftware};
 use crate::ui::UI;
 
 /// Paint an already-laid-out `ui` into a fresh `width`×`height` pixmap at the
@@ -30,7 +30,7 @@ pub fn render_to_pixmap(
     let mut image_cache = SoftwareImageCache::new();
     let mut glyph_cache = GlyphCache::new();
     {
-        let mut theme = SoftwareTheme::new(
+        let mut theme = RendererSoftware::new(
             &mut pixmap,
             registry,
             palette,
@@ -64,7 +64,7 @@ pub fn render_overlay_to_pixmap(
     let mut image_cache = SoftwareImageCache::new();
     let mut glyph_cache = GlyphCache::new();
     let painted = {
-        let mut theme = SoftwareTheme::new(
+        let mut theme = RendererSoftware::new(
             &mut pixmap,
             registry,
             palette,

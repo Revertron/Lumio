@@ -31,7 +31,7 @@ const LAYOUT: &str = r#"
 /// Dual-backend build only: after `set_render_backend(Software)`, fonts load
 /// through the software backend and text actually renders headless. Compares
 /// against an empty-text render — if the text were shaped by the GL backend,
-/// `SoftwareTheme::draw_text` would skip it and both renders would be identical.
+/// `RendererSoftware::draw_text` would skip it and both renders would be identical.
 #[cfg(feature = "backend-gl")]
 #[test]
 fn dual_build_software_text_renders() {

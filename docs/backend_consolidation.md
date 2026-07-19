@@ -9,8 +9,8 @@ files* and a handful of behavior divergences.
 
 - `lumio::run(ui, WindowConfig)` — neutral launcher (`src/app.rs`).
   `WindowConfig` is the neutral superset of window options.
-- `Theme` trait (`src/themes/mod.rs`) — the rendering abstraction;
-  `UI::paint(&mut dyn Theme)` drives both.
+- `Renderer` trait (`src/themes/mod.rs`) — the rendering abstraction;
+  `UI::paint(&mut dyn Renderer)` drives both.
 - `crate::text` — `TextBlock`/`TextLine`/`Glyph`/`FontHandle` with an opaque
   per-backend draw payload; each `FontHandle` carries its backend and shapes
   with the matching per-backend `shape` function.
@@ -33,10 +33,10 @@ already says it's a copy). `Axis` is duplicated too. Move both into
 `pub enum Axis`; each engine keeps a thin forwarding `eval`/`eval_expr` method so
 call sites are untouched, and the ~30-line match exists once.
 
-### #2 Promote palette-delegating `Theme` methods to defaults
+### #2 Promote palette-delegating `Renderer` methods to defaults
 `typeface`, `color`, `dimension`, `get_back_color`, `get_text_color` are
 byte-for-byte identical in `classic.rs` and `software.rs` (they only delegate to
-`self.palette`). Add `fn palette(&self) -> &Palette` to the `Theme` trait, make
+`self.palette`). Add `fn palette(&self) -> &Palette` to the `Renderer` trait, make
 those five default methods, and remove them from both impls (each just provides
 `palette()`). Removes ~50 identical lines per theme and prevents drift.
 
@@ -93,7 +93,7 @@ Both caches are `HashMap<u64, _>` aliases, so one generic helper covers both.
   segments); the match is exhaustive (no silent `_`). Note this was *latent* — the
   XML parser only emits `rect`/`circle`/`triangle`/`line`, so these `DrawCommand`s
   are programmatic-only today; implemented for engine parity, not runtime-tested.
-- **Software image scaling — FIXED.** `SoftwareTheme::blit_rgba` scales the source
+- **Software image scaling — FIXED.** `RendererSoftware::blit_rgba` scales the source
   to the destination rect (tiny-skia transform, bilinear when scaling, nearest at
   1:1), matching the GL backend. (The `_cache_key` ignore is fine — raster images
   arrive pre-decoded, nothing to cache; the decode for *file* images is already

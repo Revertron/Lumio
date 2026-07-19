@@ -26,16 +26,16 @@ Phase-6 implementation notes:
 Phase-5 implementation notes, deviating from the sketch below where reality
 required it:
 - Dimensions live in `Palette` (the theme resource bundle) as dip values.
-  Because **layout runs before any per-frame `Theme` exists**, views resolve
+  Because **layout runs before any per-frame `Renderer` exists**, views resolve
   them through `drawing::current_dimension(token)` — a thread-local "current
   palette" kept in sync by `Win` (same pattern as the assets provider). The
-  `Theme::dimension()` resolver exists for paint-time use.
+  `Renderer::dimension()` resolver exists for paint-time use.
 - Token set is deliberately minimal: `scrollbar.thickness` (16 — unified;
   TableView previously used 14), `caret.width`, `checkbox.box_size`,
   `radio.box_size`, `radio.left_inset`. Other widget constants (item paddings,
   tab paddings, dialog metrics) stay in code until a theme needs them.
-- Typography: `Theme::typeface(role)` is instance-level and palette-backed;
-  unknown roles fall back to `"default"`. `Classic::typeface()` remains as an
+- Typography: `Renderer::typeface(role)` is instance-level and palette-backed;
+  unknown roles fall back to `"default"`. `RendererGL::typeface()` remains as an
   inherent convenience returning the current palette's default (used by
   examples before a theme exists). Only the "default" role is seeded — add
   roles when a consumer appears.
@@ -52,14 +52,14 @@ not implementing ~30 Rust drawing methods. Dark mode becomes a palette swap.
 
 Two parallel rendering paths exist today:
 
-1. **~30 hardcoded per-widget methods** on the `Theme` trait
+1. **~30 hardcoded per-widget methods** on the `Renderer` trait
    (`draw_button_back`, `draw_tab_active`, `draw_scrollbar_thumb`, …),
-   implemented imperatively in `Classic`. The trait itself marks them
+   implemented imperatively in `RendererGL`. The trait itself marks them
    *"Legacy drawing methods (will be deprecated)"* (`src/themes/mod.rs`).
 2. **A data-driven drawable system** — Android-style XML with `<selector>`
    state matching, `<layer-list>`, shapes, strokes, gradients, dash patterns —
    loaded into `DrawableRegistry` (`src/drawing/registry.rs`) and rendered via
-   `Theme::draw_component()`. Button, CheckBox, Edit, ComboBox, Dialog and
+   `Renderer::draw_component()`. Button, CheckBox, Edit, ComboBox, Dialog and
    ImageButton already paint through it.
 
 The drawable path is crippled in two ways:
@@ -70,7 +70,7 @@ The drawable path is crippled in two ways:
 - **Drawable XMLs hardcode hex colors** — `#d4d0c8` is repeated in every file.
 
 Consequence: adding a second theme today requires new drawable XMLs **and** a
-new Rust `Theme` impl **and** touching every view. The refactor removes all
+new Rust `Renderer` impl **and** touching every view. The refactor removes all
 three requirements.
 
 Additionally, several views bypass the theme entirely with rogue hardcoded
@@ -79,11 +79,11 @@ gray `0xff808080`, tooltip yellow `0xFFFFFFDD`, TableView selection blue.
 
 ## Target architecture
 
-A theme resolves four kinds of resources. The `Theme` trait shrinks to
+A theme resolves four kinds of resources. The `Renderer` trait shrinks to
 **primitive drawing + resource lookup**:
 
 ```
-trait Theme {
+trait Renderer {
     // Primitives (stay in Rust):
     // draw_rect, draw_rounded_rect, draw_text*, draw_image*, clip stack, opacity stack
 
@@ -133,7 +133,7 @@ Numbers scattered through views are theme decisions too:
 
 ### 4. Typography
 
-- `Typeface::default()` hardcodes NotoSans; `Theme::typeface()` is a static
+- `Typeface::default()` hardcodes NotoSans; `Renderer::typeface()` is a static
   method (`where Self: Sized` — not even dyn-callable).
 - Make it instance-level and role-based: default / button / caption / heading
   fonts and sizes per theme.

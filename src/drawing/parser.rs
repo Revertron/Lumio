@@ -490,7 +490,7 @@ impl DrawableParser {
     }
 
     /// Parse a `#RRGGBB`/`#AARRGGBB` literal to a `0xAARRGGBB` color.
-    fn parse_color(color_str: &str) -> Result<u32, String> {
+    pub(crate) fn parse_color(color_str: &str) -> Result<u32, String> {
         if color_str.starts_with('#') {
             let hex = &color_str[1..];
             match hex.len() {

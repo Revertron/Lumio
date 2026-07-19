@@ -9,7 +9,7 @@ use super::events::{EventCallback, EventData, EventType};
 use super::views::Borders;
 
 use super::layout::{Layout, LinearLayout};
-use super::themes::{Theme, Typeface, ViewState};
+use super::themes::{Renderer, Typeface, ViewState};
 use super::traits::{Container, Element, View, WeakElement};
 use super::types::{Point, Rect, rect};
 use super::ui::UI;
@@ -274,7 +274,7 @@ impl View for Frame {
         size.0 <= width && size.1 <= height
     }
 
-    fn paint(&self, origin: Point<i32>, theme: &mut dyn Theme) {
+    fn paint(&self, origin: Point<i32>, theme: &mut dyn Renderer) {
         let mut rect = self.state.borrow().rect;
         let start = rect.min + origin;
         rect.move_by(origin);
