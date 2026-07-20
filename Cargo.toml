@@ -1,6 +1,6 @@
 [package]
 name = "lumio-gui"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2024"
 authors = ["Revertron <lumio@revertron.com>"]
 description = "A declarative, XML-based retained-mode GUI toolkit for Rust desktop apps (GL or software rendering backend)"

@@ -140,7 +140,16 @@ impl GlBackend {
         };
 
         let window = Rc::new(window);
-        Some((window, GlSurface { surface, context, renderer, image_cache: ImageCache::new(), width: w, height: h }))
+        let gl_surface = GlSurface {
+            surface,
+            context,
+            renderer,
+            image_cache: ImageCache::new(),
+            width: w,
+            height: h,
+            _window: Rc::clone(&window),
+        };
+        Some((window, gl_surface))
     }
 }
 
@@ -153,6 +162,15 @@ pub struct GlSurface {
     image_cache: ImageCache,
     width: u32,
     height: u32,
+    /// Keeps the winit window alive until everything above is dropped (fields
+    /// drop in declaration order, so this must stay last). Closing a window
+    /// drops `WindowState`, whose `window` field comes first — without this
+    /// reference the X11 window would be destroyed before glutin's
+    /// `glXDestroyWindow`, which then fails with `GLXBadWindow`. X errors are
+    /// asynchronous, so that error surfaces later inside an unrelated winit
+    /// call (`XSetICFocus` → `check_errors`), which panics. The software
+    /// surface is immune only because softbuffer holds the window itself.
+    _window: Rc<Window>,
 }
 
 impl RenderSurface for GlSurface {
