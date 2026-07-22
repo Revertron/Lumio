@@ -24,6 +24,7 @@ pub mod menubar;
 pub mod slider;
 pub mod treeview;
 pub mod iconlist;
+pub mod termgrid;
 
 use super::themes::{Typeface, ViewState};
 use super::traits::WeakElement;
@@ -61,6 +62,7 @@ pub use self::menubar::{MenuBar, Menu, MenuItemTag, MenuData};
 pub use self::slider::{Slider, LabelStyle};
 pub use self::treeview::{TreeView, TreeNode};
 pub use self::iconlist::{IconList, IconListItem};
+pub use self::termgrid::TermGrid;
 
 pub const BUTTON_MIN_WIDTH: i32 = 80;
 pub const BUTTON_MIN_HEIGHT: i32 = 24;
