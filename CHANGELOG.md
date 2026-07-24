@@ -5,6 +5,25 @@ All notable changes to Lumio are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project aims to adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3] - 2026-07-24
+
+**XML parser hardening** — `UI::from_xml` can no longer panic on malformed
+layout XML, so untrusted (e.g. guest-supplied) layouts can't crash the host:
+it now logs a warning and returns `None` for bad attribute syntax
+(`<X attr>` without `=`), unknown view-type tags, reader errors such as
+mismatched end tags, unbalanced or unclosed tags, and a child element inside
+a non-container parent (the child is dropped).
+
+### Added
+
+- **`UI::try_create(name)`** — like `UI::create`, but returns `None` for an
+  unregistered view type instead of panicking.
+
+### Fixed
+
+- **Self-closing root element.** A layout consisting of a single self-closing
+  tag (`<Frame .../>`) now parses as the root view instead of panicking.
+
 ## [0.5.0] - 2026-07-19
 
 **Skins** — a theme is now a swappable *resource bundle* (a palette **plus** the
