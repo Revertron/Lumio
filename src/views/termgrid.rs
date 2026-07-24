@@ -310,7 +310,11 @@ impl View for TermGrid {
                     let font =
                         if flags & TERM_BOLD != 0 { bold.as_ref() } else { regular.as_ref() };
                     if let Some(font) = font {
-                        let block = font.layout_text(&text, size, TextOptions::new());
+                        // NO trim_each_line: a run may start with real terminal cells that are
+                        // spaces (indented output) — trimming would shift the visible text left
+                        // of its grid columns.
+                        let opts = TextOptions::new().with_trim_each_line(false);
+                        let block = font.layout_text(&text, size, opts);
                         theme.draw_text(rx as f32, ry as f32, fg, &block);
                     }
                 }
