@@ -1755,7 +1755,7 @@ dependencies = [
 
 [[package]]
 name = "lumio-gui"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "accesskit",
  "accesskit_winit",

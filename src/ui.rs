@@ -608,7 +608,13 @@ impl UI {
     }
 
     pub fn create(&self, name: &str) -> Element {
-        self.types.get(name).expect("No type!")()
+        self.try_create(name).expect("No type!")
+    }
+
+    /// Like [`create`](Self::create), but returns `None` for an unregistered
+    /// type name instead of panicking.
+    pub fn try_create(&self, name: &str) -> Option<Element> {
+        self.types.get(name).map(|factory| factory())
     }
 
     pub fn on_start(&mut self, func: Box<dyn FnMut(&mut UI)>) {
@@ -1124,6 +1130,9 @@ impl UI {
         }
     }
 
+    /// Builds a `UI` from an XML layout. Returns `None` (after logging a
+    /// warning) on malformed XML — bad attribute syntax, unknown view types,
+    /// unbalanced tags — so untrusted layouts can't panic the caller.
     pub fn from_xml(xml: &str, width: u32, height: u32, typeface: Typeface, scale: f64) -> Option<Self> {
         let mut ui = UI::new(width, height, typeface, scale);
         let mut reader = Reader::from_str(xml);
@@ -1136,7 +1145,7 @@ impl UI {
         loop {
             match reader.read_event() {
                 Ok(Event::Start(ref e)) => {
-                    let element = UI::parse_element(&mut ui, e);
+                    let element = UI::parse_element(&mut ui, e)?;
                     if element.borrow().wants_raw_content() {
                         // Capture the literal inner markup (incl. inline tags like
                         // <b>…</b>) and hand it to the view instead of parsing the
@@ -1179,20 +1188,26 @@ impl UI {
                             }
                         }
                     } else {
-                        let element = UI::parse_element(&mut ui, e);
-                        let parent = stack.pop().unwrap();
-                        {
-                            element.borrow_mut().set_parent(Some(Rc::downgrade(&parent)));
-                            let mut ref_mut = parent.borrow_mut();
-                            let container = ref_mut.as_container_mut().unwrap();
-                            container.add_view(element);
+                        let element = UI::parse_element(&mut ui, e)?;
+                        match stack.last() {
+                            Some(parent) => {
+                                element.borrow_mut().set_parent(Some(Rc::downgrade(parent)));
+                                let mut ref_mut = parent.borrow_mut();
+                                if let Some(container) = ref_mut.as_container_mut() {
+                                    container.add_view(element);
+                                }
+                            }
+                            // Self-closing root element, e.g. `<Frame/>` as the whole layout
+                            None => ui.add_view(element),
                         }
-                        stack.push(parent);
                     }
                 },
                 Ok(Event::End(_)) => {
                     // TODO check that it is the same tag
-                    let element = stack.pop().unwrap();
+                    let Some(element) = stack.pop() else {
+                        warn!("Unbalanced closing tag at position {}", reader.buffer_position());
+                        return None;
+                    };
                     match stack.pop() {
                         None => {
                             ui.add_view(element);
@@ -1201,8 +1216,9 @@ impl UI {
                             {
                                 element.borrow_mut().set_parent(Some(Rc::downgrade(&parent)));
                                 let mut ref_mut = parent.borrow_mut();
-                                let container = ref_mut.as_container_mut().unwrap();
-                                container.add_view(element);
+                                if let Some(container) = ref_mut.as_container_mut() {
+                                    container.add_view(element);
+                                }
                             }
                             stack.push(parent);
                         }
@@ -1211,32 +1227,46 @@ impl UI {
                 // unescape and decode the text event using the reader encoding
                 Ok(Event::Text(e)) => txt.push(e.into_inner().into_owned()),
                 Ok(Event::Eof) => break, // exits the loop when reaching end of file
-                Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
+                Err(e) => {
+                    warn!("XML error at position {}: {:?}", reader.buffer_position(), e);
+                    return None;
+                }
                 _ => (), // There are several other `Event`s we do not consider here
             }
+        }
+        if !stack.is_empty() {
+            warn!("XML ended with {} unclosed tag(s)", stack.len());
+            return None;
         }
         Some(ui)
     }
 
-    fn parse_element(ui: &mut UI, e: &BytesStart) -> Element {
-        let attributes: Vec<(String, String)> = e
-            .attributes()
-            .map(|a| a.unwrap())
-            .map(|a| {
-                let name = String::from_utf8(a.key.0.to_vec()).unwrap();
-                // Unescape XML entities (&quot;, &amp;, &lt;, ...) in values.
-                let value = match a.normalized_value(XmlVersion::Implicit1_0) {
-                    Ok(value) => value.into_owned(),
-                    Err(_) => match a.value {
-                        Cow::Borrowed(c) => String::from_utf8(c.to_vec()).unwrap(),
-                        Cow::Owned(c) => String::from_utf8(c).unwrap(),
-                    },
-                };
-                (name, value)
-            })
-            .collect();
+    fn parse_element(ui: &mut UI, e: &BytesStart) -> Option<Element> {
+        let mut attributes: Vec<(String, String)> = Vec::new();
+        for attr in e.attributes() {
+            let attr = match attr {
+                Ok(attr) => attr,
+                Err(err) => {
+                    warn!("Malformed attribute in <{}>: {}", String::from_utf8_lossy(e.name().0), err);
+                    return None;
+                }
+            };
+            let name = String::from_utf8(attr.key.0.to_vec()).unwrap();
+            // Unescape XML entities (&quot;, &amp;, &lt;, ...) in values.
+            let value = match attr.normalized_value(XmlVersion::Implicit1_0) {
+                Ok(value) => value.into_owned(),
+                Err(_) => match attr.value {
+                    Cow::Borrowed(c) => String::from_utf8(c.to_vec()).unwrap(),
+                    Cow::Owned(c) => String::from_utf8(c).unwrap(),
+                },
+            };
+            attributes.push((name, value));
+        }
         let view_type = String::from_utf8(e.name().0.to_vec()).unwrap();
-        let view = ui.create(&view_type);
+        let Some(view) = ui.try_create(&view_type) else {
+            warn!("Unknown view type <{}>", view_type);
+            return None;
+        };
         // Apply the style bundle (if any) first, so the element's own
         // attributes override what the style sets.
         if let Some((_, style_name)) = attributes.iter().find(|(name, _)| name == "style") {
@@ -1255,7 +1285,7 @@ impl UI {
             }
             view.borrow_mut().set_any(name, value);
         }
-        view
+        Some(view)
     }
 
     /// Register the attribute bundle of a `<Style name="..." .../>` element.
