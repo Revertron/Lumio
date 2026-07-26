@@ -566,6 +566,13 @@ impl ApplicationHandler<accesskit_winit::Event> for App {
                         ws.window.request_redraw();
                     }
                 }
+                // Synthetic events are winit reporting the keyboard STATE at a focus
+                // change, not something the user just did: a key still held when a
+                // window closes is re-announced as a fresh press to whatever gains
+                // focus next. Dismissing a dialog with Enter would otherwise type
+                // that Enter into the window behind it. Modifier state arrives
+                // separately via `ModifiersChanged`, so nothing here needs them.
+                WindowEvent::KeyboardInput { is_synthetic: true, .. } => {}
                 WindowEvent::KeyboardInput { event: ke, .. } => {
                     let mut redraw = false;
                     if let (ElementState::Pressed, Some(text)) = (ke.state, &ke.text) {

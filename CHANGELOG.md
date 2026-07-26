@@ -75,6 +75,15 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 
 ### Fixed
 
+- **A key held while a window closed was typed into the window behind it.**
+  winit re-announces the keyboard state to whichever window gains focus, as
+  `is_synthetic` key events; the loop took those for real presses. Dismissing a
+  dialog with Enter therefore delivered that Enter to the parent window as well —
+  visible in a terminal app as a stray newline in the shell that had just
+  started. Synthetic events are now ignored: they describe state at a focus
+  change, not something the user did, and modifier state already arrives through
+  `ModifiersChanged`.
+
 - **`TermGrid` glyphs sat too high in their cells** — cells are at least 1.2em
   tall, and the leftover leading was left below the text, so an inverse row
   (top's header, the cursor block) looked shifted down relative to its own
