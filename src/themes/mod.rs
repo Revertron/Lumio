@@ -269,7 +269,7 @@ impl From<String> for FontStyle {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Typeface {
     pub font_name: String,
     pub font_style: FontStyle,
@@ -286,6 +286,21 @@ pub fn default_font_name() -> &'static str {
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     // Generic family — fontconfig resolves it to the distro's default sans.
     { "sans-serif" }
+}
+
+/// The standard fixed-pitch font of the current OS, for `TermGrid` and anything
+/// else that needs cells of equal width. Like [`default_font_name`], this must
+/// name a font the platform actually ships: a family that resolves to nothing
+/// leaves a character grid with no cell metrics, so it silently draws nothing.
+pub fn default_mono_font_name() -> &'static str {
+    #[cfg(target_os = "windows")]
+    // Present since Vista. Cascadia Mono is nicer but only ships with Windows 11.
+    { "Consolas" }
+    #[cfg(target_os = "macos")]
+    { "Menlo" }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    // Generic family — fontconfig resolves it to the distro's default mono.
+    { "monospace" }
 }
 
 impl Default for Typeface {

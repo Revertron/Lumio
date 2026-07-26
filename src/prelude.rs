@@ -14,7 +14,7 @@ pub use crate::shortcut::Shortcut;
 pub use crate::input::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, MouseScrollDistance, VirtualKeyCode};
 pub use crate::types::{Point, Rect};
 pub use crate::assets::{AssetsProvider, set_provider, set_font_fallbacks};
-pub use crate::themes::{Renderer, Typeface, FontStyle, default_typeface};
+pub use crate::themes::{Renderer, Typeface, FontStyle, default_typeface, default_font_name, default_mono_font_name};
 #[cfg(feature = "backend-gl")]
 pub use crate::themes::RendererGL;
 pub use crate::drawing::Palette;
