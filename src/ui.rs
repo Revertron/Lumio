@@ -2004,21 +2004,9 @@ impl UI {
         // consume; returning false falls through to normal behavior.
         // Skipped under a modal overlay: the focus owner belongs to the
         // blocked root tree there.
-        if !self.has_modal_overlay() {
-            let focused = match &self.focus_owner {
-                Some(id) => self.get_view(id),
-                None => None,
-            };
-            if let Some(el) = focused {
-                let has = el.borrow().has_listener(EventType::KeyDown);
-                if has {
-                    let data = EventData::Key { code: virtual_key_code, modifiers: modifiers.clone() };
-                    if el.borrow().fire_event(self, EventType::KeyDown, &data) {
-                        self.sync_focus();
-                        return true;
-                    }
-                }
-            }
+        if self.fire_key_listener(virtual_key_code, &modifiers) {
+            self.sync_focus();
+            return true;
         }
         let mut consumed = self.dispatch_key_down(virtual_key_code, scancode, modifiers.clone());
         // Tab / Shift+Tab move keyboard focus when no view consumed the key
@@ -2041,6 +2029,39 @@ impl UI {
         }
         self.sync_focus();
         consumed
+    }
+
+    /// A held key's auto-repeat, from the window loop.
+    ///
+    /// Only the focused view's `KeyDown` LISTENER sees it. Built-in widget
+    /// behaviour deliberately ignores repeats — a held Enter must not re-click a
+    /// button — but an app that owns the raw key stream needs them, or a
+    /// terminal cannot hold Backspace down to erase a line.
+    pub fn on_key_repeat(&mut self, virtual_key_code: Option<VirtualKeyCode>, modifiers: ModifiersState) -> bool {
+        self.modifiers = modifiers.clone();
+        let fired = self.fire_key_listener(virtual_key_code, &modifiers);
+        self.sync_focus();
+        fired
+    }
+
+    /// Give the focused view's `KeyDown` listener first refusal, so an app can
+    /// intercept keys the view would otherwise consume. Returns whether it took
+    /// the key. Skipped under a modal overlay: the focus owner belongs to the
+    /// blocked root tree there.
+    fn fire_key_listener(&mut self, virtual_key_code: Option<VirtualKeyCode>, modifiers: &ModifiersState) -> bool {
+        if self.has_modal_overlay() {
+            return false;
+        }
+        let focused = match &self.focus_owner {
+            Some(id) => self.get_view(id),
+            None => None,
+        };
+        let Some(el) = focused else { return false };
+        if !el.borrow().has_listener(EventType::KeyDown) {
+            return false;
+        }
+        let data = EventData::Key { code: virtual_key_code, modifiers: modifiers.clone() };
+        el.borrow().fire_event(self, EventType::KeyDown, &data)
     }
 
     fn dispatch_key_down(&mut self, virtual_key_code: Option<VirtualKeyCode>, scancode: KeyScancode, modifiers: ModifiersState) -> bool {
@@ -2084,6 +2105,26 @@ impl UI {
     }
 
     pub fn on_key_char(&mut self, unicode_codepoint: char, modifiers: ModifiersState) -> bool {
+        // Mirrors `on_key_down`: a user KeyChar listener on the focused view
+        // runs BEFORE built-in handling, so an app can take the raw character
+        // stream of a focused view (a TermGrid, say) before the view's own
+        // text handling sees it. Skipped under a modal overlay.
+        if !self.has_modal_overlay() {
+            let focused = match &self.focus_owner {
+                Some(id) => self.get_view(id),
+                None => None,
+            };
+            if let Some(el) = focused {
+                let has = el.borrow().has_listener(EventType::KeyChar);
+                if has {
+                    let data = EventData::Char { ch: unicode_codepoint, modifiers: modifiers.clone() };
+                    if el.borrow().fire_event(self, EventType::KeyChar, &data) {
+                        self.sync_focus();
+                        return true;
+                    }
+                }
+            }
+        }
         let consumed = self.dispatch_key_char(unicode_codepoint, modifiers);
         self.sync_focus();
         consumed

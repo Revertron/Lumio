@@ -579,7 +579,9 @@ impl ApplicationHandler<accesskit_winit::Event> for App {
                     let consumed = match ke.state {
                         // scancode is opaque to Lumio (never inspected) → 0.
                         ElementState::Pressed if !ke.repeat => ws.ui.on_key_down(vk, 0, ws.mod_state.clone()),
-                        ElementState::Pressed => false,
+                        // Auto-repeat: widgets ignore it, but an app listening for
+                        // KeyDown gets it — see `UI::on_key_repeat`.
+                        ElementState::Pressed => ws.ui.on_key_repeat(vk, ws.mod_state.clone()),
                         ElementState::Released => ws.ui.on_key_up(vk, 0, ws.mod_state.clone()),
                     };
                     redraw |= consumed;
