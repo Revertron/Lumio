@@ -85,7 +85,8 @@ A theme resolves four kinds of resources. The `Renderer` trait shrinks to
 ```
 trait Renderer {
     // Primitives (stay in Rust):
-    // draw_rect, draw_rounded_rect, draw_text*, draw_image*, clip stack, opacity stack
+    // draw_rect, draw_rounded_rect, draw_circle, draw_arc, draw_text*, draw_image*,
+    // clip stack, opacity stack
 
     // Resource resolvers (new):
     fn drawable(&self, role: &str) -> Option<&Drawable>;   // "button.back" -> theme's drawable

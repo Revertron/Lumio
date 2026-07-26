@@ -92,7 +92,8 @@ fn main() {
   `IconList` (Explorer list-mode multi-select)
 - **Layout & containers:** `Frame`, `Grid`, `ScrollView`, `TabView`, `SplitPanel`,
   `Separator`
-- **Images & indicators:** `ImageView`, `ProgressBar`, `StatusBar`
+- **Images & indicators:** `ImageView`, `ProgressBar`, `ProgressCircle`
+  (round, determinate or an orbiting-dot spinner), `StatusBar`
 - **Menus & overlays:** `MenuBar`, `PopupMenu`, `NotificationStack`
 
 ## Skins

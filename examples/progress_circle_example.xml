@@ -1,0 +1,35 @@
+<Frame id="root" direction="vertical" width="max" height="max" padding="16">
+    <Label text="ProgressCircle demo" font_style="Bold" font_size="18" width="max" height="24" margin_bottom="12"/>
+
+    <Label text="Determinate — drag the slider, the rings ease over:" width="max" height="20" font_size="14"/>
+    <Frame width="max" height="min" direction="horizontal" margin_bottom="4">
+        <ProgressCircle id="ring_small" value="0.35" margin="8"/>
+        <ProgressCircle id="ring_mid" value="0.35" width="56" height="56" thickness="5" margin="8"/>
+        <ProgressCircle id="ring_big" value="0.35" width="120" height="120" thickness="10"
+                        show_value="true" font_size="26" margin="8"/>
+        <ProgressCircle id="ring_custom" value="0.35" width="72" height="72" thickness="9"
+                        show_value="true" fill_color="#e0529c" track_color="#f0d8e4" margin="8"/>
+    </Frame>
+    <Slider id="drive" min="0" max="100" value="35" label_style="ends|current" width="max" margin_bottom="16"/>
+
+    <Label text="Indeterminate — a comet of dots, at four sizes:" width="max" height="20" font_size="14"/>
+    <Frame width="max" height="min" direction="horizontal" margin_bottom="16">
+        <ProgressCircle indeterminate="true" width="24" height="24" thickness="2" margin="8"/>
+        <ProgressCircle indeterminate="true" margin="8"/>
+        <ProgressCircle indeterminate="true" width="56" height="56" thickness="5" margin="8"/>
+        <ProgressCircle indeterminate="true" width="88" height="88" thickness="7"
+                        fill_color="#2e9e5b" margin="8"/>
+    </Frame>
+
+    <Label text="Disabled:" width="max" height="18" font_size="14"/>
+    <Frame width="max" height="min" direction="horizontal" margin_bottom="16">
+        <ProgressCircle value="0.6" enabled="false" margin="8"/>
+        <ProgressCircle indeterminate="true" enabled="false" margin="8"/>
+    </Frame>
+
+    <Frame width="max" height="min" direction="horizontal">
+        <Button id="busy" text="Toggle busy ring" width="160" margin_right="12"/>
+        <ProgressCircle id="busy_ring" width="28" height="28" thickness="3" margin_right="16"/>
+        <CheckBox id="dark_mode" text="Dark mode" width="120" height="22"/>
+    </Frame>
+</Frame>

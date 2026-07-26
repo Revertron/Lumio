@@ -21,7 +21,7 @@ pub use crate::drawing::Palette;
 pub use crate::skin::{Skin, SkinBuilder, BuiltinSkin, register_skin};
 pub use crate::containers::Frame;
 pub use crate::layout::{Layout, LinearLayout, OverlayLayout, DockLayout, create_layout};
-pub use crate::views::{Label, Button, Edit, CheckBox, RadioButton, ComboBox, ScrollView, ProgressBar, TabView, List, ImageButton, ImageView, Separator, SplitPanel, StatusBar, Memo, NotificationStack};
+pub use crate::views::{Label, Button, Edit, CheckBox, RadioButton, ComboBox, ScrollView, ProgressBar, ProgressCircle, TabView, List, ImageButton, ImageView, Separator, SplitPanel, StatusBar, Memo, NotificationStack};
 pub use crate::views::{RecyclerView, RecyclerAdapter, ViewHolder};
 pub use crate::views::{PopupMenu, MenuItem};
 pub use crate::views::{MenuBar, MenuData};

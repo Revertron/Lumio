@@ -139,6 +139,8 @@ impl Palette {
             ("slider.track_height".to_string(), 4.0),
             ("slider.thumb_size".to_string(), 16.0),
             ("slider.label_gap".to_string(), 4.0),
+            ("progress_circle.size".to_string(), 32.0),
+            ("progress_circle.thickness".to_string(), 3.0),
         ])
     }
 

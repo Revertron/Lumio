@@ -175,6 +175,49 @@ impl<'h> Renderer for RendererGL<'h> {
         self.graphics.draw_circle((x1 - rf, y1 - rf), rf, c);
     }
 
+    fn draw_circle(&mut self, cx: f32, cy: f32, radius: f32, color: u32) {
+        if radius <= 0.0 {
+            return;
+        }
+        let c = self.color_argb(color);
+        self.graphics.draw_circle((cx, cy), radius, c);
+    }
+
+    fn draw_arc(&mut self, cx: f32, cy: f32, radius: f32, start_angle: f32, sweep: f32, thickness: f32, color: u32) {
+        if radius <= 0.0 || thickness <= 0.0 || sweep == 0.0 {
+            return;
+        }
+        let c = self.color_argb(color);
+        let half = (thickness / 2.0).min(radius);
+        let (r_in, r_out) = (radius - half, radius + half);
+        let full = sweep.abs() >= std::f32::consts::TAU - 1e-3;
+        let sweep = sweep.clamp(-std::f32::consts::TAU, std::f32::consts::TAU);
+        let steps = super::arc_segments(r_out, sweep);
+
+        // The band is a strip of quads between consecutive cross-sections;
+        // adjacent quads share an edge exactly, so no seams show. Round caps
+        // are discs at both ends: they overlap the band, which is invisible
+        // for opaque colors but slightly denser under a pushed opacity (same
+        // caveat as `draw_rounded_rect`'s corner circles).
+        let mut prev: Option<(Vector2<f32>, Vector2<f32>)> = None;
+        for i in 0..=steps {
+            let a = start_angle + sweep * (i as f32 / steps as f32);
+            let (sin, cos) = a.sin_cos();
+            let outer = Vector2::new(cx + r_out * cos, cy + r_out * sin);
+            let inner = Vector2::new(cx + r_in * cos, cy + r_in * sin);
+            if let Some((prev_outer, prev_inner)) = prev {
+                self.graphics.draw_quad([prev_outer, outer, inner, prev_inner], c);
+            }
+            prev = Some((outer, inner));
+        }
+        if !full {
+            for a in [start_angle, start_angle + sweep] {
+                let (sin, cos) = a.sin_cos();
+                self.graphics.draw_circle((cx + radius * cos, cy + radius * sin), half, c);
+            }
+        }
+    }
+
     // New drawable-based methods implementation
     fn draw_drawable(&mut self, drawable: &Drawable, rect: Rect<i32>) {
         let mut engine = DrawingEngine::new(self.graphics, self.scale, self.palette);

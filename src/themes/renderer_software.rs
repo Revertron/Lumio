@@ -6,7 +6,7 @@
 use std::collections::{HashMap, VecDeque};
 
 use log::error;
-use tiny_skia::{FillRule, FilterQuality, IntSize, Mask, Paint as TsPaint, PathBuilder, Pixmap, PixmapPaint, Rect as TsRect, Transform};
+use tiny_skia::{FillRule, FilterQuality, IntSize, LineCap, LineJoin, Mask, Paint as TsPaint, PathBuilder, Pixmap, PixmapPaint, Rect as TsRect, Stroke as TsStroke, Transform};
 
 use super::super::drawing::engine_software::{argb_to_color, SoftwareDrawingEngine};
 use super::super::drawing::{Drawable, DrawableRegistry, Palette};
@@ -305,6 +305,76 @@ impl<'h> Renderer for RendererSoftware<'h> {
         }
     }
 
+    fn draw_circle(&mut self, cx: f32, cy: f32, radius: f32, color: u32) {
+        if radius <= 0.0 {
+            return;
+        }
+        let Some(c) = argb_to_color(color, self.current_opacity()) else {
+            return;
+        };
+        let bounds = bounding_rect(cx, cy, radius);
+        let mask = match self.clip_decision(bounds) {
+            ClipDecision::Skip => return,
+            ClipDecision::NoMask => None,
+            ClipDecision::Masked => self.clip_mask.as_ref(),
+        };
+        let mut pb = PathBuilder::new();
+        pb.push_circle(cx, cy, radius);
+        if let Some(path) = pb.finish() {
+            let mut paint = TsPaint::default();
+            paint.set_color(c);
+            paint.anti_alias = true;
+            self.pixmap.as_mut().fill_path(&path, &paint, FillRule::Winding, Transform::identity(), mask);
+        }
+    }
+
+    fn draw_arc(&mut self, cx: f32, cy: f32, radius: f32, start_angle: f32, sweep: f32, thickness: f32, color: u32) {
+        if radius <= 0.0 || thickness <= 0.0 || sweep == 0.0 {
+            return;
+        }
+        let Some(c) = argb_to_color(color, self.current_opacity()) else {
+            return;
+        };
+        let half = (thickness / 2.0).min(radius);
+        let full = sweep.abs() >= std::f32::consts::TAU - 1e-3;
+        let bounds = bounding_rect(cx, cy, radius + half);
+        let mask = match self.clip_decision(bounds) {
+            ClipDecision::Skip => return,
+            ClipDecision::NoMask => None,
+            ClipDecision::Masked => self.clip_mask.as_ref(),
+        };
+        // Stroke the centre line: tiny-skia's round caps/joins give the band
+        // its rounded ends, and a full ring closes into a plain circle.
+        let mut pb = PathBuilder::new();
+        if full {
+            pb.push_circle(cx, cy, radius);
+        } else {
+            let steps = super::arc_segments(radius + half, sweep);
+            for i in 0..=steps {
+                let a = start_angle + sweep * (i as f32 / steps as f32);
+                let (sin, cos) = a.sin_cos();
+                let (x, y) = (cx + radius * cos, cy + radius * sin);
+                if i == 0 {
+                    pb.move_to(x, y);
+                } else {
+                    pb.line_to(x, y);
+                }
+            }
+        }
+        if let Some(path) = pb.finish() {
+            let mut paint = TsPaint::default();
+            paint.set_color(c);
+            paint.anti_alias = true;
+            let stroke = TsStroke {
+                width: half * 2.0,
+                line_cap: LineCap::Round,
+                line_join: LineJoin::Round,
+                ..TsStroke::default()
+            };
+            self.pixmap.as_mut().stroke_path(&path, &paint, &stroke, Transform::identity(), mask);
+        }
+    }
+
     fn draw_drawable(&mut self, drawable: &Drawable, rect: Rect<i32>) {
         let clip = match self.clip_decision(rect) {
             ClipDecision::Skip => return,
@@ -468,6 +538,14 @@ mod tests {
         // Outside the rect is untouched.
         assert_eq!(px(2, 2), (0, 0, 0, 0), "drew outside the destination rect");
     }
+}
+
+/// Pixel-grid bounding box of a circle, rounded outwards, for clip testing.
+fn bounding_rect(cx: f32, cy: f32, radius: f32) -> Rect<i32> {
+    rect(
+        ((cx - radius).floor() as i32, (cy - radius).floor() as i32),
+        ((cx + radius).ceil() as i32, (cy + radius).ceil() as i32),
+    )
 }
 
 /// Build a rectangular coverage mask (the clip) the size of the pixmap.

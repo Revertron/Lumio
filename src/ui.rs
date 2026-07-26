@@ -18,7 +18,7 @@ use super::traits::{Element, View};
 use super::types::Point;
 use super::themes::Typeface;
 
-use super::views::{Button, Edit, Label, CheckBox, RadioButton, ComboBox, ScrollView, ProgressBar, TabView, List, RecyclerView, ImageButton, ImageView, PopupMenu, Separator, SplitPanel, StatusBar, Memo, NotificationStack, TableView, TableColumn, TableRow, Grid, RichText, MenuBar, Menu, MenuItemTag, Slider, TreeView, IconList, TermGrid};
+use super::views::{Button, Edit, Label, CheckBox, RadioButton, ComboBox, ScrollView, ProgressBar, ProgressCircle, TabView, List, RecyclerView, ImageButton, ImageView, PopupMenu, Separator, SplitPanel, StatusBar, Memo, NotificationStack, TableView, TableColumn, TableRow, Grid, RichText, MenuBar, Menu, MenuItemTag, Slider, TreeView, IconList, TermGrid};
 use super::views::{Dimension, Visibility};
 use std::time::Duration;
 
@@ -310,6 +310,7 @@ impl UI {
         ui.register::<ComboBox>("ComboBox");
         ui.register::<ScrollView>("ScrollView");
         ui.register::<ProgressBar>("ProgressBar");
+        ui.register::<ProgressCircle>("ProgressCircle");
         ui.register::<TabView>("TabView");
         ui.register::<Edit>("Edit");
         ui.register::<List>("List");

@@ -5,6 +5,30 @@ All notable changes to Lumio are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project aims to adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`ProgressCircle`** (`src/views/progresscircle.rs`) — a round progress
+  indicator, registered as `<ProgressCircle>`. Determinate mode draws a track
+  ring plus a round-capped arc sweeping clockwise from 12 o'clock, and eases
+  toward a newly set value instead of jumping; indeterminate mode
+  (`indeterminate="true"`) orbits a comet of ten dots that shrink and fade
+  along the trail, spaced edge to edge (not centre to centre) so the gaps stay
+  even as the dots get smaller, with a slow size pulse. Both animations are
+  driven off a wall clock, so they run at the same speed whatever the tick rate.
+  Attributes: `value`, `indeterminate`, `show_value` (centre percentage, off by
+  default), `thickness` (dips), `track_color`, `fill_color`. Demoed in
+  `examples/progress_circle_example.rs`.
+- **`Renderer::draw_circle`** and **`Renderer::draw_arc`** — float-precision
+  circle and round-capped arc primitives (physical pixels; `0` rad points right,
+  a positive sweep runs clockwise). `RendererGL` builds the arc as a quad strip
+  with disc caps, `RendererSoftware` strokes a tiny-skia path; the trait's
+  defaults approximate both from existing primitives, so custom `Renderer`
+  implementations keep compiling.
+- **Palette dimensions** `progress_circle.size` (32 dip) and
+  `progress_circle.thickness` (3 dip).
+
 ## [0.5.3] - 2026-07-24
 
 **XML parser hardening** — `UI::from_xml` can no longer panic on malformed

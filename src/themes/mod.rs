@@ -56,6 +56,14 @@ impl OpacityStack {
     }
 }
 
+/// How many straight segments approximate an arc of `radius` spanning `sweep`
+/// radians: roughly one every two pixels of arc length, clamped to a sane range.
+/// Shared by both renderers' `draw_arc`.
+pub(crate) fn arc_segments(radius: f32, sweep: f32) -> usize {
+    let length = radius.max(1.0) * sweep.abs();
+    ((length / 2.0).ceil() as usize).clamp(4, 512)
+}
+
 pub trait Renderer {
     fn clear_screen(&mut self);
 
@@ -133,6 +141,42 @@ pub trait Renderer {
     /// square `draw_rect` for themes that don't implement rounding.
     fn draw_rounded_rect(&mut self, rect: Rect<i32>, color: u32, _radius: i32) {
         self.draw_rect(rect, color);
+    }
+
+    /// Filled circle centred at `(cx, cy)` with `radius`, all in physical
+    /// pixels. Fractional coordinates are honoured, so an animated circle moves
+    /// smoothly instead of snapping to the pixel grid — callers should NOT
+    /// round. The default falls back to a pixel-grid rounded rect.
+    fn draw_circle(&mut self, cx: f32, cy: f32, radius: f32, color: u32) {
+        if radius <= 0.0 {
+            return;
+        }
+        let r = crate::types::rect(
+            ((cx - radius).round() as i32, (cy - radius).round() as i32),
+            ((cx + radius).round() as i32, (cy + radius).round() as i32),
+        );
+        self.draw_rounded_rect(r, color, radius.round() as i32);
+    }
+
+    /// Stroked circular arc: a band of `thickness`, centred on the circle of
+    /// `radius` around `(cx, cy)`, starting at `start_angle` and sweeping
+    /// `sweep` radians, with round caps. Angles are in radians, `0` points
+    /// right (3 o'clock) and a positive `sweep` runs clockwise (y grows down);
+    /// all lengths are physical pixels. A `sweep` of ±2π draws a full ring
+    /// (with no caps). The default beads the band out of overlapping circles;
+    /// both built-in renderers replace it with real geometry.
+    fn draw_arc(&mut self, cx: f32, cy: f32, radius: f32, start_angle: f32, sweep: f32, thickness: f32, color: u32) {
+        if radius <= 0.0 || thickness <= 0.0 || sweep == 0.0 {
+            return;
+        }
+        // One bead every third of the band thickness keeps the edge smooth.
+        let step = (thickness / 3.0).clamp(0.5, 2.0);
+        let steps = (((radius * sweep.abs()) / step).ceil() as usize).clamp(4, 1024);
+        for i in 0..=steps {
+            let a = start_angle + sweep * (i as f32 / steps as f32);
+            let (sin, cos) = a.sin_cos();
+            self.draw_circle(cx + radius * cos, cy + radius * sin, thickness / 2.0, color);
+        }
     }
 
     /// Thin rectangular outline (four filled strips), `width` in physical
