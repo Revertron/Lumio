@@ -713,12 +713,33 @@ impl UI {
         }
     }
 
+    /// Give every view below `element` a link back to the container holding it.
+    ///
+    /// A container cannot do this from `add_view`: it has no handle to the `Rc`
+    /// it lives in itself. The XML parser sets the link as it builds the tree,
+    /// but a view added to a container at runtime would have none — and a view
+    /// with no ancestors reports its position within its parent as though that
+    /// were the window's origin, so anything mapping window coordinates onto it
+    /// (hit tests, `TermGrid::cell_at`) lands somewhere else entirely. Doing it
+    /// as part of laying out means it cannot be forgotten.
+    fn link_parents(element: &Element) {
+        let children = match element.borrow().as_container() {
+            Some(container) => container.get_views(),
+            None => return,
+        };
+        for child in children {
+            child.borrow().set_parent(Some(Rc::downgrade(element)));
+            UI::link_parents(&child);
+        }
+    }
+
     pub fn layout(&mut self, width: u32, height: u32, scale: f64) {
         self.width = width;
         self.height = height;
         self.scale = scale;
         let root = self.root.clone();
         if let Some(root) = root {
+            UI::link_parents(&root);
             root.borrow_mut().layout_content(0, 0, width as i32, height as i32, &self.typeface.clone(), scale);
         }
         // Transparent overlays (e.g. notification stack) cover the whole window —
@@ -749,7 +770,13 @@ impl UI {
     fn do_relayout(&mut self) {
         let root = self.root.clone();
         if let Some(root) = root {
+            UI::link_parents(&root);
             root.borrow_mut().layout_content(0, 0, self.width as i32, self.height as i32, &self.typeface.clone(), self.scale);
+        }
+        // Popups are laid out where they are shown, but a view added to one at
+        // runtime still needs its link.
+        for entry in self.overlays.iter() {
+            UI::link_parents(&entry.element);
         }
     }
 

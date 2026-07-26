@@ -7,6 +7,18 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 
 ## [Unreleased]
 
+### Fixed
+
+- **A view added to a container at runtime is now linked to it.**
+  `Container::add_view` cannot set that link itself — it has no handle to the
+  `Rc` the container lives in — so only the XML parser was setting it, and a
+  view added through `add_view` at runtime ended up with no parent at all. It
+  then reported the position it has *inside its parent* as though that were the
+  window's origin, and everything mapping window coordinates onto it — hit
+  tests, `TermGrid::cell_at` — missed by however far the parent sat from the
+  window's edge. The link is now made while laying out, so it cannot be
+  forgotten.
+
 ### Added
 
 - **`EventType::KeyChar`** with `EventData::Char { ch, modifiers }` — the
