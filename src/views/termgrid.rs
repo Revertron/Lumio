@@ -2,7 +2,7 @@ use std::cell::{Cell, RefCell};
 
 use crate::assets::get_font_family;
 use crate::events::{EventCallback, EventData, EventType};
-use crate::input::{MouseButton, MouseScrollDistance};
+use crate::input::{MouseButton, MouseCursorType, MouseScrollDistance};
 use crate::text::{TextBlock, TextOptions};
 use crate::themes::{FontStyle, Renderer, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
@@ -683,6 +683,11 @@ impl View for TermGrid {
             return false;
         }
         let hit = self.state.borrow().rect.hit((position.x, position.y));
+        // The grid is selectable text, so it wants the I-beam — the same signal an edit field
+        // gives. Requested only while over the grid; elsewhere the owning view decides.
+        if hit {
+            ui.request_cursor(MouseCursorType::Text);
+        }
         let old_state = self.state.borrow().state;
         self.state.borrow_mut().state.hovered = hit;
         let changed = self.state.borrow().state != old_state;
@@ -801,6 +806,15 @@ mod tests {
     fn cell_at_is_none_before_the_first_layout() {
         let grid = TermGrid::default();
         assert_eq!(grid.cell_at(Point::new(0, 0)), None);
+    }
+
+    #[test]
+    fn the_pointer_becomes_an_i_beam_over_the_grid() {
+        let (mut ui, _el) = grid_ui();
+        ui.on_mouse_move(Point::new(35, 45));
+        assert_eq!(ui.current_cursor(), MouseCursorType::Text, "over the grid");
+        ui.on_mouse_move(Point::new(400, 400));
+        assert_eq!(ui.current_cursor(), MouseCursorType::Default, "outside it");
     }
 
     #[test]

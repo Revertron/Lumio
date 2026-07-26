@@ -27,6 +27,9 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
   reporting after the pointer leaves it.
 - **`TermGrid::cell_at(point)`** — turns an absolute window point (exactly what
   those event payloads carry) into a `(col, row)`, or `None` outside the grid.
+- **`TermGrid` asks for the I-beam pointer** while the pointer is over it, the
+  way `Edit` and `Memo` already do. The grid holds selectable text, and an arrow
+  over it says otherwise.
 - **`TabView` close buttons** — `closable="true"` (or `TabView::set_closable`)
   draws a close button on every tab and fires the new **`EventType::TabClose`**
   with the tab index. The TabView does not remove the tab itself, so an app can
