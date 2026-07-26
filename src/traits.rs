@@ -264,8 +264,25 @@ pub trait Container: View {
     fn hit_test_views(&self) -> Vec<Element> { self.get_views() }
 
     /// Remove the view with the given id from this container's subtree.
-    /// Returns true if a view was removed. Default impl does nothing —
-    /// containers that own children should override.
-    #[allow(unused_variables)]
-    fn remove_view(&mut self, id: &str) -> bool { false }
+    /// Returns true if a view was removed.
+    ///
+    /// The default handles the subtree but not this container's own children:
+    /// it forwards to nested containers, so a container that keeps its children
+    /// in some private way still lets removals pass THROUGH it. Returning a
+    /// plain `false` instead would strand every view below it — a `TabView`
+    /// inside a `SplitPanel` could never have a tab removed. Containers that own
+    /// children by id (`Frame`, `Grid`, `TabView`) override this, drop their own
+    /// match first and fall back to here.
+    fn remove_view(&mut self, id: &str) -> bool {
+        for view in self.get_views() {
+            let removed = match view.borrow_mut().as_container_mut() {
+                Some(container) => container.remove_view(id),
+                None => false,
+            };
+            if removed {
+                return true;
+            }
+        }
+        false
+    }
 }
