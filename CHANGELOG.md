@@ -9,6 +9,32 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 
 ### Added
 
+- **`EventType::KeyChar`** with `EventData::Char { ch, modifiers }` — the
+  character a keystroke produced *after* the keyboard layout, dead keys and IME
+  were applied, which `KeyDown`'s virtual key code cannot carry. Dispatched from
+  `UI::on_key_char` to the focused view's listener before built-in handling,
+  mirroring what `KeyDown` already did, so an app can take the raw character
+  stream of a focused view (a `TermGrid`, say) whatever the user's layout is.
+- **`EventType::MouseWheel`** with `EventData::Wheel { x, y, distance }` — the
+  pointer in absolute window coordinates plus the raw `MouseScrollDistance`,
+  passed through unconverted so a listener can tell a line-wise wheel from a
+  pixel-wise touchpad.
+- **`EventData::Mouse { x, y, button }`** — the payload for `MouseDown` and
+  `MouseUp`: `Position` alone could not say which button it was.
+- **`TermGrid` pointer and wheel events** — the grid now fires `MouseDown`,
+  `MouseUp`, `MouseMove` and `MouseWheel`. `MouseMove`/`MouseUp` are deliberately
+  not gated on a hit test, so a selection drag that starts in the grid keeps
+  reporting after the pointer leaves it.
+- **`TermGrid::cell_at(point)`** — turns an absolute window point (exactly what
+  those event payloads carry) into a `(col, row)`, or `None` outside the grid.
+- **`TabView` close buttons** — `closable="true"` (or `TabView::set_closable`)
+  draws a close button on every tab and fires the new **`EventType::TabClose`**
+  with the tab index. The TabView does not remove the tab itself, so an app can
+  confirm first.
+- **`TabView` strip panning** — the tab strip scrolls horizontally under the
+  mouse wheel when the tabs overflow the widget, leaving the active tab alone
+  (switching stays a click). Changing the active tab from the keyboard or the
+  app pans the strip to bring it into view.
 - **`ProgressCircle`** (`src/views/progresscircle.rs`) — a round progress
   indicator, registered as `<ProgressCircle>`. Determinate mode draws a track
   ring plus a round-capped arc sweeping clockwise from 12 o'clock, and eases
@@ -28,6 +54,77 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
   implementations keep compiling.
 - **Palette dimensions** `progress_circle.size` (32 dip) and
   `progress_circle.thickness` (3 dip).
+
+### Added
+
+- **`UI::on_key_repeat`** — a held key's auto-repeat, which the window loop used
+  to drop entirely. Only the focused view's `KeyDown` *listener* sees it: built-in
+  widget behaviour still ignores repeats, so a held Enter does not re-click a
+  button and a held Tab does not race through the focus order, but an app that
+  owns the raw key stream now gets them. Without this a terminal could not hold
+  Backspace down to erase a line, since `KeyChar` (which did repeat) carries no
+  control keys.
+
+### Changed
+
+- **`TermGrid` caches shaped text per row.** Shaping ran for every colour run of
+  every row on every paint, though a terminal repaints far more often than its
+  rows change. Rows are now reshaped only when their cells, the cursor or the
+  font metrics move — so a keystroke, which changes a single row, no longer
+  reshapes the whole screen.
+
+### Fixed
+
+- **`TermGrid` glyphs sat too high in their cells** — cells are at least 1.2em
+  tall, and the leftover leading was left below the text, so an inverse row
+  (top's header, the cursor block) looked shifted down relative to its own
+  glyphs. The baseline now sits so descenders just reach the cell floor and the
+  leading goes above: splitting it evenly still looks top-heavy, because the
+  descent below the baseline is already empty for the capitals and digits that
+  are most of what a terminal prints. The underline follows the baseline instead
+  of the cell bottom.
+- **`TermGrid` drew text outside its own cells** — painting resolved the
+  typeface against the theme's default while layout resolved it against the
+  parent in the view tree. A view with no font size of its own inherits one from
+  whatever it is resolved against, so the two disagreed: glyphs advanced by more
+  than a cell and crept right, a fraction of a cell per column. The cursor block,
+  drawn at the correct cell, ended up further behind the text the longer the line
+  got. Painting now reuses the typeface the metrics were measured with.
+- **`TermGrid` cell width came from the ink extent, not the layout step** — on
+  the software backend `TextBlock::width()` and the reported `advance_width`
+  both disagree with the positions the shaper actually produces. The cell is now
+  the measured distance between two shaped glyphs, which is what the renderer
+  draws with.
+- **`TermGrid` rows were an em tall instead of a line** — the pitch came from
+  `TextBlock::height()`, which the text layer normalises to the em size, so the
+  tails of g, j and p were clipped into the row below. Cells are now measured
+  from a probe string with both extremes (the software backend reports the
+  extents of the glyphs laid out, not the font's metrics, so a lone "W" comes
+  back with no descender at all) and never come out tighter than 1.2em.
+- **`TermGrid` defaulted to the theme's light field colour** under its light
+  default text, which is invisible, and left the theme colour showing in the
+  strip where the widget is not an exact multiple of the cell size. The default
+  background is now dark, to agree with the default foreground.
+- **`TermGrid` used a font that does not exist on Windows** — the default was
+  `Noto Sans Mono`, so on a machine without it the widget had no cell metrics
+  and silently drew nothing. It now follows the new
+  **`default_mono_font_name()`** (Consolas / Menlo / `monospace`), and a missing
+  family is logged instead of leaving a blank widget.
+- **`TermGrid` crashed on its first paint** — it asked the palette for
+  `edit.back`, which is a *drawable* role (what `Edit` and `CheckBox` draw with
+  `draw_component`), not a colour token. `Palette::color` guards unknown tokens
+  with a `debug_assert`, so painting a terminal aborted any debug build. It now
+  draws the themed field background, and a headless render test covers it.
+- **`Container::remove_view` stranded whole subtrees** — the default returned
+  `false` without looking at the container's children, so a removal could not
+  pass *through* a container that did not override it. A `TabView` inside a
+  `SplitPanel` could never have a tab removed, because `SplitPanel` does not
+  implement the method. The default now forwards to nested containers.
+- **`TabView::remove_view`** — `TabView` never implemented it, so the `Container`
+  default applied and a tab could not be removed at all (neither directly nor via
+  `UI::remove_view`). It now drops the child and its tab together and keeps the
+  active index pointing at the same tab where it can, falling back to the new
+  last tab when the active one goes.
 
 ## [0.5.3] - 2026-07-24
 
