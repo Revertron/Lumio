@@ -144,12 +144,22 @@ fn context_menu_listener_suppresses_builtin_menu() {
     let edit = ui.get_view("edit1").unwrap();
     edit.borrow_mut().on_event(EventType::ContextMenu, log_event(&log, "context"));
 
-    ui.on_mouse_button_down(center(&ui, "edit1"), MouseButton::Right);
+    // Nothing happens on the press: a context menu belongs to the release, the
+    // way Windows does it. The press is what selects whatever is under it.
+    let first = center(&ui, "edit1");
+    ui.on_mouse_button_down(first, MouseButton::Right);
+    assert!(log.borrow().is_empty(), "the press fired ContextMenu");
+    assert!(!ui.has_popups(), "the press opened the built-in menu");
+
+    ui.on_mouse_button_up(first, MouseButton::Right);
     assert_eq!(*log.borrow(), vec!["context"]);
     assert!(!ui.has_popups(), "built-in Edit menu must be suppressed by a consuming handler");
 
-    // edit2 has no listener: the built-in menu opens as before.
-    ui.on_mouse_button_down(center(&ui, "edit2"), MouseButton::Right);
+    // edit2 has no listener: the built-in menu opens, on the release.
+    let second = center(&ui, "edit2");
+    ui.on_mouse_button_down(second, MouseButton::Right);
+    assert!(!ui.has_popups(), "the press opened the built-in menu");
+    ui.on_mouse_button_up(second, MouseButton::Right);
     assert!(ui.has_popups(), "built-in Edit menu must still open without a listener");
 }
 

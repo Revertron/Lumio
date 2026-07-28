@@ -7,6 +7,28 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 
 ## [Unreleased]
 
+### Changed
+
+- **A context menu now opens on the release of the right button, not on the
+  press** — which is where Windows puts it, and where the rest of the desktop
+  looks for it. `EventType::ContextMenu` fires from `UI::on_mouse_button_up`,
+  and the built-in menus (`Edit`, `Memo`, `Label`, `RichText`) moved with it, so
+  a consuming handler still suppresses them. The press keeps doing what it did:
+  taking focus, and letting a view select whatever is under the pointer before
+  the menu asks what to do with it.
+
+### Added
+
+- **`TreeView::key_at`** — the key of the row at a window position. `ContextMenu`
+  fires before the click is dispatched, so a menu built from `selected_key`
+  would offer actions on whatever the last left click selected; this lets the
+  menu act on the row actually under the pointer.
+- **A right press on a `TreeView` selects the row under it**, so the release has
+  a row to open a menu about. The scrollbar and the expand chevron stay
+  left-button business.
+- **`ImageView::tint`** — reads back what `set_tint` put there, so an app that
+  tints its glyphs to the palette can prove it followed a skin change.
+
 ### Fixed
 
 - **A decorative `ImageView` no longer swallows the click meant for its

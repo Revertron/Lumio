@@ -1522,7 +1522,7 @@ impl View for Edit {
         self.state.borrow().main.state != old_state
     }
 
-    fn on_mouse_button_down(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_down(&self, _ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
         if !self.state.borrow().main.rect.hit((position.x, position.y)) {
             return false;
@@ -1531,9 +1531,7 @@ impl View for Edit {
 
         if !matches!(button, MouseButton::Left) {
             self.state.borrow_mut().main.state.focused = true;
-            if matches!(button, MouseButton::Right) && !ui.context_menu_suppressed() {
-                self.open_context_menu(ui, position.x, position.y);
-            }
+            // The menu itself opens on the release; see `on_mouse_button_up`.
             return true;
         }
 
@@ -1615,6 +1613,15 @@ impl View for Edit {
 
     fn on_mouse_button_up(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
+        if matches!(button, MouseButton::Right) {
+            if self.state.borrow().main.rect.hit((position.x, position.y))
+                && !ui.context_menu_suppressed()
+            {
+                self.open_context_menu(ui, position.x, position.y);
+                return true;
+            }
+            return false;
+        }
         if !matches!(button, MouseButton::Left) {
             return false;
         }

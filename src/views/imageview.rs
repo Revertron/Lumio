@@ -58,6 +58,11 @@ impl ImageView {
         *self.tint.borrow_mut() = color;
     }
 
+    /// The tint in force, or `None` when the image is drawn as authored.
+    pub fn tint(&self) -> Option<u32> {
+        *self.tint.borrow()
+    }
+
     /// Corner radius in dips; 0 disables rounding.
     pub fn set_corner_radius(&mut self, radius: f32) {
         *self.corner_radius.borrow_mut() = radius.max(0.0);

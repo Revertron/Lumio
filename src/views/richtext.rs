@@ -1376,15 +1376,9 @@ impl View for RichText {
         if !self.base_is_enabled() {
             return false;
         }
-        // Right-click opens the Copy / Select All menu on selectable text.
+        // The Copy / Select All menu belongs to the release; see
+        // `on_mouse_button_up`.
         if matches!(button, MouseButton::Right) {
-            if *self.selectable.borrow()
-                && self.state.borrow().main.rect.hit((position.x, position.y))
-                && !ui.context_menu_suppressed()
-            {
-                self.open_context_menu(ui, position.x, position.y);
-                return true;
-            }
             return false;
         }
         if !matches!(button, MouseButton::Left) {
@@ -1413,6 +1407,18 @@ impl View for RichText {
     }
 
     fn on_mouse_button_up(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
+        // Right-click opens the Copy / Select All menu on selectable text, on
+        // the release the way Windows does it.
+        if matches!(button, MouseButton::Right) {
+            if *self.selectable.borrow()
+                && self.state.borrow().main.rect.hit((position.x, position.y))
+                && !ui.context_menu_suppressed()
+            {
+                self.open_context_menu(ui, position.x, position.y);
+                return true;
+            }
+            return false;
+        }
         if !matches!(button, MouseButton::Left) {
             return false;
         }

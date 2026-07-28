@@ -1566,7 +1566,7 @@ impl View for Memo {
         self.state.borrow().main.state != old_state
     }
 
-    fn on_mouse_button_down(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_down(&self, _ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
         self.break_undo_coalescing();
         if !self.state.borrow().main.rect.hit((position.x, position.y)) {
@@ -1575,9 +1575,7 @@ impl View for Memo {
 
         if !matches!(button, MouseButton::Left) {
             self.state.borrow_mut().main.state.focused = true;
-            if matches!(button, MouseButton::Right) && !ui.context_menu_suppressed() {
-                self.open_context_menu(ui, position.x, position.y);
-            }
+            // The menu itself opens on the release; see `on_mouse_button_up`.
             return true;
         }
 
@@ -1638,8 +1636,17 @@ impl View for Memo {
         true
     }
 
-    fn on_mouse_button_up(&self, _ui: &mut UI, _position: Point<i32>, button: MouseButton) -> bool {
+    fn on_mouse_button_up(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
+        if matches!(button, MouseButton::Right) {
+            if self.state.borrow().main.rect.hit((position.x, position.y))
+                && !ui.context_menu_suppressed()
+            {
+                self.open_context_menu(ui, position.x, position.y);
+                return true;
+            }
+            return false;
+        }
         // End any drag-selection; collapse a zero-length anchor from a plain click.
         if *self.dragging.borrow() {
             *self.dragging.borrow_mut() = false;

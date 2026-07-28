@@ -1852,23 +1852,14 @@ impl UI {
         } else {
             Some((Instant::now(), position, dc_target.clone()))
         };
-        // Snapshot before firing ContextMenu: a handler may open a popup right
-        // here (not only during dispatch), and that overlay change must still be
-        // seen by the redraw/cursor refresh below — otherwise a context menu
-        // opened on right-click is not painted until the next input event.
+        // Snapshot before dispatch: a handler may open a popup right here (not
+        // only during dispatch), and that overlay change must still be seen by
+        // the redraw/cursor refresh below — otherwise a popup opened from a
+        // press is not painted until the next input event.
         let overlays_before = self.overlays.len();
-        // ContextMenu fires BEFORE dispatch so a consuming handler can
-        // suppress the built-in menus that open during dispatch.
-        if matches!(button, MouseButton::Right) {
-            let target = self.hit_test_listener(position.x, position.y,
-                &|v| v.is_enabled() && v.has_listener(EventType::ContextMenu));
-            if let Some(el) = target {
-                let data = EventData::Position { x: position.x, y: position.y };
-                self.context_menu_suppressed = el.borrow().fire_event(self, EventType::ContextMenu, &data);
-            }
-        }
+        // A right press only focuses and selects. The menu itself belongs to the
+        // release: see `on_mouse_button_up`.
         let mut redraw = self.dispatch_mouse_button_down(position, button);
-        self.context_menu_suppressed = false;
         if is_double {
             // Fire after dispatch: focus/press behavior is already applied.
             if let Some(id) = dc_target {
@@ -1967,7 +1958,21 @@ impl UI {
                 }
             }
         let overlays_before = self.overlays.len();
+        // A context menu belongs to the release, which is where Windows puts it:
+        // pressing the right button over a row selects it, and letting go is
+        // what asks what can be done with it. It fires BEFORE dispatch so a
+        // consuming handler can suppress the built-in menus that open during it.
+        if matches!(button, MouseButton::Right) {
+            let target = self.hit_test_listener(position.x, position.y,
+                &|v| v.is_enabled() && v.has_listener(EventType::ContextMenu));
+            if let Some(el) = target {
+                let data = EventData::Position { x: position.x, y: position.y };
+                self.context_menu_suppressed = el.borrow().fire_event(self, EventType::ContextMenu, &data);
+                redraw = true;
+            }
+        }
         redraw |= self.dispatch_mouse_button_up(position, button);
+        self.context_menu_suppressed = false;
         redraw |= self.refresh_cursor_if_overlays_changed(position, overlays_before);
         redraw
     }

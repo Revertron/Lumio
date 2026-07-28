@@ -422,6 +422,25 @@ impl TreeView {
         if bh < 2 * t { 0 } else { bh - 2 * t }
     }
 
+    /// The key of the row at `position`, in **window** coordinates — which is
+    /// what [`EventData::Position`] carries. `None` outside the tree, or below
+    /// its last row.
+    ///
+    /// Lets a right-click act on the row under the pointer. `ContextMenu` fires
+    /// before the click is dispatched, so at that moment the selection is still
+    /// wherever the last left-click left it; a menu built from `selected_key`
+    /// would offer actions on the wrong row.
+    pub fn key_at(&self, position: Point<i32>) -> Option<String> {
+        let origin = self.get_absolute_position();
+        let rect = self.state.borrow().rect;
+        let (local_x, local_y) = (position.x - origin.x, position.y - origin.y);
+        if local_x < 0 || local_y < 0 || local_x >= rect.width() || local_y >= rect.height() {
+            return None;
+        }
+        let index = self.row_at_local_y(local_y)?;
+        self.flat.borrow().get(index).map(|row| row.key.clone())
+    }
+
     /// Flat row index at a widget-local y, or None below the last row.
     fn row_at_local_y(&self, local_y: i32) -> Option<usize> {
         let row_h = self.row_height_px.get().max(1);
@@ -813,9 +832,24 @@ impl View for TreeView {
         if !self.base_is_enabled() { return false; }
         let r = self.state.borrow().rect;
         if !r.hit((position.x, position.y)) { return false; }
-        if !matches!(button, MouseButton::Left) { return false; }
+        if !matches!(button, MouseButton::Left | MouseButton::Right) { return false; }
 
         self.state.borrow_mut().state.focused = true;
+
+        // A right press selects the row under it, so the menu its release opens
+        // is about the row the user aimed at. The scrollbar and the expand
+        // chevron are left-button business only.
+        if matches!(button, MouseButton::Right) {
+            if self.v_scroll_visible.get()
+                && self.v_scrollbar_rect(point(0, 0)).hit((position.x, position.y))
+            {
+                return true;
+            }
+            if let Some(idx) = self.row_at_local_y(position.y - r.min.y) {
+                self.select_row(ui, idx);
+            }
+            return true;
+        }
 
         if self.v_scroll_visible.get() {
             let thumb = self.v_thumb_rect(point(0, 0));

@@ -952,15 +952,9 @@ impl View for Label {
 
     fn on_mouse_button_down(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
-        // Right-click opens the Copy / Select All menu on selectable labels.
+        // The Copy / Select All menu belongs to the release; see
+        // `on_mouse_button_up`.
         if matches!(button, MouseButton::Right) {
-            if *self.selectable.borrow()
-                && self.state.borrow().main.rect.hit((position.x, position.y))
-                && !ui.context_menu_suppressed()
-            {
-                self.open_context_menu(ui, position.x, position.y);
-                return true;
-            }
             return false;
         }
         if !matches!(button, MouseButton::Left) { return false; }
@@ -1005,6 +999,18 @@ impl View for Label {
 
     fn on_mouse_button_up(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
+        // Right-click opens the Copy / Select All menu on selectable labels, on
+        // the release the way Windows does it.
+        if matches!(button, MouseButton::Right) {
+            if *self.selectable.borrow()
+                && self.state.borrow().main.rect.hit((position.x, position.y))
+                && !ui.context_menu_suppressed()
+            {
+                self.open_context_menu(ui, position.x, position.y);
+                return true;
+            }
+            return false;
+        }
         if !matches!(button, MouseButton::Left) { return false; }
         // Finish a selection drag; collapse a zero-length (plain-click) selection.
         if *self.dragging.borrow() {
