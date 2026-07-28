@@ -9,6 +9,14 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 
 ### Fixed
 
+- **A decorative `ImageView` no longer swallows the click meant for its
+  parent.** It captured every press and consumed the matching release whether or
+  not anything was listening to it, so a tile built the usual way — an image and
+  a caption inside a `Frame` that carries the `Click` listener — answered only on
+  the padding around the picture, which is the one place nobody aims at. An
+  `ImageView` now claims a press only when it has a `Click` listener of its own;
+  one that is listened to behaves exactly as before.
+
 - **A view added to a container at runtime is now linked to it.**
   `Container::add_view` cannot set that link itself — it has no handle to the
   `Rc` the container lives in — so only the XML parser was setting it, and a

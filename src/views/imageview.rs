@@ -381,6 +381,12 @@ impl View for ImageView {
 
     fn on_mouse_button_down(&self, _ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !self.base_is_enabled() { return false; }
+        // Claim the press only when something is listening for the click.
+        // Most images are decoration inside a larger click target — a tile of
+        // icon plus caption, a clickable header — and an image that captured
+        // every press would swallow the release too, leaving the parent's own
+        // Click to fire only on the padding around the picture.
+        if !self.has_listener(EventType::Click) { return false; }
         let hit = self.state.borrow().rect.hit((position.x, position.y));
         if hit {
             let mut state = self.state.borrow_mut();
