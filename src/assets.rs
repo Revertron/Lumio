@@ -249,6 +249,69 @@ fn clear_family_cache() {
     backend_soft::clear_family_cache();
 }
 
+/// Every monospaced font family installed on this machine, sorted by name.
+///
+/// Whether a family is monospaced can only be told by loading it, and a desktop
+/// carries a few hundred: the scan reads them on several threads and still
+/// takes long enough — around a tenth of a second warm, a few times that on a
+/// cold file cache — that a caller wanting a list to choose from should ask
+/// once and keep the answer.
+///
+/// Empty in the headless `software` core, where there is no system to ask.
+#[cfg(feature = "system-fonts")]
+pub fn monospace_families() -> Vec<String> {
+    let Ok(families) = SystemSource::new().all_families() else {
+        return Vec::new();
+    };
+    let workers = std::thread::available_parallelism()
+        .map(|count| count.get().clamp(1, 8))
+        .unwrap_or(1);
+    let mut found: Vec<String> = std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..workers)
+            .map(|worker| {
+                let families = &families;
+                scope.spawn(move || {
+                    // One source per thread: font-kit's is not shareable.
+                    let source = SystemSource::new();
+                    families
+                        .iter()
+                        .skip(worker)
+                        .step_by(workers)
+                        .filter(|family| is_monospace(&source, family))
+                        .cloned()
+                        .collect::<Vec<String>>()
+                })
+            })
+            .collect();
+        handles
+            .into_iter()
+            .filter_map(|handle| handle.join().ok())
+            .flatten()
+            .collect()
+    });
+    found.sort_by_key(|family| family.to_lowercase());
+    found.dedup();
+    found
+}
+
+#[cfg(not(feature = "system-fonts"))]
+pub fn monospace_families() -> Vec<String> {
+    Vec::new()
+}
+
+/// Whether the family's best match reports itself as fixed pitch. A font that
+/// cannot be loaded is not one to offer, so it answers no.
+#[cfg(feature = "system-fonts")]
+fn is_monospace(source: &SystemSource, family: &str) -> bool {
+    let Ok(handle) = source.select_best_match(
+        &[FamilyName::Title(String::from(family))],
+        &Properties::new(),
+    ) else {
+        return false;
+    };
+    handle.load().map(|font| font.is_monospace()).unwrap_or(false)
+}
+
 /// Returns a [`FontHandle`] whose first entry is the requested font and whose
 /// tail is the configured fallback chain (missing fonts silently dropped).
 /// Returns `None` only when the primary font cannot be resolved through any

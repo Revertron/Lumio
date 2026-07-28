@@ -2,7 +2,7 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::str::FromStr;
 
-use crate::input::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
+use crate::input::{KeyScancode, ModifiersState, MouseButton, MouseCursorType, VirtualKeyCode};
 
 use crate::events::{EventCallback, EventData, EventType};
 use crate::themes::{Renderer, Typeface, ViewState};
@@ -12,8 +12,12 @@ use crate::ui::UI;
 use crate::view_base::{HasMainFields, ViewBasics};
 use crate::views::{Borders, Dimension, Direction, FieldsMain, Gravity, Visibility};
 
-const DEFAULT_DIVIDER_SIZE: i32 = 4;
+const DEFAULT_DIVIDER_SIZE: i32 = 2;
 const DEFAULT_MIN_PANE_SIZE: i32 = 50;
+/// How far the drag zone reaches past the gap on each side, in dip. The gap
+/// itself is only `divider_size` wide, which is far too thin to aim at; window
+/// managers and IDEs all grab a few pixels of the panes as well.
+const DIVIDER_GRAB: i32 = 1;
 
 #[derive(Copy, Clone, Debug)]
 enum SplitPos {
@@ -51,7 +55,6 @@ pub struct SplitPanel {
     divider_dragging: Cell<bool>,
     drag_start_mouse: Cell<i32>,
     drag_start_split: Cell<i32>,
-    divider_hovered: Cell<bool>,
     min_pane_size: Cell<i32>,
     needs_relayout: Cell<bool>,
     last_typeface: RefCell<Option<Typeface>>,
@@ -83,26 +86,39 @@ impl SplitPanel {
         (self.split_pos_px.get() as f64 / scale).round() as i32
     }
 
-    /// Get the divider rect in local coordinates (relative to the panel's own rect)
-    fn divider_rect_local(&self) -> Rect<i32> {
+    /// The draggable zone in local coordinates (relative to the panel's own
+    /// rect). Nothing is painted for the divider — the gap between the two
+    /// panes *is* the divider — so the zone is that gap widened by
+    /// [`DIVIDER_GRAB`] dip on each side, which is what makes the seam
+    /// grabbable at all.
+    fn divider_hit_rect_local(&self) -> Rect<i32> {
         let my_rect = self.state.borrow().rect;
         let split = self.split_pos_px.get();
         let scale = self.state.borrow().scale;
         let div_size = (self.divider_size.get() as f64 * scale).round() as i32;
+        let grab = (DIVIDER_GRAB as f64 * scale).round() as i32;
 
         match self.direction {
             Direction::Horizontal => {
                 rect(
-                    (split, 0),
-                    (split + div_size, my_rect.height()),
+                    (split - grab, 0),
+                    (split + div_size + grab, my_rect.height()),
                 )
             }
             Direction::Vertical => {
                 rect(
-                    (0, split),
-                    (my_rect.width(), split + div_size),
+                    (0, split - grab),
+                    (my_rect.width(), split + div_size + grab),
                 )
             }
+        }
+    }
+
+    /// The resize cursor for this panel's split axis.
+    fn divider_cursor(&self) -> MouseCursorType {
+        match self.direction {
+            Direction::Horizontal => MouseCursorType::EwResize,
+            Direction::Vertical => MouseCursorType::NsResize,
         }
     }
 
@@ -362,15 +378,11 @@ impl View for SplitPanel {
             theme.pop_clip();
         }
 
-        // Draw divider
-        let div_local = self.divider_rect_local();
-        let div_rect = rect(
-            (div_local.min.x + start.x, div_local.min.y + start.y),
-            (div_local.max.x + start.x, div_local.max.y + start.y),
-        );
-        let view_state = self.state.borrow().state;
-        let role = if div_rect.width() >= div_rect.height() { "separator.h" } else { "separator.v" };
-        theme.draw_component(role, div_rect, view_state);
+        // The divider itself is not painted: both children are clipped to their
+        // own half, so the `divider_size`-wide gap between them shows the
+        // panel's own background — the seam between the panes, the way native
+        // desktop split views look. Its drag zone lives in
+        // `divider_hit_rect_local`.
 
         theme.pop_clip();
     }
@@ -581,6 +593,7 @@ impl View for SplitPanel {
         );
 
         if self.divider_dragging.get() {
+            ui.request_cursor(self.divider_cursor());
             let mouse_pos = match self.direction {
                 Direction::Horizontal => local.x,
                 Direction::Vertical => local.y,
@@ -609,10 +622,12 @@ impl View for SplitPanel {
             return true;
         }
 
-        // Hit-test divider for hover state
-        let div_rect = self.divider_rect_local();
-        let hit = div_rect.hit((local.x, local.y));
-        self.divider_hovered.set(hit);
+        // Over the seam: ask for the resize cursor. `request_cursor` is
+        // first-write-wins and we run before the children below, so the resize
+        // arrows beat whatever a view under the grab zone would ask for.
+        if self.divider_hit_rect_local().hit((local.x, local.y)) {
+            ui.request_cursor(self.divider_cursor());
+        }
 
         // Forward to children
         let mut processed = false;
@@ -628,9 +643,11 @@ impl View for SplitPanel {
             position.y - self.state.borrow().rect.min.y,
         );
 
-        // Hit-test divider
-        let div_rect = self.divider_rect_local();
-        if div_rect.hit((local.x, local.y)) {
+        // Hit-test the divider. Left button only: the grab zone reaches a few
+        // pixels into both panes, so a right-click near the seam must still
+        // reach the child under it (e.g. a tree's context menu) instead of
+        // starting a drag.
+        if button == MouseButton::Left && self.divider_hit_rect_local().hit((local.x, local.y)) {
             self.divider_dragging.set(true);
             let mouse_pos = match self.direction {
                 Direction::Horizontal => local.x,
@@ -743,7 +760,6 @@ impl Default for SplitPanel {
             divider_dragging: Cell::new(false),
             drag_start_mouse: Cell::new(0),
             drag_start_split: Cell::new(0),
-            divider_hovered: Cell::new(false),
             min_pane_size: Cell::new(DEFAULT_MIN_PANE_SIZE),
             needs_relayout: Cell::new(false),
             last_typeface: RefCell::new(None),

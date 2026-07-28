@@ -9,6 +9,17 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 
 ### Changed
 
+- **A `SplitPanel`'s divider is now the gap between the panes, not a painted
+  line.** Native split views don't draw a rule down the seam, and neither does
+  this one any more: both panes are clipped to their own half, and the
+  `divider_size`-wide space between them (now 2 dip by default, was 4) shows the
+  panel's background. What made it hard to use was never the look, though — the
+  drag zone *was* that gap, so the split could only be moved by hitting a line a
+  few pixels wide. The zone now reaches a dip past the gap into each pane, and
+  the pointer turns into the east-west (or north-south) resize arrows over it
+  and stays that way for the length of the drag. Only the left button drags: the
+  zone overlaps both panes, so a right-click near the seam still reaches the
+  view under it.
 - **A context menu now opens on the release of the right button, not on the
   press** — which is where Windows puts it, and where the rest of the desktop
   looks for it. `EventType::ContextMenu` fires from `UI::on_mouse_button_up`,
@@ -28,6 +39,10 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
   left-button business.
 - **`ImageView::tint`** — reads back what `set_tint` put there, so an app that
   tints its glyphs to the palette can prove it followed a skin change.
+- **`assets::monospace_families`** — the installed fixed-pitch families, sorted,
+  for an app that lets the user pick a terminal font. Whether a family is
+  monospaced can only be told by loading it, so the scan reads them on several
+  threads; it is still slow enough to be worth asking once and keeping.
 
 ### Fixed
 
