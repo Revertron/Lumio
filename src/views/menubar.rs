@@ -30,6 +30,19 @@ pub struct MenuData {
 /// vertical root Frame (`width="max" height="min"`); clicking a title opens
 /// the menu through the popup layer, so open menus never affect layout.
 ///
+/// With `width="min"` (or `set_width(Dimension::Min)` from code) the bar
+/// shrinks to its titles instead, so the space after them can be filled by
+/// siblings in a horizontal Frame:
+///
+/// ```xml
+/// <Frame width="max" height="min" direction="horizontal">
+///     <MenuBar id="bar" width="min">
+///         <Menu title="File">...</Menu>
+///     </MenuBar>
+///     <Edit id="search" width="200"/>
+/// </Frame>
+/// ```
+///
 /// Fires `EventType::Click` when a leaf item anywhere in the menu chain is
 /// activated; read the chosen item's ID with `clicked_item()`.
 pub struct MenuBar {
@@ -257,8 +270,15 @@ impl View for MenuBar {
             .max()
             .unwrap_or((crate::drawing::current_text_size("menu") * scale as f32).ceil() as i32);
         let bar_h = text_h + 2 * pad_v;
+        // `width="min"` shrinks the bar to its titles so it can share a
+        // horizontal Frame with other views; any other bound keeps the full
+        // width the parent handed us.
+        let bar_w = match self.get_bounds().0 {
+            Dimension::Min => self.get_content_size().0,
+            _ => width,
+        };
 
-        let r = rect((x, y), (x + width, y + bar_h));
+        let r = rect((x, y), (x + bar_w, y + bar_h));
         self.set_rect(r);
         r
     }
@@ -826,6 +846,21 @@ mod tests {
         bar.close_menu(&mut ui);
         assert!(!ui.has_popups());
         assert!(bar.open_index.borrow().is_none());
+    }
+
+    #[test]
+    fn min_width_shrinks_to_titles() {
+        let (mut ui, bar_el) = bar_ui();
+        ui.force_layout();
+        assert_eq!(bar_el.borrow().get_rect_width(), 800);
+
+        bar_el.borrow_mut().set_width(Dimension::Min);
+        ui.force_layout();
+
+        let bar = bar_el.borrow();
+        let content_w = bar.get_content_size().0;
+        assert!(content_w > 0 && content_w < 800);
+        assert_eq!(bar.get_rect_width(), content_w);
     }
 
     #[test]

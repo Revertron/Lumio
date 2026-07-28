@@ -30,6 +30,13 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 
 ### Added
 
+- **A `MenuBar` with `width="min"` shrinks to its titles** instead of always
+  taking the whole row. A menu bar is usually two or three short words wide, and
+  the rest of that row was unreachable; now the bar can sit in a horizontal
+  `Frame` next to a search field, a toolbar button, or anything else, and
+  `gravity="right"` on a sibling pushes it against the far edge. Any other width
+  bound keeps the old full-width behaviour, and the setting works from code
+  (`set_width(Dimension::Min)` + `UI::relayout`) as well as from XML.
 - **`TreeView::key_at`** — the key of the row at a window position. `ContextMenu`
   fires before the click is dispatched, so a menu built from `selected_key`
   would offer actions on whatever the last left click selected; this lets the
