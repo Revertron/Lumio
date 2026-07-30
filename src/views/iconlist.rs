@@ -508,10 +508,13 @@ impl View for IconList {
                 let y0 = body_origin.y + row as i32 * row_h;
                 let item_rect = rect((x0, y0), (x0 + item_w, y0 + row_h));
 
-                let mut text_color = theme.color("text");
+                // An underlay, not a slab — see TreeView: the item's icon is
+                // only tinted by this view, never recoloured, so a fill that
+                // assumes a matching text colour would leave the icon stranded
+                // on it. `row_selection` is meant to be read through.
+                let text_color = theme.color("text");
                 if selected.contains(&idx) {
-                    theme.draw_rect(item_rect, theme.color("item_highlight"));
-                    text_color = theme.color("item_highlight_text");
+                    theme.draw_rect(item_rect, theme.color("row_selection"));
                 }
                 if focused && lead == Some(idx) {
                     let width = (scale.round() as i32).max(1);

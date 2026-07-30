@@ -1,15 +1,15 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::cmp::max;
 use std::rc::Rc;
 
 use crate::text::{TextBlock, TextOptions};
-use crate::input::{KeyScancode, ModifiersState, MouseButton, VirtualKeyCode};
+use crate::input::{KeyScancode, ModifiersState, MouseButton, MouseScrollDistance, VirtualKeyCode};
 
 use crate::assets::get_font_family;
 use crate::events::{EventCallback, EventData, EventType};
 use crate::themes::{Renderer, Typeface, ViewState};
 use crate::traits::{Element, View, WeakElement};
-use crate::types::{Point, Rect, rect};
+use crate::types::{Point, Rect, point, rect};
 use crate::ui::{PopupDirection, PopupMode, UI};
 use crate::view_base::{HasMainFields, ViewBasics};
 use crate::views::{Borders, Dimension, FieldsMain, FieldsTexted, Gravity, Visibility};
@@ -20,6 +20,15 @@ const ARROW_AREA_WIDTH: i32 = 16;
 const ITEM_HEIGHT: i32 = 28;
 const ITEM_PADDING_LEFT: i32 = 6;
 const ITEM_PADDING_RIGHT: i32 = 6;
+const MIN_THUMB_SIZE: i32 = 16;
+/// The sunken bevel `edit.body` draws around the closed box — two dip, an outer
+/// and an inner line (drawables/edit_field_classic_body.xml).
+const FIELD_BORDER: i32 = 2;
+/// The flat outline `popup.body` draws around the dropdown — one dip
+/// (drawables/popup_classic_body.xml). It is also the dropdown's padding: the
+/// list fills the popup right up to the border on all four sides, as it does on
+/// Windows, so a highlighted row has no white strip beside it.
+const POPUP_BORDER: i32 = 1;
 
 // ─── ComboBox ────────────────────────────────────────────────────────────────
 
@@ -175,16 +184,32 @@ impl ComboBox {
         let scale = self.state.borrow().main.scale;
         let width = self.get_rect_width();
 
-        let dropdown = ComboDropdown::new(items, typeface, scale, width, Rc::clone(&self.pending_selection), *self.selected.borrow());
-        let element: Element = Rc::new(RefCell::new(dropdown));
+        let mut dropdown = ComboDropdown::new(items, typeface, scale, width, Rc::clone(&self.pending_selection), *self.selected.borrow());
 
+        // Placement, the way Windows does it: below the box when the whole list
+        // fits there, else flipped above when it fits there, else on whichever
+        // side has more room, shortened to it (the list scrolls).
         let pos = self.get_absolute_position();
         let height = self.get_rect_height();
+        let wanted = dropdown.natural_height();
+        let below = ui.get_height() as i32 - (pos.y + height);
+        let above = pos.y;
+        let (direction, anchor_y, max_height) = if wanted <= below {
+            (PopupDirection::BottomRight, pos.y + height, wanted)
+        } else if wanted <= above {
+            (PopupDirection::TopRight, pos.y, wanted)
+        } else if below >= above {
+            (PopupDirection::BottomRight, pos.y + height, below)
+        } else {
+            (PopupDirection::TopRight, pos.y, above)
+        };
+        dropdown.set_max_height(max_height);
 
+        let element: Element = Rc::new(RefCell::new(dropdown));
         let id = element.borrow().get_id();
         *self.dropdown_id.borrow_mut() = Some(id);
 
-        ui.show_popup(element, pos.x, pos.y + height, PopupDirection::BottomRight, PopupMode::Popup);
+        ui.show_popup(element, pos.x, anchor_y, direction, PopupMode::Popup);
     }
 }
 
@@ -268,7 +293,7 @@ impl View for ComboBox {
         rect.move_by(origin);
 
         let arrow_w = (ARROW_AREA_WIDTH as f64 * scale).round() as i32;
-        let border = (scale * 2.0).round() as i32;
+        let border = (FIELD_BORDER as f64 * scale).round() as i32;
         let button_rect = crate::types::rect(
             (rect.max.x - arrow_w - border, rect.min.y + border),
             (rect.max.x - border, rect.max.y - border),
@@ -503,6 +528,18 @@ impl View for ComboBox {
     }
 
     fn update(&mut self, ui: &mut UI) -> bool {
+        // A dropdown dismissed without a pick (Escape, or a click outside) is
+        // dropped by the UI, which has no way to tell this box. Let go of the
+        // stale handle, or `is_open()` stays true forever and the keyboard can
+        // never reopen the list.
+        let stale = match &*self.dropdown_id.borrow() {
+            Some(id) => !ui.is_popup_open(id),
+            None => false,
+        };
+        if stale {
+            *self.dropdown_id.borrow_mut() = None;
+        }
+
         let pending = self.pending_selection.borrow_mut().take();
         if let Some(index) = pending {
             let items = self.items.borrow();
@@ -560,6 +597,8 @@ impl View for ComboBox {
 
     // Space, Enter or Alt+Down open the dropdown when the box is focused;
     // the dropdown itself handles arrow keys and Enter as an overlay.
+    // With the dropdown closed, plain Up/Down step through the items in place,
+    // as they do on Windows.
     fn on_key_down(&self, ui: &mut UI, virtual_key_code: Option<VirtualKeyCode>, _scancode: KeyScancode, state: ModifiersState) -> bool {
         if !self.base_is_enabled() { return false; }
         let open = match virtual_key_code {
@@ -569,6 +608,31 @@ impl View for ComboBox {
         };
         if open && !self.is_open() {
             self.open_dropdown(ui);
+            return true;
+        }
+        if !self.is_open() && !state.alt() {
+            let step = match virtual_key_code {
+                Some(VirtualKeyCode::Down) => 1i32,
+                Some(VirtualKeyCode::Up) => -1i32,
+                _ => return false,
+            };
+            let count = self.items.borrow().len();
+            if count == 0 {
+                return false;
+            }
+            // Step off the pending index when one is queued: two key presses can
+            // land in the same update tick, and the first has not been applied
+            // to `selected` yet.
+            let current = self.pending_selection.borrow().or(*self.selected.borrow());
+            let next = match current {
+                Some(i) => (i as i32 + step).clamp(0, count as i32 - 1) as usize,
+                None => if step > 0 { 0 } else { count - 1 },
+            };
+            if Some(next) != current {
+                // The same route a dropdown click takes: `update()` applies it
+                // and fires SelectionChanged once all borrows are free.
+                *self.pending_selection.borrow_mut() = Some(next);
+            }
             return true;
         }
         false
@@ -593,6 +657,16 @@ struct ComboDropdown {
     pending_selection: Rc<RefCell<Option<usize>>>,
     typeface: Option<Typeface>,
     combo_width: i32,
+    /// The room the ComboBox found for the list on the side it chose. Layout
+    /// never grows past it, so the popup stays clear of the window edge.
+    max_height: i32,
+    /// Vertical scroll offset, 0 at the top and negative once scrolled down
+    /// (the sign convention the other scrolling views use).
+    scroll_y: Cell<i32>,
+    v_scroll_visible: Cell<bool>,
+    dragging_thumb: Cell<bool>,
+    drag_anchor_y: Cell<i32>,
+    drag_anchor_scroll: Cell<i32>,
 }
 
 impl HasMainFields for ComboDropdown {
@@ -613,7 +687,7 @@ impl ComboDropdown {
         selected: Option<usize>,
     ) -> Self {
         let mut main = FieldsMain::with_rect(rect((0, 0), (combo_width, 100)), Dimension::Min, Dimension::Min);
-        main.padding = Borders::with_padding(2);
+        main.padding = Borders::with_padding(POPUP_BORDER);
         main.state.focusable = false;
         main.scale = scale;
         let cached_texts = vec![None; items.len()];
@@ -627,6 +701,12 @@ impl ComboDropdown {
             pending_selection,
             typeface,
             combo_width,
+            max_height: i32::MAX,
+            scroll_y: Cell::new(0),
+            v_scroll_visible: Cell::new(false),
+            dragging_thumb: Cell::new(false),
+            drag_anchor_y: Cell::new(0),
+            drag_anchor_scroll: Cell::new(0),
         }
     }
 
@@ -649,26 +729,150 @@ impl ComboDropdown {
         }
     }
 
-    fn get_hit_item(&self, x: i32, y: i32) -> Option<usize> {
+    fn item_height(&self) -> i32 {
+        let scale = self.state.borrow().scale;
+        (ITEM_HEIGHT as f64 * scale).round() as i32
+    }
+
+    /// The height the list wants: every item, plus the popup's padding.
+    fn natural_height(&self) -> i32 {
         let state = self.state.borrow();
-        let r = state.rect;
-        if !r.hit((x, y)) {
+        let padding = state.padding.scaled(state.scale);
+        drop(state);
+        padding.top + self.content_height() + padding.bottom
+    }
+
+    fn set_max_height(&mut self, height: i32) {
+        self.max_height = height;
+    }
+
+    fn scrollbar_thickness(&self) -> i32 {
+        let scale = self.state.borrow().scale;
+        (crate::drawing::current_dimension("scrollbar.thickness") as f64 * scale).round() as i32
+    }
+
+    /// Where the rows live: the popup rect minus its border, and minus the
+    /// scrollbar when one is showing. Rows fill it edge to edge, so a
+    /// highlighted one touches the border on every side. `origin` shifts it
+    /// into window space.
+    fn body_rect(&self, origin: Point<i32>) -> Rect<i32> {
+        let state = self.state.borrow();
+        let mut r = state.rect;
+        r.move_by(origin);
+        let padding = state.padding.scaled(state.scale);
+        drop(state);
+        let mut max_x = r.max.x - padding.right;
+        if self.v_scroll_visible.get() {
+            max_x -= self.scrollbar_thickness();
+        }
+        let min_x = r.min.x + padding.left;
+        rect((min_x, r.min.y + padding.top), (max_x.max(min_x), r.max.y - padding.bottom))
+    }
+
+    fn body_height(&self) -> i32 {
+        let state = self.state.borrow();
+        let padding = state.padding.scaled(state.scale);
+        (state.rect.height() - padding.top - padding.bottom).max(0)
+    }
+
+    fn content_height(&self) -> i32 {
+        self.items.len() as i32 * self.item_height()
+    }
+
+    fn clamp_scroll(&self) {
+        let max_neg = -(self.content_height() - self.body_height()).max(0);
+        self.scroll_y.set(self.scroll_y.get().clamp(max_neg, 0));
+    }
+
+    /// Scrolls the least amount that brings item `idx` fully into view.
+    fn ensure_visible(&self, idx: usize) {
+        let item_h = self.item_height().max(1);
+        let bh = self.body_height();
+        let top = idx as i32 * item_h;
+        let bottom = top + item_h;
+        let cur = self.scroll_y.get();
+        if top + cur < 0 {
+            self.scroll_y.set(-top);
+        } else if bottom + cur > bh {
+            self.scroll_y.set(bh - bottom);
+        }
+        self.clamp_scroll();
+    }
+
+    // Scrollbar geometry (vertical only), matching the TreeView chrome.
+
+    fn v_scrollbar_rect(&self, origin: Point<i32>) -> Rect<i32> {
+        let state = self.state.borrow();
+        let mut r = state.rect;
+        r.move_by(origin);
+        let padding = state.padding.scaled(state.scale);
+        drop(state);
+        let thickness = self.scrollbar_thickness();
+        let x_max = r.max.x - padding.right;
+        rect((x_max - thickness, r.min.y + padding.top), (x_max, r.max.y - padding.bottom))
+    }
+
+    fn v_arrow_top_rect(&self, origin: Point<i32>) -> Rect<i32> {
+        let sb = self.v_scrollbar_rect(origin);
+        let size = self.scrollbar_thickness();
+        rect((sb.min.x, sb.min.y), (sb.max.x, sb.min.y + size))
+    }
+
+    fn v_arrow_bottom_rect(&self, origin: Point<i32>) -> Rect<i32> {
+        let sb = self.v_scrollbar_rect(origin);
+        let size = self.scrollbar_thickness();
+        rect((sb.min.x, sb.max.y - size), (sb.max.x, sb.max.y))
+    }
+
+    fn v_track_rect(&self, origin: Point<i32>) -> Rect<i32> {
+        let sb = self.v_scrollbar_rect(origin);
+        let size = self.scrollbar_thickness();
+        if sb.height() < 2 * size {
+            return rect((sb.min.x, sb.min.y), (sb.max.x, sb.min.y));
+        }
+        rect((sb.min.x, sb.min.y + size), (sb.max.x, sb.max.y - size))
+    }
+
+    fn v_thumb_rect(&self, origin: Point<i32>) -> Rect<i32> {
+        let track = self.v_track_rect(origin);
+        let bh = self.body_height().max(1);
+        let ch = self.content_height().max(1);
+        let track_len = track.height();
+        if track_len <= 0 {
+            return track;
+        }
+        let thumb_len = ((bh as f64 / ch as f64) * track_len as f64).round() as i32;
+        let thumb_len = thumb_len.max(MIN_THUMB_SIZE).min(track_len.max(MIN_THUMB_SIZE));
+        let scroll_range = (ch - bh).max(0);
+        let thumb_range = (track_len - thumb_len).max(0);
+        let pos = if scroll_range > 0 {
+            (-self.scroll_y.get() as f64 / scroll_range as f64 * thumb_range as f64).round() as i32
+        } else { 0 };
+        rect((track.min.x, track.min.y + pos), (track.max.x, track.min.y + pos + thumb_len))
+    }
+
+    fn get_hit_item(&self, x: i32, y: i32) -> Option<usize> {
+        let rows = self.body_rect(point(0, 0));
+        if !rows.hit((x, y)) {
             return None;
         }
-        let scale = state.scale;
-        let padding = state.padding.scaled(scale);
-        let item_h = (ITEM_HEIGHT as f64 * scale).round() as i32;
-        let local_y = y - r.min.y - padding.top;
+        let item_h = self.item_height().max(1);
+        let local_y = y - rows.min.y - self.scroll_y.get();
         if local_y < 0 {
             return None;
         }
-        let index = local_y / item_h;
-        let count = self.items.len() as i32;
-        if index >= 0 && index < count {
-            Some(index as usize)
+        let index = (local_y / item_h) as usize;
+        if index < self.items.len() {
+            Some(index)
         } else {
             None
         }
+    }
+
+    /// Moves the keyboard highlight to `index` and scrolls it into view.
+    fn highlight(&self, index: usize) {
+        *self.hovered.borrow_mut() = Some(index);
+        self.ensure_visible(index);
     }
 }
 
@@ -693,11 +897,28 @@ impl View for ComboDropdown {
         let content_w = self.combo_width - padding.left - padding.right;
         let content_h = item_h * self.items.len() as i32;
 
+        // A list too tall for the room the box found shows whole items only and
+        // scrolls the rest, the way the Windows dropdown does. One item always
+        // shows, however little room there is — a sliver of a popup is no use.
+        let available_h = (height.min(self.max_height) - padding.top - padding.bottom).max(0);
+        let visible_h = if content_h > available_h {
+            (available_h / item_h.max(1) * item_h).max(item_h)
+        } else {
+            content_h
+        };
+
         let total_w = (padding.left + content_w + padding.right).min(width);
-        let total_h = (padding.top + content_h + padding.bottom).min(height);
+        let total_h = padding.top + visible_h + padding.bottom;
 
         let r = rect((x, y), (x + total_w, y + total_h));
         self.set_rect(r);
+
+        self.v_scroll_visible.set(content_h > visible_h);
+        // Open showing the current selection, not always the top of the list.
+        if let Some(index) = *self.hovered.borrow() {
+            self.ensure_visible(index);
+        }
+        self.clamp_scroll();
         r
     }
 
@@ -707,32 +928,40 @@ impl View for ComboDropdown {
     }
 
     fn paint(&self, origin: Point<i32>, theme: &mut dyn Renderer) {
-        let state = self.state.borrow();
-        let mut r = state.rect;
+        let view_state = self.state.borrow().state;
+        let scale = self.state.borrow().scale;
+        let mut r = self.state.borrow().rect;
         r.move_by(origin);
-        let scale = state.scale;
 
         theme.push_clip();
         theme.clip_rect(r);
 
         // Background
-        theme.draw_component("edit.back", r, state.state);
+        theme.draw_component("edit.back", r, view_state);
 
-        let padding = state.padding.scaled(scale);
+        // Rows fill the popup up to its border, but their text has to line up
+        // with the closed box's, which clears the wider sunken bevel — so the
+        // text is measured from the popup's outer edge, not from the row's.
         let pad_left = (ITEM_PADDING_LEFT as f64 * scale).round() as i32;
-        let item_h = (ITEM_HEIGHT as f64 * scale).round() as i32;
+        let text_x = r.min.x + (FIELD_BORDER as f64 * scale).round() as i32 + pad_left;
+        let item_h = self.item_height().max(1);
+        let rows = self.body_rect(origin);
+        let scroll_y = self.scroll_y.get();
+
+        theme.push_clip();
+        theme.clip_rect(rows);
 
         let hovered = *self.hovered.borrow();
         let cached = self.cached_texts.borrow();
 
-        let content_x = r.min.x + padding.left;
-        let mut y = r.min.y + padding.top;
+        // Only the items the body can show are worth drawing.
+        let n = self.items.len();
+        let first = ((-scroll_y) / item_h).max(0) as usize;
+        let last = (((rows.height() - scroll_y).max(0) / item_h) as usize + 1).min(n);
 
-        for (i, _item) in self.items.iter().enumerate() {
-            let item_rect = rect(
-                (content_x, y),
-                (r.max.x - padding.right - 1, y + item_h),
-            );
+        for i in first..last {
+            let top = rows.min.y + i as i32 * item_h + scroll_y;
+            let item_rect = rect((rows.min.x, top), (rows.max.x, top + item_h));
 
             let text_color = if hovered == Some(i) {
                 theme.draw_rect(item_rect, theme.color("item_highlight"));
@@ -742,17 +971,36 @@ impl View for ComboDropdown {
             };
 
             if let Some(Some(text)) = cached.get(i) {
-                let text_x = content_x + pad_left;
-                let text_y = y + (item_h as f32 - text.height()) as i32 / 2;
+                let text_y = top + (item_h as f32 - text.height()) as i32 / 2;
                 theme.draw_text(text_x as f32, text_y as f32, text_color, text);
             }
+        }
+        drop(cached);
 
-            y += item_h;
+        theme.pop_clip();
+
+        // ---- Scrollbar ----
+        if self.v_scroll_visible.get() {
+            let unfocused = ViewState::no_focus();
+            let track = self.v_track_rect(origin);
+            let thumb = self.v_thumb_rect(origin);
+            let arrow_top = self.v_arrow_top_rect(origin);
+            let arrow_bottom = self.v_arrow_bottom_rect(origin);
+            for (arrow_rect, role) in [(arrow_top, "scrollbar.arrow.up"), (arrow_bottom, "scrollbar.arrow.down")] {
+                theme.draw_component("button.back", arrow_rect, unfocused);
+                theme.draw_component("button.body", arrow_rect, unfocused);
+                theme.draw_component(role, arrow_rect, unfocused);
+            }
+            theme.draw_component("scrollbar.track", track, unfocused);
+            let mut thumb_state = unfocused;
+            thumb_state.pressed = self.dragging_thumb.get();
+            theme.draw_component("button.back", thumb, thumb_state);
+            theme.draw_component("button.body", thumb, thumb_state);
         }
 
         // Border: plain solid outline (a dropdown is a floating popup, not a
         // sunken field).
-        theme.draw_component("popup.body", r, state.state);
+        theme.draw_component("popup.body", r, view_state);
 
         theme.pop_clip();
     }
@@ -892,6 +1140,22 @@ impl View for ComboDropdown {
     fn click(&self, _ui: &mut UI) -> bool { false }
 
     fn on_mouse_move(&self, _ui: &mut UI, position: Point<i32>) -> bool {
+        if self.dragging_thumb.get() {
+            let r = self.state.borrow().rect;
+            let local_y = position.y - r.min.y;
+            let bh = self.body_height().max(1);
+            let ch = self.content_height().max(1);
+            let track_len = self.v_track_rect(point(0, 0)).height().max(1);
+            let thumb_len = ((bh as f64 / ch as f64) * track_len as f64).round() as i32;
+            let thumb_len = thumb_len.max(MIN_THUMB_SIZE).min(track_len.max(MIN_THUMB_SIZE));
+            let scroll_range = (ch - bh).max(1) as f64;
+            let thumb_range = (track_len - thumb_len).max(1) as f64;
+            let dy = (local_y - self.drag_anchor_y.get()) as f64;
+            let new_scroll = self.drag_anchor_scroll.get() as f64 - dy * (scroll_range / thumb_range);
+            self.scroll_y.set(new_scroll.round() as i32);
+            self.clamp_scroll();
+            return true;
+        }
         let hit_item = self.get_hit_item(position.x, position.y);
         let old = *self.hovered.borrow();
         *self.hovered.borrow_mut() = hit_item;
@@ -902,14 +1166,51 @@ impl View for ComboDropdown {
         if !matches!(button, MouseButton::Left) {
             return false;
         }
-        let hit = self.get_hit_item(position.x, position.y);
-        *self.pressed.borrow_mut() = hit;
-        hit.is_some()
+        // A press anywhere inside the popup is the popup's own — consuming it
+        // keeps the scrollbar and the border from dismissing the dropdown.
+        if !self.state.borrow().rect.hit((position.x, position.y)) {
+            return false;
+        }
+
+        if self.v_scroll_visible.get() {
+            let zero = point(0, 0);
+            let item_h = self.item_height().max(1);
+            let thumb = self.v_thumb_rect(zero);
+            if thumb.hit((position.x, position.y)) {
+                self.dragging_thumb.set(true);
+                self.drag_anchor_y.set(position.y - self.state.borrow().rect.min.y);
+                self.drag_anchor_scroll.set(self.scroll_y.get());
+                return true;
+            }
+            if self.v_arrow_top_rect(zero).hit((position.x, position.y)) {
+                self.scroll_y.set(self.scroll_y.get() + item_h);
+                self.clamp_scroll();
+                return true;
+            }
+            if self.v_arrow_bottom_rect(zero).hit((position.x, position.y)) {
+                self.scroll_y.set(self.scroll_y.get() - item_h);
+                self.clamp_scroll();
+                return true;
+            }
+            if self.v_scrollbar_rect(zero).hit((position.x, position.y)) {
+                // Track click beside the thumb: page-scroll toward it.
+                let dir = if position.y < thumb.min.y { 1 } else { -1 };
+                self.scroll_y.set(self.scroll_y.get() + dir * self.body_height());
+                self.clamp_scroll();
+                return true;
+            }
+        }
+
+        *self.pressed.borrow_mut() = self.get_hit_item(position.x, position.y);
+        true
     }
 
     fn on_mouse_button_up(&self, ui: &mut UI, position: Point<i32>, button: MouseButton) -> bool {
         if !matches!(button, MouseButton::Left) {
             return false;
+        }
+        if self.dragging_thumb.replace(false) {
+            return true;
         }
         let pressed = self.pressed.borrow_mut().take();
         let hit = self.get_hit_item(position.x, position.y);
@@ -924,9 +1225,32 @@ impl View for ComboDropdown {
         false
     }
 
+    fn on_mouse_wheel_scroll(&self, _ui: &mut UI, position: Point<i32>, distance: MouseScrollDistance) -> bool {
+        if !self.state.borrow().rect.hit((position.x, position.y)) {
+            return false;
+        }
+        if !self.v_scroll_visible.get() {
+            // Nothing to scroll, but the list is under the pointer: the view
+            // behind the popup must not scroll instead.
+            return true;
+        }
+        let item_h = self.item_height().max(1);
+        let bh = self.body_height();
+        let dy = match distance {
+            MouseScrollDistance::Lines { y, .. } => y as i32 * item_h,
+            MouseScrollDistance::Pixels { y, .. } => y as i32,
+            MouseScrollDistance::Pages { y, .. } => y as i32 * bh,
+        };
+        self.scroll_y.set(self.scroll_y.get() + dy);
+        self.clamp_scroll();
+        true
+    }
+
     // Keyboard navigation while the dropdown is open (dispatched as an
-    // overlay, before the root tree): arrows move the highlight, Enter
-    // commits it. Esc is handled by the generic popup-dismiss path.
+    // overlay, before the root tree): arrows, Page and Home/End move the
+    // highlight — scrolling it into view when the list is longer than the
+    // popup — and Enter commits it. Esc is handled by the generic
+    // popup-dismiss path.
     fn on_key_down(&self, ui: &mut UI, virtual_key_code: Option<VirtualKeyCode>, _scancode: KeyScancode, _state: ModifiersState) -> bool {
         let count = self.items.len();
         if count == 0 {
@@ -934,23 +1258,31 @@ impl View for ComboDropdown {
         }
         let Some(code) = virtual_key_code else { return false; };
         let current = *self.hovered.borrow();
+        // A page is what the popup can show at once, one item at the very least.
+        let page = (self.body_height() / self.item_height().max(1)).max(1) as usize;
         match code {
             VirtualKeyCode::Down => {
-                let next = current.map(|i| (i + 1).min(count - 1)).unwrap_or(0);
-                *self.hovered.borrow_mut() = Some(next);
+                self.highlight(current.map(|i| (i + 1).min(count - 1)).unwrap_or(0));
                 true
             }
             VirtualKeyCode::Up => {
-                let next = current.map(|i| i.saturating_sub(1)).unwrap_or(count - 1);
-                *self.hovered.borrow_mut() = Some(next);
+                self.highlight(current.map(|i| i.saturating_sub(1)).unwrap_or(count - 1));
+                true
+            }
+            VirtualKeyCode::PageDown => {
+                self.highlight(current.map(|i| (i + page).min(count - 1)).unwrap_or(count - 1));
+                true
+            }
+            VirtualKeyCode::PageUp => {
+                self.highlight(current.map(|i| i.saturating_sub(page)).unwrap_or(0));
                 true
             }
             VirtualKeyCode::Home => {
-                *self.hovered.borrow_mut() = Some(0);
+                self.highlight(0);
                 true
             }
             VirtualKeyCode::End => {
-                *self.hovered.borrow_mut() = Some(count - 1);
+                self.highlight(count - 1);
                 true
             }
             VirtualKeyCode::Return | VirtualKeyCode::NumpadEnter => {

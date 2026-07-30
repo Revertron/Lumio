@@ -105,5 +105,5 @@ fn main() {
     // Force a relayout so the freshly-set data is laid out before first paint.
     let _ = &mut ui; // silence unused-mut if any path becomes optional in the future
 
-    lumio::run(ui, WindowConfig::new(TITLE, WIDTH, HEIGHT).center());
+    lumio::run(ui, WindowConfig::new(TITLE, WIDTH, HEIGHT).skin("dark").center());
 }

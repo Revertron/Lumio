@@ -638,12 +638,16 @@ impl View for TreeView {
         for i in first..last {
             let row = &flat[i];
             let row_top = body_origin.y + i as i32 * row_h + scroll_y;
-            let mut text_color = theme.color("text");
+            let text_color = theme.color("text");
 
+            // A selected row is an UNDERLAY, not a slab: the row carries an icon
+            // this view only tints, so it cannot flip the whole row's colours
+            // the way a text-only list can. Hence `row_selection` rather than
+            // `item_highlight` — a fill sized to be read through, with the
+            // label left in the body text colour.
             if selected == Some(i) {
                 let hl = rect((body_origin.x, row_top), (body_origin.x + bw, row_top + row_h));
-                theme.draw_rect(hl, theme.color("item_highlight"));
-                text_color = theme.color("item_highlight_text");
+                theme.draw_rect(hl, theme.color("row_selection"));
             }
 
             let chevron_x = body_origin.x + row.depth as i32 * indent;

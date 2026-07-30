@@ -9,6 +9,26 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 
 ### Changed
 
+- **The dark palette's selection is amber**, not the usual blue — warm against
+  its gray faces, and it leaves blue to mean "link". `selection`,
+  `item_highlight` and `progress_fill` are all `#E8A72A`, and
+  `item_highlight_text` is near-black rather than white: amber is an
+  intrinsically light hue, so dimming it to a blue's luminance drains the chroma
+  and leaves brown. Bright with a dark label reads as gold and carries far more
+  contrast than the blue did — a selected row now stands 7.3:1 off the surface
+  where it used to manage 2.5:1, so *which* row is selected no longer rests on
+  the label alone. `Palette::classic()` is unchanged.
+- **`table_selection` is now `row_selection`**, and `TreeView` and `IconList`
+  draw it where they used to draw `item_highlight`. The distinction it names is
+  not about tables: a view that paints only its own text can invert that text
+  and use a saturated slab, but a view that paints content it does *not* own —
+  `TableView`'s arbitrary cell views, the icons `TreeView` and `IconList` merely
+  tint — cannot recolour that content to suit the fill. Those views need a fill
+  meant to be read *through*, and a bright one strands a pale icon on it. The
+  token is neutral in both palettes (`#505050` in dark, matching the menu
+  highlight) and the content keeps its own colours. **A skin overriding
+  `table_selection` must rename the key**; the old name is no longer read, and
+  an unknown token is silently ignored rather than reported.
 - **A `SplitPanel`'s divider is now the gap between the panes, not a painted
   line.** Native split views don't draw a rule down the seam, and neither does
   this one any more: both panes are clipped to their own half, and the
@@ -50,9 +70,35 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
   for an app that lets the user pick a terminal font. Whether a family is
   monospaced can only be told by loading it, so the scan reads them on several
   threads; it is still slow enough to be worth asking once and keeping.
+- **A `ComboBox` dropdown scrolls.** A list longer than the room the popup had
+  simply stopped: everything past the last visible item was unreachable by mouse
+  or keyboard. The popup now shows as many whole items as fit and scrolls the
+  rest, with the wheel, a drag-able scrollbar, its arrows and a page-click on the
+  track. It opens scrolled to the current selection rather than to the top, and
+  Up/Down/PageUp/PageDown/Home/End move the highlight and bring it into view.
+- **A closed `ComboBox` steps through its items with Up/Down** when it has
+  focus, as it does on Windows, without opening the list. The change goes
+  through the same path a dropdown click takes, so `SelectionChanged` fires
+  identically either way.
+- **The `indicator` colour token** — the tick in a `CheckBox` and the dot in a
+  `RadioButton`. They were painted in `@text`, which left a theme no way to
+  accent them without moving body text with it. Black in the classic palette, so
+  it renders as before; amber in the dark one.
 
 ### Fixed
 
+- **A `ComboBox` dropdown that does not fit below the box opens above it.** It
+  used to be shoved back inside the window, covering the box it belongs to.
+  Placement is now the one Windows uses: below when the whole list fits there,
+  flipped above when it fits there instead, otherwise on whichever side has more
+  room and shortened to it.
+- **A `ComboBox` could not be reopened from the keyboard** after its dropdown
+  was dismissed without a pick. Escape and a click outside are handled by the UI,
+  which has no way to tell the box its popup is gone, so the box went on
+  believing it was open and refused to open again.
+- **The highlight on a dropdown item reaches the popup border.** The popup's
+  padding was two dip where its outline is one, leaving a hairline of background
+  down every side of a selected row.
 - **A window that is off screen is no longer painted.** A minimized, hidden or
   fully occluded window kept rendering every frame the UI asked of it — wasted
   work at best, and on the GL backend a standing hazard: every call into a

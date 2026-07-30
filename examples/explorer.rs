@@ -186,5 +186,5 @@ fn main() {
         ui.relayout();
     }));
 
-    lumio::run(ui, WindowConfig::new(TITLE, WIDTH, HEIGHT).center());
+    lumio::run(ui, WindowConfig::new(TITLE, WIDTH, HEIGHT).skin("dark").center());
 }

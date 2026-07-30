@@ -74,11 +74,14 @@ impl Palette {
             ("text".to_string(), 0xFF000000),
             ("text_hint".to_string(), 0xFF808080),
             ("selection".to_string(), 0xFF000080),
+            // The tick in a CheckBox and the dot in a RadioButton. Its own
+            // token so a theme can accent them without touching body text.
+            ("indicator".to_string(), 0xFF000000),
             ("item_highlight".to_string(), 0xFF0000C0),
             ("item_highlight_text".to_string(), 0xFFFFFFFF),
             ("menu_highlight".to_string(), 0xFFBAB6AE),
             ("menu_highlight_text".to_string(), 0xFF000000),
-            ("table_selection".to_string(), 0xFFCCE0F5),
+            ("row_selection".to_string(), 0xFFCCE0F5),
             ("table_separator".to_string(), 0xFFD0D0D0),
             ("progress_fill".to_string(), 0xFF000080),
             ("outline".to_string(), 0xFF808080),
@@ -106,14 +109,26 @@ impl Palette {
             ("border_dark".to_string(), 0xFF161616),
             ("text".to_string(), 0xFFE0E0E0),
             ("text_hint".to_string(), 0xFF6A6A6A),
-            ("selection".to_string(), 0xFF264F78),
-            ("item_highlight".to_string(), 0xFF3060A8),
-            ("item_highlight_text".to_string(), 0xFFFFFFFF),
+            // Selection is amber rather than the usual blue: warm against the
+            // gray faces, and it leaves blue to mean "link". Amber is a light
+            // hue — dimming it to a blue's luminance turns it brown — so these
+            // stay bright and take dark text instead.
+            ("selection".to_string(), 0xFFE8A72A),
+            // Tick and dot carry the accent here rather than the body text
+            // colour, so a checked control reads as "on" at a glance.
+            ("indicator".to_string(), 0xFFE8A72A),
+            ("item_highlight".to_string(), 0xFFE8A72A),
+            ("item_highlight_text".to_string(), 0xFF1A1A1A),
             ("menu_highlight".to_string(), 0xFF505050),
             ("menu_highlight_text".to_string(), 0xFFE0E0E0),
-            ("table_selection".to_string(), 0xFF2A4D6E),
+            // Neutral, like the menu highlight. Views that paint content they
+            // don't own — TableView's cell views, TreeView's and IconList's
+            // icons — draw this UNDER it and leave the content's own colours
+            // alone, so it is the one selection surface that cannot carry the
+            // accent and stay readable.
+            ("row_selection".to_string(), 0xFF505050),
             ("table_separator".to_string(), 0xFF454545),
-            ("progress_fill".to_string(), 0xFF2D7DD2),
+            ("progress_fill".to_string(), 0xFFE8A72A),
             ("outline".to_string(), 0xFF6A6A6A),
             ("focus".to_string(), 0xFF808080),
             ("tooltip_back".to_string(), 0xFF202020),

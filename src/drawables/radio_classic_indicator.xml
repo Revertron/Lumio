@@ -4,7 +4,7 @@
         <layer-list>
             <item>
                 <shape type="circle" radius="22.5%">
-                    <solid color="@text"/>
+                    <solid color="@indicator"/>
                 </shape>
             </item>
         </layer-list>

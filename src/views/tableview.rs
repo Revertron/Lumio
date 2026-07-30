@@ -994,7 +994,7 @@ impl View for TableView {
 
             // Selection highlight (light underlay so cell text remains readable)
             if self.selected_raw.get() == Some(raw) {
-                theme.draw_rect(row_rect, theme.color("table_selection"));
+                theme.draw_rect(row_rect, theme.color("row_selection"));
             }
 
             // Cells — each cell's own paint() draws at (origin + cell.rect.min).
