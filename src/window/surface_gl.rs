@@ -5,14 +5,26 @@
 //! Lumio owns the winit window and the GL context. The glutin setup mirrors what
 //! the vendored speedy2d does internally (`window_internal_glutin.rs`); it was
 //! validated standalone by the Phase-1 spike before landing here.
+//!
+//! ## Context loss
+//!
+//! A GL context does not survive the graphics driver being replaced underneath
+//! it — updating the display driver, disabling the adapter, a TDR. Afterwards
+//! every `make_current`/`swap_buffers` fails and the window is frozen on its
+//! last frame, which reads as a hung app. [`GlSurface`] therefore splits its GL
+//! objects into a replaceable [`Live`] half: the first failure drops it, and the
+//! surface then rebuilds against the same window and [`Config`] on a backoff
+//! schedule until the adapter comes back. See `WindowState::render` for the
+//! matching rule that an off-screen window is not painted at all.
 
 use std::ffi::CString;
 use std::num::NonZeroU32;
 use std::rc::Rc;
+use std::time::{Duration, Instant};
 
-use log::error;
+use log::{debug, error, info, warn};
 
-use glutin::config::{ConfigTemplateBuilder, GlConfig};
+use glutin::config::{Config, ConfigTemplateBuilder, GlConfig};
 use glutin::context::{
     ContextApi, ContextAttributesBuilder, NotCurrentGlContext, PossiblyCurrentContext,
     PossiblyCurrentGlContext, Version,
@@ -32,6 +44,13 @@ use super::RenderSurface;
 use crate::drawing::{DrawableRegistry, Palette};
 use crate::themes::{RendererGL, ImageCache};
 use crate::ui::UI;
+
+/// Rebuild pacing after a context loss. A driver install can keep the adapter
+/// unavailable for tens of seconds, so attempts continue indefinitely, backing
+/// off from `RETRY_MIN` to `RETRY_MAX` — neither hammering a driver that is
+/// mid-install nor giving up before it returns.
+const RETRY_MIN: Duration = Duration::from_millis(250);
+const RETRY_MAX: Duration = Duration::from_secs(2);
 
 /// GL backend: a stateless window + surface factory. Each window gets its own
 /// glutin display/context/surface/renderer — Lumio doesn't share GL resources
@@ -63,7 +82,7 @@ impl GlBackend {
                         .expect("no GL config")
                 })
         }));
-        let (mut window, gl_config) = match built {
+        let (window, gl_config) = match built {
             Ok(Ok(r)) => r,
             Ok(Err(e)) => {
                 error!("window: GL display build failed: {e}");
@@ -75,22 +94,9 @@ impl GlBackend {
             }
         };
 
-        let gl_display = gl_config.display();
-        let raw = window.as_ref().and_then(|w| w.window_handle().ok()).map(|h| h.as_raw());
-        let context_attributes = ContextAttributesBuilder::new()
-            .with_context_api(ContextApi::OpenGl(Some(Version::new(2, 0))))
-            .build(raw);
-        let not_current = match unsafe { gl_display.create_context(&gl_config, &context_attributes) } {
-            Ok(c) => c,
-            Err(e) => {
-                error!("window: GL create_context failed: {e}");
-                return None;
-            }
-        };
-
         // On X11 the window must be (re)created to match the chosen config;
         // elsewhere DisplayBuilder already produced it.
-        let window: Window = match window.take() {
+        let window: Window = match window {
             Some(w) => w,
             None => match glutin_winit::finalize_window(event_loop, attrs, &gl_config) {
                 Ok(w) => w,
@@ -101,106 +107,240 @@ impl GlBackend {
             },
         };
 
-        let surf_attrs = match window.build_surface_attributes(SurfaceAttributesBuilder::default()) {
-            Ok(a) => a,
-            Err(e) => {
-                error!("window: build_surface_attributes failed: {e}");
-                return None;
-            }
-        };
-        let surface = match unsafe { gl_display.create_window_surface(&gl_config, &surf_attrs) } {
-            Ok(s) => s,
-            Err(e) => {
-                error!("window: create_window_surface failed: {e}");
-                return None;
-            }
-        };
-        let context = match not_current.make_current(&surface) {
-            Ok(c) => c,
-            Err(e) => {
-                error!("window: make_current failed: {e}");
-                return None;
-            }
-        };
-        let _ = surface.set_swap_interval(&context, SwapInterval::Wait(NonZeroU32::new(1).unwrap()));
-
         let size = window.inner_size();
         let (w, h) = (size.width.max(1), size.height.max(1));
-        let renderer = match unsafe {
-            GLRenderer::new_for_gl_context(UVec2::new(w, h), |symbol: &str| {
-                let symbol = CString::new(symbol).unwrap();
-                gl_display.get_proc_address(symbol.as_c_str())
-            })
-        } {
-            Ok(r) => r,
+        let live = match Live::create(&gl_config, &window, w, h) {
+            Ok(live) => live,
             Err(e) => {
-                error!("window: GLRenderer creation failed: {e}");
+                error!("window: {e}");
                 return None;
             }
         };
 
         let window = Rc::new(window);
         let gl_surface = GlSurface {
-            surface,
-            context,
-            renderer,
+            live: Some(live),
             image_cache: ImageCache::new(),
+            config: gl_config,
             width: w,
             height: h,
-            _window: Rc::clone(&window),
+            gl_failures: 0,
+            rebuilds: 0,
+            retry_at: Instant::now(),
+            retry_backoff: RETRY_MIN,
+            window: Rc::clone(&window),
         };
         Some((window, gl_surface))
+    }
+}
+
+/// The volatile half of a [`GlSurface`]: everything a lost context invalidates
+/// and a rebuild replaces. Kept together so the whole set can be dropped and
+/// recreated as a unit.
+struct Live {
+    surface: GlutinSurface<WindowSurface>,
+    context: PossiblyCurrentContext,
+    renderer: GLRenderer,
+}
+
+impl Live {
+    /// Build the GL surface, context and renderer for `window` against
+    /// `config`. Shared by first-time creation and post-loss rebuild, so a
+    /// rebuilt context is set up exactly like the original one. The error is
+    /// returned rather than logged: a first-time failure is worth an `error!`,
+    /// while a retry during a driver install is expected and merely noisy.
+    fn create(config: &Config, window: &Window, width: u32, height: u32) -> Result<Live, String> {
+        let gl_display = config.display();
+        let raw = window.window_handle().ok().map(|h| h.as_raw());
+        let context_attributes = ContextAttributesBuilder::new()
+            .with_context_api(ContextApi::OpenGl(Some(Version::new(2, 0))))
+            .build(raw);
+        let not_current = unsafe { gl_display.create_context(config, &context_attributes) }
+            .map_err(|e| format!("GL create_context failed: {e}"))?;
+
+        let surf_attrs = window
+            .build_surface_attributes(SurfaceAttributesBuilder::default())
+            .map_err(|e| format!("build_surface_attributes failed: {e}"))?;
+        let surface = unsafe { gl_display.create_window_surface(config, &surf_attrs) }
+            .map_err(|e| format!("create_window_surface failed: {e}"))?;
+        let context = not_current
+            .make_current(&surface)
+            .map_err(|e| format!("make_current failed: {e}"))?;
+        let _ = surface.set_swap_interval(&context, SwapInterval::Wait(NonZeroU32::new(1).unwrap()));
+
+        let renderer = unsafe {
+            GLRenderer::new_for_gl_context(UVec2::new(width.max(1), height.max(1)), |symbol: &str| {
+                let symbol = CString::new(symbol).unwrap();
+                gl_display.get_proc_address(symbol.as_c_str())
+            })
+        }
+        .map_err(|e| format!("GLRenderer creation failed: {e}"))?;
+
+        Ok(Live { surface, context, renderer })
     }
 }
 
 /// Per-window GL render target: the glutin surface + (current) context plus the
 /// speedy2d renderer and this window's GPU image cache.
 pub struct GlSurface {
-    surface: GlutinSurface<WindowSurface>,
-    context: PossiblyCurrentContext,
-    renderer: GLRenderer,
+    /// The GL objects, or `None` between losing the context and a successful
+    /// rebuild. Declared first so it drops before the image cache and the
+    /// window, as these fields did when they were spelled out here.
+    live: Option<Live>,
     image_cache: ImageCache,
+    /// The config the context and surface are built from, kept so a rebuild can
+    /// reuse it. Reusing it is what makes an in-place rebuild portable: on X11
+    /// the window was created to match this config's visual, so a *different*
+    /// config would require a new window too.
+    config: Config,
     width: u32,
     height: u32,
+    /// Consecutive frames that failed to present (`make_current` or
+    /// `swap_buffers`); reset by the first frame that presents cleanly. Drives
+    /// the rate-limited logging in [`Self::note_failure`].
+    gl_failures: u32,
+    /// Rebuild attempts since the context was lost; reset once one succeeds.
+    rebuilds: u32,
+    /// When the next rebuild may be attempted while `live` is `None`.
+    retry_at: Instant,
+    /// Current wait between rebuild attempts, growing to `RETRY_MAX`.
+    retry_backoff: Duration,
     /// Keeps the winit window alive until everything above is dropped (fields
-    /// drop in declaration order, so this must stay last). Closing a window
+    /// drop in declaration order, so this must stay last) — and provides the
+    /// window a rebuild builds its new surface against. Closing a window
     /// drops `WindowState`, whose `window` field comes first — without this
     /// reference the X11 window would be destroyed before glutin's
     /// `glXDestroyWindow`, which then fails with `GLXBadWindow`. X errors are
     /// asynchronous, so that error surfaces later inside an unrelated winit
     /// call (`XSetICFocus` → `check_errors`), which panics. The software
     /// surface is immune only because softbuffer holds the window itself.
-    _window: Rc<Window>,
+    window: Rc<Window>,
+}
+
+impl GlSurface {
+    /// Record a failed presentation step and log it, rate-limited: the first
+    /// failure, then every 600th, so a lost context leaves a trail in the log
+    /// without flooding it.
+    fn note_failure(&mut self, step: &str, err: glutin::error::Error) {
+        self.gl_failures += 1;
+        if self.gl_failures == 1 || self.gl_failures.is_multiple_of(600) {
+            error!(
+                "window: GL {step} failed on {} consecutive frame(s): {err} — the context is \
+                 probably lost (display-driver update, adapter reset); rebuilding it",
+                self.gl_failures
+            );
+        }
+    }
+
+    /// Give up on the current GL objects after a failed presentation step and
+    /// schedule a rebuild.
+    fn lose_context(&mut self, step: &str, err: glutin::error::Error) {
+        self.note_failure(step, err);
+        // Drop everything the dead context owned, including this window's
+        // textures: the cached `ImageHandle`s are names on a GPU that is gone.
+        // `RendererGL` re-uploads on a cache miss, so clearing costs one
+        // re-upload per image on the first frame that presents again.
+        self.live = None;
+        self.image_cache.clear();
+        // Try again on the very next frame: a one-off failure recovers at once,
+        // and a real outage starts backing off from there.
+        self.retry_at = Instant::now();
+        self.retry_backoff = RETRY_MIN;
+    }
+
+    /// Attempt to rebuild the GL objects, at most once per backoff interval.
+    /// Returns whether the surface is usable afterwards.
+    fn try_rebuild(&mut self) -> bool {
+        if Instant::now() < self.retry_at {
+            return false;
+        }
+        self.rebuilds += 1;
+        match Live::create(&self.config, &self.window, self.width, self.height) {
+            Ok(live) => {
+                self.live = Some(live);
+                warn!(
+                    "window: GL context rebuilt after {} failed frame(s) and {} attempt(s)",
+                    self.gl_failures, self.rebuilds
+                );
+                self.rebuilds = 0;
+                true
+            }
+            Err(e) => {
+                // Expected while a driver install has the adapter offline, so
+                // report periodically rather than once per attempt.
+                if self.rebuilds == 1 || self.rebuilds.is_multiple_of(10) {
+                    error!("window: GL rebuild attempt {} failed: {e}", self.rebuilds);
+                } else {
+                    debug!("window: GL rebuild attempt {} failed: {e}", self.rebuilds);
+                }
+                self.retry_backoff = (self.retry_backoff * 2).min(RETRY_MAX);
+                self.retry_at = Instant::now() + self.retry_backoff;
+                false
+            }
+        }
+    }
 }
 
 impl RenderSurface for GlSurface {
     fn resize(&mut self, width: u32, height: u32) {
         self.width = width;
         self.height = height;
+        // While the context is lost there is nothing to resize; the rebuild
+        // picks the new size up from the fields above.
+        let Some(live) = self.live.as_mut() else { return };
         if let (Some(w), Some(h)) = (NonZeroU32::new(width), NonZeroU32::new(height)) {
-            self.surface.resize(&self.context, w, h);
-            self.renderer.set_viewport_size_pixels(UVec2::new(width, height));
+            live.surface.resize(&live.context, w, h);
+            live.renderer.set_viewport_size_pixels(UVec2::new(width, height));
         }
     }
 
+    fn needs_repaint(&self) -> bool {
+        // Nothing in the UI schedules a frame while the context is down, so the
+        // loop has to keep asking — this is what drives `try_rebuild`.
+        self.live.is_none()
+    }
+
     fn paint(&mut self, ui: &UI, palette: &Palette, registry: &DrawableRegistry, scale: f64) {
+        // Lost context: retry on the backoff schedule, and skip the frame until
+        // one of those attempts succeeds.
+        if self.live.is_none() && !self.try_rebuild() {
+            return;
+        }
+
         // This window's context must be current before touching its GL resources
         // (multi-window: each window owns a context) — and before dropping evicted
         // ImageHandles, which free GL textures.
-        if self.context.make_current(&self.surface).is_err() {
-            return;
+        {
+            let Some(live) = self.live.as_mut() else { return };
+            if let Err(e) = live.context.make_current(&live.surface) {
+                self.lose_context("make_current", e);
+                return;
+            }
         }
         crate::image_source::drain_evictions(&mut self.image_cache);
 
         let (w, h) = (self.width as i32, self.height as i32);
         {
-            let renderer = &mut self.renderer;
+            let Some(live) = self.live.as_mut() else { return };
+            let renderer = &mut live.renderer;
             let image_cache = &mut self.image_cache;
             renderer.draw_frame(|graphics| {
                 let mut theme = RendererGL::new(graphics, registry, palette, image_cache, w, h, scale);
                 ui.paint(&mut theme);
             });
         }
-        let _ = self.surface.swap_buffers(&self.context);
+
+        {
+            let Some(live) = self.live.as_mut() else { return };
+            if let Err(e) = live.surface.swap_buffers(&live.context) {
+                self.lose_context("swap_buffers", e);
+                return;
+            }
+        }
+        if self.gl_failures > 0 {
+            info!("window: GL presentation recovered after {} failed frame(s)", self.gl_failures);
+            self.gl_failures = 0;
+            self.retry_backoff = RETRY_MIN;
+        }
     }
 }

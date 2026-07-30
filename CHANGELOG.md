@@ -53,6 +53,33 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 
 ### Fixed
 
+- **A window that is off screen is no longer painted.** A minimized, hidden or
+  fully occluded window kept rendering every frame the UI asked of it — wasted
+  work at best, and on the GL backend a standing hazard: every call into a
+  driver that might be replaced underneath it, such as a display-driver update
+  arriving while the app sits minimized, is a chance to lose the context or
+  wedge the loop, which is how an invisible window ends up impossible to
+  restore. Painting now stops while the window is away and resumes on the frame
+  it comes back, with any layout, skin or palette change queued in the meantime
+  applied first, so it wakes up showing current state. The window learns it is
+  off screen from `Occluded` where the platform reports it, from a zero-sized
+  `Resized` on Windows (where it does not), and from `UI::request_hide` or a
+  `hide_on_close` main window being dismissed to the tray.
+
+- **A GL window recovers from a lost context instead of freezing.** Replacing
+  the graphics driver under a running app — a driver update, an adapter reset —
+  invalidates its OpenGL context permanently, and both `make_current` and
+  `swap_buffers` failures were being discarded, so every later frame quietly did
+  nothing and the window sat frozen on its last one, indistinguishable from a
+  hung app and with not a line in the log to say so. Both are now checked: the
+  first failure is logged and drops the context, and the surface rebuilds it
+  against the same window and GL config, retrying from 250 ms out to 2 s for as
+  long as it takes, since a driver install can keep the adapter away for tens of
+  seconds. Cached textures are re-uploaded by the first frame that presents
+  again. Recovery is verified by fault injection; whether every driver reports a
+  real swap as a plain failure, rather than hanging the calling thread, is not
+  yet proven — so this may not be the whole fix for that scenario.
+
 - **A decorative `ImageView` no longer swallows the click meant for its
   parent.** It captured every press and consumed the matching release whether or
   not anything was listening to it, so a tile built the usual way — an image and

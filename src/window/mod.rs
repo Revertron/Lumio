@@ -44,6 +44,13 @@ pub trait RenderSurface {
     /// Paint the already-laid-out `ui` and present it. The surface owns its
     /// caches and per-frame eviction; `scale` is the current DPI scale.
     fn paint(&mut self, ui: &UI, palette: &Palette, registry: &DrawableRegistry, scale: f64);
+    /// Whether this surface needs another frame even though the UI has not
+    /// changed. The GL surface uses it to drive recovery after a context loss:
+    /// a frozen UI schedules no redraws, so without this nothing would ever
+    /// call `paint` again to retry the rebuild. Software rendering never does.
+    fn needs_repaint(&self) -> bool {
+        false
+    }
 }
 
 /// UI update cadence (matches the GL backend's 15ms ticker).
@@ -114,6 +121,15 @@ impl RenderSurface for Surface {
             Surface::Software(s) => s.paint(ui, palette, registry, scale),
         }
     }
+
+    fn needs_repaint(&self) -> bool {
+        match self {
+            #[cfg(feature = "backend-gl")]
+            Surface::Gl(s) => s.needs_repaint(),
+            #[cfg(feature = "backend-software")]
+            Surface::Software(s) => s.needs_repaint(),
+        }
+    }
 }
 
 /// A window awaiting creation (the main window before `resumed`, or a child from
@@ -153,6 +169,9 @@ struct WindowState {
     is_child: bool,
     /// Main-window-only: the close button hides the window instead of exiting.
     hide_on_close: bool,
+    /// Nothing of this window is on screen: minimized, hidden by the app, or
+    /// fully occluded. Such a window is not painted at all — see [`Self::render`].
+    hidden: bool,
 }
 
 impl WindowState {
@@ -160,6 +179,22 @@ impl WindowState {
     fn apply_cursor(&mut self) {
         if let Some(cursor) = crate::input::cursor_transition(self.ui.current_cursor(), &mut self.last_cursor) {
             self.window.set_cursor(to_cursor_icon(cursor));
+        }
+    }
+
+    /// Note whether the window is currently off screen (see [`Self::hidden`]).
+    ///
+    /// Becoming visible asks for a repaint: a restored window is usually the
+    /// same size it was before, so [`Self::on_resize`] alone would short-circuit
+    /// and never schedule one — leaving the window blank until something else
+    /// happened to request a redraw.
+    fn set_hidden(&mut self, hidden: bool) {
+        if self.hidden == hidden {
+            return;
+        }
+        self.hidden = hidden;
+        if !hidden {
+            self.window.request_redraw();
         }
     }
 
@@ -179,6 +214,16 @@ impl WindowState {
     /// Render one frame: one coalesced relayout for any pending resize / skin /
     /// palette change, then hand off to the backend surface to paint and present.
     fn render(&mut self) {
+        // An off-screen window is not painted: there is nothing to present, and
+        // on GL every call into a driver that may be swapped out underneath us
+        // (a driver update while the app sits minimized) risks wedging the loop
+        // or losing the context — which is how an invisible window ends up
+        // unrestorable. Pending layout/skin/palette changes stay queued and are
+        // applied by the first visible frame, so waking up shows current state.
+        if self.hidden {
+            return;
+        }
+
         // Coalesce a resize/scale-factor relayout and any pending skin/palette
         // change into a single layout pass. A full skin swap (forms + palette)
         // applies first; a palette-only swap then recolors on top.
@@ -346,6 +391,9 @@ impl App {
             pending_layout: false,
             is_child: pw.is_child,
             hide_on_close: pw.config.hide_on_close,
+            // A window created invisible (a tray app) paints nothing until it is
+            // shown; `WindowCommand::Show` clears this.
+            hidden: !pw.config.visible,
         };
         if self.main_window.is_none() {
             self.main_window = Some(id);
@@ -413,7 +461,11 @@ impl App {
         let mut quit = false;
         for id in ids {
             let Some(ws) = self.windows.get_mut(&id) else { continue };
-            if ws.ui.update() {
+            // `needs_repaint` keeps frames coming to a surface that is trying to
+            // recover from a GL context loss — an idle UI would schedule none,
+            // and the retry only runs inside `paint`. Pointless while hidden,
+            // where `render` returns before reaching the surface anyway.
+            if ws.ui.update() || (!ws.hidden && ws.surface.needs_repaint()) {
                 ws.window.request_redraw();
             }
             for req in ws.ui.take_window_requests() {
@@ -445,9 +497,13 @@ impl App {
                     ws.window.set_visible(true);
                     // Tray "show": also bring the window to front and focus it.
                     ws.window.focus_window();
+                    ws.set_hidden(false);
                     ws.window.request_redraw();
                 }
-                Some(WindowCommand::Hide) => ws.window.set_visible(false),
+                Some(WindowCommand::Hide) => {
+                    ws.window.set_visible(false);
+                    ws.set_hidden(true);
+                }
                 Some(WindowCommand::Quit) => quit = true,
                 None => {}
             }
@@ -494,11 +550,12 @@ impl ApplicationHandler<accesskit_winit::Event> for App {
             WindowEvent::CloseRequested => {
                 // Tray apps: the main window's close button hides it instead of
                 // exiting (mirrors speedy2d's `with_hide_on_close`).
-                if let Some(ws) = self.windows.get(&window_id)
+                if let Some(ws) = self.windows.get_mut(&window_id)
                     && ws.hide_on_close
                     && Some(window_id) == self.main_window
                 {
                     ws.window.set_visible(false);
+                    ws.set_hidden(true);
                     return;
                 }
                 self.handle_close(event_loop, window_id);
@@ -521,8 +578,16 @@ impl ApplicationHandler<accesskit_winit::Event> for App {
                 WindowEvent::Resized(size) => {
                     let maximized = ws.window.is_maximized();
                     ws.ui.update_window_geometry(None, Some((size.width, size.height)), maximized);
+                    // A zero size is how a minimize arrives on Windows (winit
+                    // forwards the raw `WM_SIZE` extents, which are 0×0 for
+                    // `SIZE_MINIMIZED`) — and `Occluded` is unsupported there, so
+                    // this is the only minimize signal on that platform.
+                    ws.set_hidden(size.width == 0 || size.height == 0);
                     ws.on_resize(size)
                 }
+                // Minimized / fully covered / app-hidden, on the platforms that
+                // report it (not Windows or Wayland in winit 0.30).
+                WindowEvent::Occluded(occluded) => ws.set_hidden(occluded),
                 WindowEvent::Moved(pos) => {
                     let maximized = ws.window.is_maximized();
                     ws.ui.update_window_geometry(Some((pos.x, pos.y)), None, maximized);
