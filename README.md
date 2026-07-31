@@ -49,11 +49,11 @@ from a software-only build. Design notes: `docs/unified_window_loop.md`.
 ```toml
 # Cargo.toml — the crate is published as `lumio-gui`, but imported as `lumio`.
 [dependencies]
-lumio-gui = "0.5"                             # GL backend (default)
+lumio-gui = "0.6"                             # GL backend (default)
 # software backend instead:
-# lumio-gui = { version = "0.5", default-features = false, features = ["backend-software"] }
+# lumio-gui = { version = "0.6", default-features = false, features = ["backend-software"] }
 # GL with automatic software fallback (e.g. for apps that must run in GPU-less VMs):
-# lumio-gui = { version = "0.5", features = ["backend-software"] }
+# lumio-gui = { version = "0.6", features = ["backend-software"] }
 ```
 
 ```rust
