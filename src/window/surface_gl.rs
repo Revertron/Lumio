@@ -16,8 +16,20 @@
 //! surface then rebuilds against the same window and [`Config`] on a backoff
 //! schedule until the adapter comes back. See `WindowState::render` for the
 //! matching rule that an off-screen window is not painted at all.
+//!
+//! ## Machines without OpenGL 2.0
+//!
+//! A context is not guaranteed to honour the version asked for: without
+//! `WGL_ARB_create_context` glutin falls back to a legacy `wglCreateContext`,
+//! which on a machine with no GPU driver (Remote Desktop, a VM without 3D, the
+//! Microsoft Basic Display Adapter) yields Windows' GDI generic OpenGL **1.1**.
+//! speedy2d assumes 2.0 and starts compiling shaders, so the first
+//! `glCreateShader` — a null entry point there — panics inside `glow` rather
+//! than failing. [`check_gl_version`] rejects such a context up front, turning
+//! the crash into the ordinary "GL setup failed" path: a software fallback in a
+//! dual-backend build (see `App::create_surface`), a logged error otherwise.
 
-use std::ffi::CString;
+use std::ffi::{CStr, CString, c_void};
 use std::num::NonZeroU32;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
@@ -29,7 +41,7 @@ use glutin::context::{
     ContextApi, ContextAttributesBuilder, NotCurrentGlContext, PossiblyCurrentContext,
     PossiblyCurrentGlContext, Version,
 };
-use glutin::display::{GetGlDisplay, GlDisplay};
+use glutin::display::{Display, GetGlDisplay, GlDisplay};
 use glutin::surface::{
     GlSurface as _, Surface as GlutinSurface, SurfaceAttributesBuilder, SwapInterval, WindowSurface,
 };
@@ -51,6 +63,67 @@ use crate::ui::UI;
 /// mid-install nor giving up before it returns.
 const RETRY_MIN: Duration = Duration::from_millis(250);
 const RETRY_MAX: Duration = Duration::from_secs(2);
+
+/// The GL version speedy2d's shader pipeline needs (it hard-codes
+/// `GLVersion::OpenGL2_0` in `GLRenderer::new_for_gl_context`).
+const MIN_GL_VERSION: (u32, u32) = (2, 0);
+
+/// `GL_VERSION` — the one GL enum used here, spelled out rather than pulling in
+/// a bindings crate for a single call.
+const GL_VERSION: u32 = 0x1F02;
+
+/// Check that the *current* context really implements OpenGL 2.0, before
+/// speedy2d assumes it does. `glGetString` is OpenGL 1.1, so it is exported by
+/// `opengl32.dll`/`libGL` even on the implementations this guards against.
+///
+/// A version string that cannot be parsed is accepted: a driver with unusual
+/// spelling should not be locked out, and the `catch_unwind` around the
+/// renderer still contains the fallout if it really is too old.
+fn check_gl_version(display: &Display) -> Result<(), String> {
+    type GlGetString = unsafe extern "system" fn(u32) -> *const u8;
+
+    let symbol = CString::new("glGetString").unwrap();
+    let ptr = display.get_proc_address(symbol.as_c_str());
+    if ptr.is_null() {
+        return Err("glGetString is missing — the GL context is unusable".to_string());
+    }
+    let get_string = unsafe { std::mem::transmute::<*const c_void, GlGetString>(ptr) };
+    let raw = unsafe { get_string(GL_VERSION) };
+    if raw.is_null() {
+        return Err("glGetString(GL_VERSION) returned null — the GL context is unusable".to_string());
+    }
+    let version = unsafe { CStr::from_ptr(raw.cast()) }.to_string_lossy().into_owned();
+
+    match parse_gl_version(&version) {
+        Some(found) if found < MIN_GL_VERSION => Err(format!(
+            "OpenGL {}.{} is required, but this context reports \"{version}\" — the machine has no \
+             usable GPU driver (Windows' GDI generic renderer, a Remote Desktop session, or a VM \
+             without 3D acceleration)",
+            MIN_GL_VERSION.0, MIN_GL_VERSION.1
+        )),
+        Some(_) => Ok(()),
+        None => {
+            warn!("window: unrecognized GL version string {version:?}; assuming it is new enough");
+            Ok(())
+        }
+    }
+}
+
+/// Pull the `major.minor` out of a `GL_VERSION` string. The spec fixes the
+/// leading token as `major.minor[.release]` optionally prefixed by `OpenGL ES`
+/// (`"4.6.0 NVIDIA 560.94"`, `"OpenGL ES 3.2 Mesa 24.0"`, `"1.1.0"`), so take
+/// the first token that starts with a digit and read the two numbers off it.
+fn parse_gl_version(version: &str) -> Option<(u32, u32)> {
+    let head = version
+        .split_whitespace()
+        .find(|token| token.starts_with(|c: char| c.is_ascii_digit()))?;
+    let mut parts = head.split('.');
+    let major = parts.next()?.parse().ok()?;
+    // Trailing junk on the minor part is tolerated: some drivers append a build
+    // tag directly ("3.2build1"), and the digits before it are still the minor.
+    let digits: String = parts.next()?.chars().take_while(char::is_ascii_digit).collect();
+    Some((major, digits.parse().ok()?))
+}
 
 /// GL backend: a stateless window + surface factory. Each window gets its own
 /// glutin display/context/surface/renderer — Lumio doesn't share GL resources
@@ -168,12 +241,25 @@ impl Live {
             .map_err(|e| format!("make_current failed: {e}"))?;
         let _ = surface.set_swap_interval(&context, SwapInterval::Wait(NonZeroU32::new(1).unwrap()));
 
-        let renderer = unsafe {
+        // Only meaningful with the context current, which it now is.
+        check_gl_version(&gl_display)?;
+
+        // speedy2d resolves the GL entry points it needs through the loader and
+        // calls them unconditionally; a missing one panics inside `glow` instead
+        // of returning an error. The version check above catches the case that
+        // actually happens in the field, and this contains anything else — an
+        // implementation that reports 2.0 yet omits an entry point — so it is a
+        // failed window rather than a dead app.
+        let renderer = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| unsafe {
             GLRenderer::new_for_gl_context(UVec2::new(width.max(1), height.max(1)), |symbol: &str| {
                 let symbol = CString::new(symbol).unwrap();
                 gl_display.get_proc_address(symbol.as_c_str())
             })
-        }
+        }))
+        .map_err(|_| {
+            "GLRenderer creation panicked — a GL entry point speedy2d needs is not available"
+                .to_string()
+        })?
         .map_err(|e| format!("GLRenderer creation failed: {e}"))?;
 
         Ok(Live { surface, context, renderer })
@@ -342,5 +428,35 @@ impl RenderSurface for GlSurface {
             self.gl_failures = 0;
             self.retry_backoff = RETRY_MIN;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{MIN_GL_VERSION, parse_gl_version};
+
+    #[test]
+    fn parses_real_gl_version_strings() {
+        assert_eq!(parse_gl_version("4.6.0 NVIDIA 560.94"), Some((4, 6)));
+        assert_eq!(parse_gl_version("3.3.0 - Build 27.20.100.9316"), Some((3, 3)));
+        assert_eq!(parse_gl_version("4.5 (Compatibility Profile) Mesa 24.0.9"), Some((4, 5)));
+        assert_eq!(parse_gl_version("OpenGL ES 3.2 Mesa 24.0.9"), Some((3, 2)));
+        // What the GDI generic implementation reports — the case this guards.
+        assert_eq!(parse_gl_version("1.1.0"), Some((1, 1)));
+        assert_eq!(parse_gl_version("3.2build1"), Some((3, 2)));
+    }
+
+    #[test]
+    fn unparseable_version_strings_yield_none() {
+        assert_eq!(parse_gl_version(""), None);
+        assert_eq!(parse_gl_version("OpenGL"), None);
+        assert_eq!(parse_gl_version("4"), None);
+    }
+
+    #[test]
+    fn only_below_2_0_is_rejected() {
+        assert!(parse_gl_version("1.1.0").unwrap() < MIN_GL_VERSION);
+        assert!(parse_gl_version("2.0.0").unwrap() >= MIN_GL_VERSION);
+        assert!(parse_gl_version("4.6.0 NVIDIA 560.94").unwrap() >= MIN_GL_VERSION);
     }
 }

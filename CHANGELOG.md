@@ -87,6 +87,20 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 
 ### Fixed
 
+- **A machine without OpenGL 2.0 no longer crashes the app on startup.** Where
+  there is no usable GPU driver — a Remote Desktop session, a VM without 3D
+  acceleration, Windows' Basic Display Adapter — the context created is the GDI
+  generic OpenGL 1.1 one, whatever version was asked for: without
+  `WGL_ARB_create_context` the request is not even looked at. speedy2d assumes
+  2.0 and compiles its shaders regardless, so `glCreateShader` — a null entry
+  point there — panicked inside `glow` before the first window ever appeared.
+  The GL backend now reads `GL_VERSION` once the context is current and refuses
+  anything below 2.0, which routes the failure into the path that already
+  existed for a GL setup error: a build with both backends falls back to
+  software rendering and opens normally, a GL-only build logs why it cannot
+  start instead of dying in a panic. Creating the renderer is wrapped in
+  `catch_unwind` as well, so an implementation that claims 2.0 yet omits an
+  entry point costs a window rather than the process.
 - **A `ComboBox` dropdown that does not fit below the box opens above it.** It
   used to be shoved back inside the window, covering the box it belongs to.
   Placement is now the one Windows uses: below when the whole list fits there,
